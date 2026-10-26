@@ -1,0 +1,37 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
+      PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
+      PORT: ${PORT:-3000}
+      OTEL_INGEST_TOKEN: ${OTEL_INGEST_TOKEN:?Set OTEL_INGEST_TOKEN in .env}
+      OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
+      TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-1500}
+      TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-10000}
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+
+volumes:
+  mysql_data:

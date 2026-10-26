@@ -1,0 +1,759 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  color-scheme: light;
+  --bg: #f2f2ee;
+  --dots: #c2c2b8;
+  --panel: #fff;
+  --panel2: #f3f3ef;
+  --border: #d6d6ce;
+  --text: #1a1c1e;
+  --muted: #585e64;
+  --accent: #0f766e;
+  --accent-ink: #fff;
+  --accent-soft: #d6efeb;
+  --danger: #b42318;
+  --danger-soft: #fbe4e1;
+  --shadow: 0 8px 28px rgba(20, 24, 28, 0.12), 0 1px 2px rgba(20, 24, 28, 0.08);
+  --edge: #8a9097;
+  --get-fg: #1d4ed8;
+  --get-bg: #e3ebfd;
+  --post-fg: #047857;
+  --post-bg: #daf3e8;
+  --put-fg: #9a4a06;
+  --put-bg: #fbebd3;
+  --patch-fg: #6d28d9;
+  --patch-bg: #ece4fb;
+  --delete-fg: #b91c1c;
+  --delete-bg: #fbe0e0;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.app {
+  background: var(--bg);
+  color: var(--text);
+}
+.app.dark {
+  color-scheme: dark;
+  --bg: #101214;
+  --dots: #2b3036;
+  --panel: #1a1d20;
+  --panel2: #22262a;
+  --border: #32373d;
+  --text: #e7e9eb;
+  --muted: #9ba2a9;
+  --accent: #2dd4bf;
+  --accent-ink: #06201c;
+  --accent-soft: #12312d;
+  --danger: #ff8a80;
+  --danger-soft: #43211f;
+  --shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  --edge: #5c646c;
+  --get-fg: #8ab4ff;
+  --get-bg: #1c2a47;
+  --post-fg: #5ee0a9;
+  --post-bg: #123528;
+  --put-fg: #f5b861;
+  --put-bg: #3c2a12;
+  --patch-fg: #bfa2ff;
+  --patch-bg: #2e2150;
+  --delete-fg: #ff8f8f;
+  --delete-bg: #422020;
+}
+.app button,
+.app input,
+.app select,
+.app textarea {
+  font: inherit;
+  color: inherit;
+}
+.app button {
+  cursor: pointer;
+}
+.float,
+.node-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.topbar {
+  @apply absolute z-30 flex items-center gap-3 rounded-2xl px-3.5;
+  left: 16px;
+  right: 16px;
+  top: 14px;
+  height: 62px;
+}
+.brand-mark,
+.framework-icon,
+.mock-icon {
+  @apply grid place-items-center rounded-lg;
+  width: 34px;
+  height: 34px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font:
+    600 12px "IBM Plex Mono",
+    monospace;
+}
+.brand {
+  @apply flex flex-col;
+  line-height: 1.1;
+}
+.brand strong {
+  @apply text-sm;
+}
+.brand span {
+  @apply mt-1 text-[9px] tracking-widest;
+  color: var(--muted);
+}
+.top-actions {
+  @apply ml-auto flex items-center gap-2;
+}
+.project-label {
+  @apply px-2 text-xs;
+  color: var(--muted);
+}
+.project-label i,
+.service-state i {
+  @apply mr-1.5 inline-block rounded-full;
+  width: 7px;
+  height: 7px;
+  background: #15966f;
+}
+.button {
+  @apply rounded-lg border px-3 py-2 text-xs font-medium;
+  border-color: var(--border);
+  background: var(--panel);
+}
+.button:hover,
+.icon-button:hover,
+.context-menu button:hover,
+.log-row:hover {
+  background: var(--panel2);
+}
+.button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.button.primary:disabled {
+  @apply opacity-60;
+}
+.button.small {
+  @apply px-2 py-1.5 text-[11px];
+}
+.button.danger-outline {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.icon-button {
+  @apply rounded-lg border text-lg;
+  width: 34px;
+  height: 34px;
+  border-color: var(--border);
+  background: var(--panel);
+  line-height: 1;
+}
+.canvas-shell {
+  @apply absolute inset-0;
+}
+.graph-flow {
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--dots) 1.1px, transparent 1.3px);
+  background-size: 22px 22px;
+}
+.vue-flow__background {
+  background-color: transparent;
+}
+.vue-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  bottom: 76px !important;
+  right: 16px !important;
+  background: var(--panel) !important;
+}
+.vue-flow__controls {
+  bottom: 76px !important;
+  left: 16px !important;
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.vue-flow__controls-button {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: var(--text) !important;
+}
+.vue-flow__controls-button svg,
+.vue-flow__controls-button svg path {
+  fill: var(--text);
+}
+.vue-flow__edge-path {
+  stroke: var(--edge);
+  stroke-width: 2;
+}
+.vue-flow__edge-text {
+  font-size: 10px;
+  fill: var(--muted);
+}
+.vue-flow__edge.observed .vue-flow__edge-path,
+.vue-flow__edge.running-edge .vue-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 2.7;
+  stroke-dasharray: 7 5;
+}
+.vue-flow__edge.observed .vue-flow__edge-path {
+  animation: dash 0.8s linear infinite;
+}
+.vue-flow__node {
+  width: 288px;
+}
+.service-node,
+.mock-node {
+  @apply relative rounded-2xl;
+  width: 288px;
+  overflow: visible;
+}
+.service-node.service-error {
+  border-color: var(--danger);
+  box-shadow:
+    0 0 0 2px var(--danger-soft),
+    var(--shadow);
+}
+.vue-flow__node.selected .node-card {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.node-header {
+  @apply flex items-center gap-2 border-b px-3;
+  height: 58px;
+  border-color: var(--border);
+}
+.node-heading {
+  @apply flex min-w-0 flex-1 flex-col;
+}
+.node-heading strong {
+  @apply truncate font-semibold;
+}
+.node-heading span,
+.service-state.off {
+  color: var(--muted);
+  font-size: 10px;
+}
+.framework-icon,
+.mock-icon {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  background: #0b7a6c;
+  color: white;
+  font:
+    500 11px "IBM Plex Mono",
+    monospace;
+}
+.mock-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.service-state {
+  @apply whitespace-nowrap rounded-xl px-2 py-1 text-[10px];
+}
+.service-state.on {
+  color: #047857;
+  background: var(--post-bg);
+}
+.service-state.off {
+  background: var(--panel2);
+}
+.service-state.off i {
+  background: transparent;
+  border: 1px solid var(--muted);
+}
+.endpoint-heading,
+.section-title,
+.endpoint-form-head {
+  @apply flex items-center justify-between;
+}
+.endpoint-heading {
+  @apply px-3;
+  height: 35px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+}
+.text-button.danger-text,
+.error-text {
+  color: var(--danger);
+}
+.endpoint-row {
+  @apply relative flex items-center gap-2 border-t border-dashed px-3;
+  height: 47px;
+  border-color: var(--border);
+  min-width: 0;
+}
+.endpoint-row code,
+.mock-copy span,
+.method-tag,
+.run-details pre,
+.log-row,
+.canvas-hint kbd {
+  font-family: "IBM Plex Mono", monospace;
+}
+.endpoint-row code {
+  @apply ml-auto truncate;
+  color: var(--muted);
+  max-width: 78px;
+  font-size: 10px;
+}
+.endpoint-name {
+  @apply max-w-24 truncate whitespace-nowrap;
+  font-size: 11px;
+}
+.method-tag {
+  @apply rounded px-1 py-0.5;
+  font-size: 9px;
+}
+.method-get,
+.severity.info {
+  color: var(--get-fg);
+  background: var(--get-bg);
+}
+.method-post,
+.severity.error,
+.severity.fatal {
+  color: var(--post-fg);
+  background: var(--post-bg);
+}
+.method-put,
+.severity.warn {
+  color: var(--put-fg);
+  background: var(--put-bg);
+}
+.method-patch {
+  color: var(--patch-fg);
+  background: var(--patch-bg);
+}
+.method-delete {
+  color: var(--delete-fg);
+  background: var(--delete-bg);
+}
+.empty-endpoints,
+.empty-logs {
+  @apply p-5 text-center;
+  color: var(--muted);
+  font-size: 11px;
+}
+.endpoint-handle,
+.mock-handle,
+.service-source {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid var(--panel) !important;
+  background: var(--edge) !important;
+}
+.endpoint-handle {
+  left: -5px !important;
+}
+.mock-handle {
+  right: -5px !important;
+}
+.service-source {
+  right: -5px !important;
+  top: 28px !important;
+}
+.error-indicator {
+  @apply border-t px-3 py-2;
+  color: var(--danger);
+  border-color: var(--border);
+  font-size: 10px;
+}
+.mock-row {
+  @apply relative flex items-center gap-2 border-b border-dashed px-2 py-2;
+  min-height: 62px;
+  border-color: var(--border);
+}
+.mock-row.running {
+  background: var(--accent-soft);
+}
+.run-button {
+  @apply grid place-items-center rounded-full;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink) !important;
+  font-size: 12px;
+}
+.run-button:disabled {
+  @apply opacity-50;
+}
+.mock-copy {
+  @apply flex min-w-0 flex-1 flex-col gap-1;
+}
+.mock-copy strong,
+.mock-copy span {
+  @apply truncate whitespace-nowrap;
+}
+.mock-copy strong {
+  font-size: 11px;
+}
+.mock-copy span {
+  color: var(--muted);
+  font-size: 9px;
+}
+.mock-copy b {
+  color: var(--accent);
+}
+.run-state {
+  @apply uppercase;
+  color: var(--muted);
+  font-size: 9px;
+}
+.run-state.completed {
+  color: #047857;
+}
+.run-state.failed {
+  color: var(--danger);
+}
+.add-mock {
+  @apply w-full p-2.5;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 10px;
+}
+.canvas-hint {
+  @apply absolute rounded-lg px-3 py-2;
+  left: 72px;
+  bottom: 20px;
+  color: var(--muted);
+  font-size: 10px;
+  pointer-events: none;
+}
+.canvas-hint kbd {
+  @apply rounded border px-1;
+  border-color: var(--border);
+  color: var(--text);
+}
+.canvas-hint span {
+  @apply px-1;
+}
+.context-menu {
+  @apply fixed z-[60] rounded-xl p-1;
+  min-width: 180px;
+}
+.context-menu button {
+  @apply w-full rounded-lg px-2.5 py-2 text-left text-xs;
+  border: 0;
+  background: transparent;
+}
+.context-menu b {
+  @apply mr-2 text-base;
+  color: var(--accent);
+}
+.loading-banner {
+  @apply absolute rounded-lg px-3 py-2;
+  left: 50%;
+  top: 86px;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 11px;
+}
+.toast {
+  @apply absolute z-[80] flex gap-3 rounded-lg p-3;
+  top: 88px;
+  right: 18px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  max-width: min(520px, calc(100vw - 36px));
+}
+.toast button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 17px;
+}
+.logs-toggle {
+  @apply absolute z-40 flex items-center gap-2.5 rounded-full px-3.5;
+  right: 16px;
+  bottom: 16px;
+  height: 46px;
+  min-width: 150px;
+  background: var(--panel);
+  font-size: 12px;
+}
+.logs-toggle.active {
+  border-color: var(--accent);
+}
+.logs-toggle > span:first-child {
+  color: var(--accent);
+}
+.logs-toggle em {
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+}
+.toggle-chevron {
+  @apply ml-auto;
+  color: var(--muted);
+}
+.logs-panel {
+  @apply absolute z-[35] flex flex-col overflow-hidden;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  height: max(20vh, 200px);
+  border-radius: 18px;
+}
+.logs-open .logs-toggle {
+  display: none;
+}
+.logs-toolbar {
+  @apply flex flex-wrap items-center gap-2 border-b px-3 py-2;
+  min-height: 54px;
+  border-color: var(--border);
+}
+.logs-title {
+  @apply mr-auto flex items-baseline gap-2;
+}
+.logs-title strong {
+  font-size: 14px;
+}
+.logs-title span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.control {
+  @apply w-full rounded-lg border px-2.5 py-2 text-[11px] outline-none;
+  border-color: var(--border);
+  background: var(--panel);
+}
+.control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.logs-toolbar .control {
+  width: auto;
+  min-width: 130px;
+  padding: 7px 9px;
+}
+.logs-toolbar .search {
+  width: min(250px, 26vw);
+}
+.logs-list {
+  @apply flex-1 overflow-auto px-2.5 py-1.5;
+}
+.log-row {
+  @apply grid items-center gap-2.5 rounded-lg px-2 py-1;
+  min-height: 30px;
+  grid-template-columns: 80px 72px 145px minmax(0, 1fr);
+  font-size: 10px;
+}
+.log-row time {
+  color: var(--muted);
+}
+.log-row strong {
+  @apply truncate whitespace-nowrap;
+  font-weight: 500;
+}
+.severity {
+  @apply justify-self-start rounded px-1 py-0.5;
+  font-size: 9px;
+}
+.log-message {
+  @apply truncate whitespace-nowrap;
+}
+.dialog-backdrop {
+  @apply fixed inset-0 z-[70] flex justify-end;
+  background: rgba(20, 24, 28, 0.4);
+}
+.side-dialog {
+  @apply flex h-full flex-col overflow-hidden;
+  width: min(520px, 100vw);
+  border-radius: 18px 0 0 18px;
+  background: var(--panel);
+}
+.dialog-header {
+  @apply flex items-center justify-between border-b px-5 py-4;
+  border-color: var(--border);
+}
+.dialog-header > div,
+.field,
+.switch-row span {
+  @apply flex flex-col;
+}
+.dialog-header strong {
+  font-size: 15px;
+}
+.dialog-header span {
+  @apply mt-1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.dialog-body {
+  @apply flex flex-1 flex-col gap-3 overflow-auto px-5 py-4;
+}
+.dialog-footer {
+  @apply flex justify-end gap-2 border-t px-5 py-3;
+  border-color: var(--border);
+}
+.field {
+  @apply min-w-0 flex-1 gap-1;
+}
+.field > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+.field-row {
+  @apply flex gap-2.5;
+}
+.switch-row {
+  @apply flex items-center justify-between rounded-lg border px-3 py-2.5;
+  border-color: var(--border);
+}
+.switch-row strong {
+  font-size: 11px;
+}
+.switch-row small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.switch-row input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.section-title {
+  @apply mt-1 gap-2;
+}
+.section-title strong {
+  font-size: 12px;
+}
+.endpoint-form-card {
+  @apply flex flex-col gap-2.5 rounded-xl border p-3;
+  border-color: var(--border);
+  background: var(--panel2);
+}
+.endpoint-form-head strong {
+  font-size: 11px;
+}
+.code-input {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  resize: vertical;
+}
+.delete-service {
+  align-self: flex-start;
+}
+.run-drawer {
+  @apply absolute z-30 overflow-hidden rounded-xl;
+  right: 16px;
+  top: 88px;
+  width: min(390px, calc(100vw - 32px));
+  max-height: 38vh;
+  background: var(--panel);
+}
+.run-drawer > header {
+  @apply flex items-center justify-between border-b px-3 py-2;
+  border-color: var(--border);
+}
+.run-drawer > header > div {
+  @apply flex items-center gap-2.5;
+}
+.run-drawer > header strong {
+  font-size: 12px;
+}
+.run-details {
+  @apply overflow-auto p-3;
+  max-height: calc(38vh - 42px);
+}
+.run-details pre {
+  @apply overflow-auto whitespace-pre-wrap;
+  margin: 0;
+  max-height: 150px;
+  word-break: break-word;
+  font-size: 10px;
+}
+.run-details small {
+  @apply mt-2 block;
+  color: var(--muted);
+  font-size: 9px;
+}
+.error-text {
+  font-size: 11px;
+}
+.nodrag {
+  pointer-events: all;
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@media (max-width: 720px) {
+  .topbar {
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    height: 54px;
+    padding: 0 9px;
+  }
+  .brand span,
+  .project-label,
+  .top-actions .secondary {
+    display: none;
+  }
+  .top-actions {
+    gap: 5px;
+  }
+  .button {
+    padding: 7px 8px;
+    font-size: 10px;
+  }
+  .canvas-hint,
+  .vue-flow__minimap {
+    display: none;
+  }
+  .logs-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    height: 34vh;
+  }
+  .logs-toolbar .search {
+    width: 100%;
+  }
+  .log-row {
+    grid-template-columns: 55px 55px 80px minmax(0, 1fr);
+    gap: 5px;
+    font-size: 9px;
+  }
+  .field-row {
+    flex-direction: column;
+  }
+  .side-dialog {
+    width: 100%;
+    border-radius: 0;
+  }
+}
