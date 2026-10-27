@@ -11,10 +11,8 @@ processors:
 
 exporters:
   otlp_http/app:
-    endpoint: http://app:3000
+    endpoint: http://app:3001
     encoding: json
-    headers:
-      Authorization: "Bearer ${env:OTEL_INGEST_TOKEN}"
 
 service:
   pipelines:

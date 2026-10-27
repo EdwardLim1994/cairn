@@ -1,13 +1,8 @@
 import { createError } from "h3";
-import { httpUrl, record } from "./graph-validation";
-
-const methods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+import { record } from "./graph-validation";
 
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
-  const method = typeof input.method === "string" ? input.method.toUpperCase() : "";
-  if (!methods.has(method))
-    throw createError({ statusCode: 400, statusMessage: "Unsupported REST method" });
   if (typeof input.targetEndpointId !== "string" || !input.targetEndpointId)
     throw createError({ statusCode: 400, statusMessage: "A service endpoint is required" });
   if (typeof input.name !== "string" || !input.name.trim() || input.name.trim().length > 255)
@@ -15,11 +10,18 @@ export function mockApiInput(value: unknown) {
   const description = input.description === undefined ? "" : input.description;
   if (typeof description !== "string")
     throw createError({ statusCode: 400, statusMessage: "Description must be text" });
+  let requestJson: unknown;
+  try {
+    const encoded = JSON.stringify(input.requestJson ?? {});
+    if (encoded === undefined) throw new Error();
+    requestJson = JSON.parse(encoded);
+  } catch {
+    throw createError({ statusCode: 400, statusMessage: "Mock API request must be valid JSON" });
+  }
   return {
     name: input.name.trim(),
-    method,
-    url: httpUrl(input.url, "Mock API URL"),
     targetEndpointId: input.targetEndpointId,
     description,
+    requestJson,
   };
 }

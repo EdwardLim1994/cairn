@@ -22,12 +22,12 @@ The system SHALL let users add a service node from the canvas context menu and r
 
 ### Requirement: Users can register service endpoints
 
-The system SHALL let users register each endpoint with a name, API type, method, manually entered URL, and JSON request value without requiring a request schema.
+The system SHALL let users register each endpoint with a name, API type, method, and manually entered URL.
 
 #### Scenario: Register an endpoint
 
 - **WHEN** a user adds an endpoint and saves the service
-- **THEN** the system stores and displays the endpoint name, API type, method, URL, and JSON request value
+- **THEN** the system stores the endpoint name, API type, method, and URL, and displays the endpoint name and method on its service node
 
 #### Scenario: Endpoint URL is entered manually
 

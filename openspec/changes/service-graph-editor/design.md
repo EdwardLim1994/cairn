@@ -47,7 +47,7 @@ Index telemetry by project and `trace_id`; also index logs by project, service, 
 
 ### Trigger REST calls on the server
 
-When a user runs a mock entry, create a run record, then call the selected endpoint using that endpoint's method, base URL plus endpoint URL, and registered JSON request. The mock row's method and URL remain entry metadata, as shown in the design. Return the actual HTTP status, headers, and response body; treat non-success HTTP status as a failed run while retaining its response.
+When a user runs a mock entry, create a run record, then call the selected endpoint using that endpoint's method and URL with the mock entry's JSON request. Return the actual HTTP status, headers, and response body; treat non-success HTTP status as a failed run while retaining its response.
 
 For GET requests, send query parameters in the manually entered URL and do not send a JSON body. Other supported methods send the configured JSON body. Validate URLs as HTTP or HTTPS and reject malformed JSON before saving. Use a request timeout and record timeout or connection failures on the run.
 

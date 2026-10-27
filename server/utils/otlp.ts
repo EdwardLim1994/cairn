@@ -1,13 +1,16 @@
-import { timingSafeEqual } from "node:crypto";
-import { createError, type H3Event } from "h3";
-import { getAppConfig } from "./config";
+import { gunzipSync } from "node:zlib";
+import { createError, readRawBody, type H3Event } from "h3";
 import { record } from "./graph-validation";
 
-export function requireIngestToken(event: H3Event) {
-  const expected = Buffer.from(getAppConfig().otelIngestToken);
-  const actual = Buffer.from(getHeader(event, "authorization")?.replace(/^Bearer\s+/i, "") ?? "");
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-    throw createError({ statusCode: 401, statusMessage: "Invalid telemetry ingestion token" });
+export async function readOtlpBody(event: H3Event, label: string) {
+  let body = await readRawBody(event, false);
+  if (!body) throw createError({ statusCode: 400, statusMessage: `${label} is required` });
+  try {
+    if (getHeader(event, "content-encoding")?.toLowerCase() === "gzip") body = gunzipSync(body);
+    return otlpObject(JSON.parse(body.toString("utf8")), label);
+  } catch (cause) {
+    if (cause && typeof cause === "object" && "statusCode" in cause) throw cause;
+    throw createError({ statusCode: 400, statusMessage: `${label} must be valid OTLP JSON` });
   }
 }
 

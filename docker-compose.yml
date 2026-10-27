@@ -18,6 +18,9 @@ services:
 
   app:
     build: .
+    networks:
+      - default
+      - java-microservices
     depends_on:
       mysql:
         condition: service_healthy
@@ -25,13 +28,17 @@ services:
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
       PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
-      PORT: ${PORT:-3000}
-      OTEL_INGEST_TOKEN: ${OTEL_INGEST_TOKEN:?Set OTEL_INGEST_TOKEN in .env}
+      PORT: ${PORT:-3001}
       OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
       TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-1500}
       TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-10000}
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - "${PORT:-3001}:${PORT:-3001}"
 
 volumes:
   mysql_data:
+
+networks:
+  java-microservices:
+    external: true
+    name: java-microservices_default

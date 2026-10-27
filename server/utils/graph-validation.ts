@@ -6,7 +6,6 @@ export type EndpointInput = {
   apiType: string;
   method: string;
   url: string;
-  requestJson: unknown;
 };
 
 export type ServiceInput = {
@@ -75,21 +74,12 @@ function endpoint(value: unknown): EndpointInput {
     throw createError({ statusCode: 400, statusMessage: "Unsupported REST method" });
   if (input.apiType !== "REST")
     throw createError({ statusCode: 400, statusMessage: "Only REST endpoints are supported" });
-  let requestJson: unknown;
-  try {
-    const encoded = JSON.stringify(input.requestJson ?? {});
-    if (encoded === undefined) throw new Error();
-    requestJson = JSON.parse(encoded);
-  } catch {
-    throw createError({ statusCode: 400, statusMessage: "Endpoint request must be valid JSON" });
-  }
   return {
     id: typeof input.id === "string" ? input.id : undefined,
     name: requiredText(input.name, "Endpoint name"),
     apiType: "REST",
     method,
     url: endpointPath(input.url),
-    requestJson,
   };
 }
 

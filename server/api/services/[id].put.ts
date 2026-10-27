@@ -50,7 +50,6 @@ export default defineEventHandler(async (event) => {
         apiType: endpoint.apiType,
         method: endpoint.method,
         url: endpoint.url,
-        requestJson: endpoint.requestJson,
       };
       if (endpoint.id)
         await tx

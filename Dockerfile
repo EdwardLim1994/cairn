@@ -13,10 +13,10 @@ WORKDIR /app
 ENV DATABASE_URL="" \
     OTEL_COLLECTOR_URL="" \
     PROJECT_ID="" \
-    PORT=3000 \
+    PORT=3001 \
     HOST=0.0.0.0
 
 COPY --from=build /app/.output ./.output
 
-EXPOSE 3000
+EXPOSE 3001
 CMD ["node", ".output/server/index.mjs"]

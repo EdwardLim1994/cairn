@@ -37,10 +37,9 @@ type Service = {
 type MockApi = {
   id?: string;
   name: string;
-  method: string;
-  url: string;
   targetEndpointId: string;
   description: string;
+  requestJson: unknown;
 };
 type LogEntry = {
   id: number;
@@ -69,6 +68,7 @@ const serviceDraft = ref<ServiceDraft>(newServiceDraft());
 const mockPanel = ref(false);
 const mockDraft = ref<MockApi[]>([]);
 const logsOpen = ref(false);
+const logsPanelHeight = ref(280);
 const logs = ref<LogEntry[]>([]);
 const logSearch = ref("");
 const logService = ref("");
@@ -102,7 +102,7 @@ function newServiceDraft(): ServiceDraft {
     framework: "",
     baseUrl: "http://localhost:3000",
     active: true,
-    endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/", requestJson: {} }],
+    endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
   };
 }
 
@@ -115,6 +115,12 @@ function endpointTarget(endpointId: string) {
     if (service.endpoints.some((endpoint) => endpoint.id === endpointId)) return service.id;
   }
   return undefined;
+}
+
+function mockEndpoint(entry: MockApi) {
+  return services.value
+    .flatMap((service) => service.endpoints)
+    .find((item) => item.id === entry.targetEndpointId);
 }
 
 function serviceNode(service: Service): Node {
@@ -347,10 +353,7 @@ function editService(id: string) {
     framework: service.framework,
     baseUrl: service.baseUrl,
     active: service.active,
-    endpoints: service.endpoints.map((endpoint) => ({
-      ...endpoint,
-      requestJson: endpoint.requestJson ?? {},
-    })),
+    endpoints: service.endpoints.map((endpoint) => ({ ...endpoint })),
   };
   serviceDialog.value = true;
 }
@@ -367,7 +370,6 @@ function addEndpoint() {
     apiType: "REST",
     method: "GET",
     url: "/",
-    requestJson: {},
   });
 }
 
@@ -375,19 +377,8 @@ function removeEndpoint(index: number) {
   serviceDraft.value.endpoints.splice(index, 1);
 }
 
-function parseRequest(endpoint: Endpoint) {
-  if (typeof endpoint.requestJson === "string") {
-    try {
-      endpoint.requestJson = JSON.parse(endpoint.requestJson);
-    } catch {
-      throw new Error(`Request for ${endpoint.name || "endpoint"} must be valid JSON`);
-    }
-  }
-}
-
 async function saveService() {
   try {
-    for (const endpoint of serviceDraft.value.endpoints) parseRequest(endpoint);
     const path = editingServiceId.value
       ? `/api/services/${editingServiceId.value}`
       : "/api/services";
@@ -413,7 +404,10 @@ async function deleteService(id: string) {
 }
 
 function openMockPanel() {
-  mockDraft.value = mockApis.value.map((entry) => ({ ...entry }));
+  mockDraft.value = mockApis.value.map((entry) => ({
+    ...entry,
+    requestJson: JSON.stringify(entry.requestJson ?? {}, null, 2),
+  }));
   mockPanel.value = true;
 }
 function addMockDraft() {
@@ -421,10 +415,9 @@ function addMockDraft() {
     services.value.flatMap((service) => service.endpoints).find((item) => item.id)?.id ?? "";
   mockDraft.value.push({
     name: "",
-    method: "GET",
-    url: "http://localhost:3000",
     targetEndpointId: endpoint,
     description: "",
+    requestJson: "{}",
   });
 }
 function removeMockDraft(index: number) {
@@ -433,11 +426,23 @@ function removeMockDraft(index: number) {
 
 async function saveMockDraft() {
   try {
-    const savedIds = new Set(mockDraft.value.flatMap((entry) => (entry.id ? [entry.id] : [])));
+    const entries = mockDraft.value.map((entry) => {
+      let requestJson: unknown;
+      try {
+        requestJson =
+          typeof entry.requestJson === "string"
+            ? JSON.parse(entry.requestJson.trim() || "{}")
+            : (entry.requestJson ?? {});
+      } catch {
+        throw new Error(`Request for ${entry.name || "mock API"} must be valid JSON`);
+      }
+      return { ...entry, requestJson };
+    });
+    const savedIds = new Set(entries.flatMap((entry) => (entry.id ? [entry.id] : [])));
     for (const entry of mockApis.value)
       if (entry.id && !savedIds.has(entry.id))
         await api(`/api/mock-apis/${entry.id}`, { method: "DELETE" });
-    for (const entry of mockDraft.value) {
+    for (const entry of entries) {
       if (entry.id) await api(`/api/mock-apis/${entry.id}`, { method: "PUT", body: entry });
       else await api("/api/mock-apis", { method: "POST", body: entry });
     }
@@ -515,16 +520,46 @@ function formatTime(value: string) {
     second: "2-digit",
   });
 }
+
+function resizeLogsPanel(event: PointerEvent) {
+  const startY = event.clientY;
+  const startHeight = logsPanelHeight.value;
+  const update = (move: PointerEvent) => {
+    logsPanelHeight.value = Math.max(
+      160,
+      Math.min(window.innerHeight - 32, startHeight + startY - move.clientY),
+    );
+  };
+  const stop = () => {
+    window.removeEventListener("pointermove", update);
+    window.removeEventListener("pointerup", stop);
+    window.removeEventListener("pointercancel", stop);
+  };
+  window.addEventListener("pointermove", update);
+  window.addEventListener("pointerup", stop, { once: true });
+  window.addEventListener("pointercancel", stop, { once: true });
+}
+
+function adjustLogsPanelHeight(delta: number) {
+  logsPanelHeight.value = Math.max(
+    160,
+    Math.min(window.innerHeight - 32, logsPanelHeight.value + delta),
+  );
+}
 const servicesForSelect = computed(() =>
   services.value.flatMap((service) =>
     service.endpoints.map((endpoint) => ({
       id: endpoint.id!,
-      label: `${service.name} Â· ${endpoint.name} (${endpoint.method})`,
+      label: `${service.name}  |  ${endpoint.name} (${endpoint.method})`,
     })),
   ),
 );
 
 onMounted(async () => {
+  logsPanelHeight.value = Math.max(
+    160,
+    Math.round(window.innerHeight * (window.innerWidth <= 720 ? 0.34 : 0.25)),
+  );
   await loadCanvas();
   await loadLogs();
 });
@@ -546,14 +581,21 @@ onMounted(async () => {
           {{ locked ? "Unlock canvas" : "Lock positions" }}
         </button>
         <button class="button primary" :disabled="saving" @click.stop="saveCanvas">
-          {{ saving ? "Savingâ€¦" : "Save graph" }}
+          {{ saving ? "Saving..." : "Save graph" }}
         </button>
         <button
           class="icon-button"
           :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
           @click.stop="dark = !dark"
         >
-          {{ dark ? "â˜¼" : "â—" }}
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle v-if="dark" cx="12" cy="12" r="4" />
+            <path
+              v-if="dark"
+              d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
+            />
+            <path v-else d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z" />
+          </svg>
         </button>
       </div>
     </header>
@@ -607,7 +649,7 @@ onMounted(async () => {
               </div>
               <div class="node-heading">
                 <strong>{{ data.name }}</strong
-                ><span>{{ data.framework }} Â· {{ data.endpoints.length }} endpoints</span>
+                ><span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>
               </div>
               <span class="service-state" :class="data.active ? 'on' : 'off'"
                 ><i></i>{{ data.active ? "Active" : "Inactive" }}</span
@@ -627,18 +669,17 @@ onMounted(async () => {
                 endpoint.method
               }}</span>
               <span class="endpoint-name">{{ endpoint.name }}</span>
-              <code>{{ endpoint.url }}</code>
             </div>
             <div v-if="!data.endpoints.length" class="empty-endpoints">No endpoints registered</div>
             <div v-if="observedErrorServices.includes(data.name)" class="error-indicator">
-              â— Error reported in observed trace
+              <span class="error-mark">!</span> Error reported for this service
             </div>
           </article>
         </template>
         <template #node-mockApis>
           <article class="mock-node node-card">
             <div class="node-header mock-header">
-              <div class="mock-icon">â–¶</div>
+              <div class="mock-icon">API</div>
               <div class="node-heading">
                 <strong>Mock APIs</strong><span>Reusable REST calls</span>
               </div>
@@ -665,12 +706,20 @@ onMounted(async () => {
                 :title="`Run ${entry.name}`"
                 @click.stop="runMock(entry)"
               >
-                {{ runningMockId === entry.id ? "â€¦" : "â–¶" }}
+                <svg
+                  v-if="runningMockId !== entry.id"
+                  class="ui-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="M8 5v14l11-7z" /></svg
+                ><span>{{ runningMockId === entry.id ? "Running..." : "Run" }}</span>
               </button>
               <div class="mock-copy">
                 <strong>{{ entry.name }}</strong
                 ><span
-                  ><b>{{ entry.method }}</b> Â· {{ entry.url }}</span
+                  ><b>{{ mockEndpoint(entry)?.method ?? "No endpoint" }}</b>
+                  {{ mockEndpoint(entry)?.url ?? "Select a service endpoint" }}</span
                 >
               </div>
               <span
@@ -684,13 +733,17 @@ onMounted(async () => {
           </article>
         </template>
       </VueFlow>
-      <div v-if="loading" class="loading-banner float">Loading saved graphâ€¦</div>
+      <div v-if="loading" class="loading-banner float">Loading saved graph...</div>
       <div v-if="errorMessage" class="toast error-toast" role="alert">
         <span>{{ errorMessage }}</span
-        ><button @click="errorMessage = ''">Ã—</button>
+        ><button aria-label="Dismiss error" @click="errorMessage = ''">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
       </div>
       <div class="canvas-hint float">
-        <kbd>Right click</kbd> to add a service <span>Â·</span> Drag from a node to an endpoint to
+        <kbd>Right click</kbd> to add a service <span> | </span> Drag from a node to an endpoint to
         connect
       </div>
       <div
@@ -699,7 +752,7 @@ onMounted(async () => {
         :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
         @click.stop
       >
-        <button @click="beginAddService"><b>ï¼‹</b> Add service node</button>
+        <button @click="beginAddService"><b>+</b> Add service node</button>
       </div>
     </section>
 
@@ -708,10 +761,25 @@ onMounted(async () => {
       :class="{ active: logsOpen }"
       @click.stop="logsOpen = !logsOpen"
     >
-      <span>â–¤</span><b>Logs</b><em>{{ logs.length }}</em
-      ><span class="toggle-chevron">{{ logsOpen ? "âŒ„" : "âŒƒ" }}</span>
+      <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h10" /></svg
+      ><b>Logs</b><em>{{ logs.length }}</em>
     </button>
-    <section v-if="logsOpen" class="logs-panel float">
+    <section
+      v-if="logsOpen"
+      class="logs-panel float"
+      :style="{ '--logs-panel-height': `${logsPanelHeight}px` }"
+    >
+      <div
+        class="logs-resize-handle"
+        role="separator"
+        aria-label="Resize logs panel"
+        aria-orientation="horizontal"
+        tabindex="0"
+        @pointerdown.prevent="resizeLogsPanel"
+        @keydown.up.prevent="adjustLogsPanelHeight(24)"
+        @keydown.down.prevent="adjustLogsPanelHeight(-24)"
+      ></div>
       <div class="logs-toolbar">
         <div class="logs-title">
           <strong>Logs</strong><span>{{ logs.length }} entries</span>
@@ -719,7 +787,7 @@ onMounted(async () => {
         <input
           v-model="logSearch"
           class="control search"
-          placeholder="Search log messagesâ€¦"
+          placeholder="Search log messages..."
           aria-label="Search log messages"
         />
         <select v-model="logService" class="control" aria-label="Filter by service">
@@ -739,16 +807,31 @@ onMounted(async () => {
           <option>INFO</option>
           <option>DEBUG</option>
         </select>
-        <button class="icon-button" aria-label="Refresh logs" @click="loadLogs">â†»</button
-        ><button class="icon-button" aria-label="Close logs" @click="logsOpen = false">Ã—</button>
+        <button class="icon-button" aria-label="Refresh logs" @click="loadLogs">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 7v5h-5M20 12a8 8 0 1 1-2.34-5.66L20 7" />
+          </svg>
+        </button>
+        <button class="icon-button" aria-label="Close logs" @click="logsOpen = false">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
       </div>
       <div class="logs-list">
         <div v-if="!logs.length" class="empty-logs">No logs match these filters.</div>
-        <div v-for="log in logs" :key="log.id" class="log-row">
+        <div
+          v-for="log in logs"
+          :key="log.id"
+          class="log-row"
+          :class="{ 'log-row-error': log.severity === 'ERROR' }"
+        >
           <time>{{ formatTime(log.timestamp) }}</time
           ><span class="severity" :class="log.severity.toLowerCase()">{{ log.severity }}</span
           ><strong>{{ log.serviceName }}</strong
-          ><span class="log-message">{{ log.message }}</span>
+          ><span class="log-message" :class="{ 'log-error-message': log.severity === 'ERROR' }">{{
+            log.message
+          }}</span>
         </div>
       </div>
     </section>
@@ -765,7 +848,11 @@ onMounted(async () => {
             <strong>{{ editingServiceId ? "Service settings" : "Add service node" }}</strong
             ><span>Configure the service and its endpoints</span>
           </div>
-          <button class="icon-button" aria-label="Close" @click="serviceDialog = false">Ã—</button>
+          <button class="icon-button" aria-label="Close" @click="serviceDialog = false">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
         </header>
         <div class="dialog-body">
           <label class="field"
@@ -799,7 +886,7 @@ onMounted(async () => {
           /></label>
           <div class="section-title">
             <strong>Available endpoints</strong
-            ><button class="button secondary small" @click="addEndpoint">ï¼‹ Add endpoint</button>
+            ><button class="button secondary small" @click="addEndpoint">+ Add endpoint</button>
           </div>
           <article
             v-for="(endpoint, index) in serviceDraft.endpoints"
@@ -836,20 +923,6 @@ onMounted(async () => {
             <label class="field"
               ><span>URL</span><input v-model="endpoint.url" class="control" placeholder="/orders"
             /></label>
-            <label class="field"
-              ><span>Request (JSON)</span
-              ><textarea
-                v-model="endpoint.requestJson"
-                class="control code-input"
-                rows="4"
-                placeholder="{}"
-                @blur="
-                  typeof endpoint.requestJson === 'string' &&
-                  !endpoint.requestJson.trim() &&
-                  (endpoint.requestJson = {})
-                "
-              ></textarea>
-            </label>
           </article>
           <button
             v-if="editingServiceId"
@@ -880,12 +953,16 @@ onMounted(async () => {
           <div>
             <strong>Mock APIs</strong><span>Calls linked to registered service endpoints</span>
           </div>
-          <button class="icon-button" aria-label="Close" @click="mockPanel = false">Ã—</button>
+          <button class="icon-button" aria-label="Close" @click="mockPanel = false">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
         </header>
         <div class="dialog-body">
           <div class="section-title">
             <strong>Registered mock APIs</strong
-            ><button class="button secondary small" @click="addMockDraft">ï¼‹ Add row</button>
+            ><button class="button secondary small" @click="addMockDraft">+ Add row</button>
           </div>
           <article
             v-for="(entry, index) in mockDraft"
@@ -902,24 +979,6 @@ onMounted(async () => {
               ><span>Name</span
               ><input v-model="entry.name" class="control" placeholder="e.g. Create order"
             /></label>
-            <div class="field-row">
-              <label class="field"
-                ><span>Method</span
-                ><select v-model="entry.method" class="control">
-                  <option>GET</option>
-                  <option>POST</option>
-                  <option>PUT</option>
-                  <option>PATCH</option>
-                  <option>DELETE</option>
-                </select></label
-              ><label class="field"
-                ><span>URL</span
-                ><input
-                  v-model="entry.url"
-                  class="control"
-                  placeholder="http://localhost:4000/orders"
-              /></label>
-            </div>
             <label class="field"
               ><span>Service endpoint</span
               ><select v-model="entry.targetEndpointId" class="control">
@@ -929,6 +988,15 @@ onMounted(async () => {
                 </option>
               </select></label
             >
+            <label class="field"
+              ><span>Request (JSON)</span
+              ><textarea
+                v-model="entry.requestJson"
+                class="control code-input"
+                rows="4"
+                placeholder="{}"
+              ></textarea>
+            </label>
             <label class="field"
               ><span>Description</span
               ><input v-model="entry.description" class="control" placeholder="Optional note"
@@ -956,10 +1024,14 @@ onMounted(async () => {
             v-for="result in Object.values(runResults).slice(-1)"
             :key="result.id"
             :class="`run-state ${result.status}`"
-            >{{ result.status }} Â· {{ result.responseStatus ?? "â€”" }}</span
+            >{{ result.status }} | {{ result.responseStatus ?? "-" }}</span
           >
         </div>
-        <button class="icon-button" @click="runResults = {}">Ã—</button>
+        <button class="icon-button" aria-label="Close run details" @click="runResults = {}">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
       </header>
       <div
         v-for="result in Object.values(runResults).slice(-1)"
@@ -969,7 +1041,7 @@ onMounted(async () => {
         <p v-if="result.error" class="error-text">{{ result.error }}</p>
         <pre>{{ prettyResponse(result.responseBody) }}</pre>
         <small v-if="result.traceId"
-          >Trace {{ result.traceId }} Â· flow
+          >Trace {{ result.traceId }} | flow
           {{ result.flow?.incomplete ? "incomplete" : result.flow?.status || "pending" }}</small
         >
       </div>

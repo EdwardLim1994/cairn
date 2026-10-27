@@ -6,16 +6,14 @@ import { ensureProject } from "../../utils/project";
 import {
   otlpArray,
   otlpAttributes,
-  otlpObject,
   otlpTimestamp,
-  requireIngestToken,
+  readOtlpBody,
   resourceAttributes,
   validHex,
 } from "../../utils/otlp";
 
 export default defineEventHandler(async (event) => {
-  requireIngestToken(event);
-  const body = otlpObject(await readBody(event), "Trace payload");
+  const body = await readOtlpBody(event, "Trace payload");
   const projectId = await ensureProject();
   const records: (typeof spans.$inferInsert)[] = [];
   for (const resourceSpanValue of otlpArray(body.resourceSpans, "resourceSpans")) {

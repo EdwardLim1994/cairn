@@ -56,7 +56,6 @@ export const serviceEndpoints = mysqlTable(
     apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     method: varchar("method", { length: 10 }).notNull(),
     url: text("url").notNull(),
-    requestJson: json("request_json").$type<unknown>().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("endpoints_project_service_idx").on(table.projectId, table.serviceId)],
@@ -70,12 +69,11 @@ export const mockApis = mysqlTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
-    method: varchar("method", { length: 10 }).notNull().default("GET"),
-    url: text("url").notNull(),
     targetEndpointId: varchar("target_endpoint_id", { length: 36 }).references(
       () => serviceEndpoints.id,
       { onDelete: "set null" },
     ),
+    requestJson: json("request_json").$type<unknown>().notNull(),
     description: text("description").notNull().default(""),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

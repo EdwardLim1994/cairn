@@ -160,6 +160,16 @@ body {
   background: var(--panel);
   line-height: 1;
 }
+.ui-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
 .canvas-shell {
   @apply absolute inset-0;
 }
@@ -224,7 +234,7 @@ body {
   width: 288px;
   overflow: visible;
 }
-.service-node.service-error {
+.vue-flow__node.service-error .service-node {
   border-color: var(--danger);
   box-shadow:
     0 0 0 2px var(--danger-soft),
@@ -335,11 +345,14 @@ body {
   color: var(--get-fg);
   background: var(--get-bg);
 }
-.method-post,
-.severity.error,
-.severity.fatal {
+.method-post {
   color: var(--post-fg);
   background: var(--post-bg);
+}
+.severity.error,
+.severity.fatal {
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 .method-put,
 .severity.warn {
@@ -384,6 +397,11 @@ body {
   border-color: var(--border);
   font-size: 10px;
 }
+.error-mark {
+  @apply mr-1 inline-grid h-4 w-4 place-items-center rounded-full;
+  background: var(--danger-soft);
+  font-weight: 700;
+}
 .mock-row {
   @apply relative flex items-center gap-2 border-b border-dashed px-2 py-2;
   min-height: 62px;
@@ -393,9 +411,9 @@ body {
   background: var(--accent-soft);
 }
 .run-button {
-  @apply grid place-items-center rounded-full;
+  @apply flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5;
   flex: none;
-  width: 34px;
+  min-width: 70px;
   height: 34px;
   border: 0;
   background: var(--accent);
@@ -522,8 +540,31 @@ body {
   left: 16px;
   right: 16px;
   bottom: 16px;
-  height: max(20vh, 200px);
+  height: var(--logs-panel-height, max(20vh, 200px));
+  max-height: calc(100vh - 32px);
   border-radius: 18px;
+}
+.logs-resize-handle {
+  @apply absolute left-0 right-0 top-0 z-10 flex justify-center;
+  height: 12px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.logs-resize-handle::after {
+  content: "";
+  width: 40px;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--muted);
+  opacity: 0.55;
+}
+.logs-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.logs-panel .logs-toolbar {
+  padding-top: 12px;
 }
 .logs-open .logs-toggle {
   display: none;
@@ -582,6 +623,15 @@ body {
 }
 .log-message {
   @apply truncate whitespace-nowrap;
+}
+.log-row-error {
+  align-items: start;
+}
+.log-message.log-error-message {
+  @apply whitespace-pre-wrap break-words;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 .dialog-backdrop {
   @apply fixed inset-0 z-[70] flex justify-end;
@@ -739,7 +789,6 @@ body {
     left: 8px;
     right: 8px;
     bottom: 8px;
-    height: 34vh;
   }
   .logs-toolbar .search {
     width: 100%;

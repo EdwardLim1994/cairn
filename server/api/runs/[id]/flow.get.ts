@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { runs, spans } from "../../../db/schema";
+import { mockApis, runs, serviceEndpoints, services, spans } from "../../../db/schema";
 import { getAppConfig } from "../../../utils/config";
 import { ensureProject } from "../../../utils/project";
 
@@ -18,6 +18,28 @@ export default defineEventHandler(async (event) => {
     .from(spans)
     .where(and(eq(spans.projectId, projectId), eq(spans.traceId, run.traceId)))
     .orderBy(asc(spans.startTime));
+  const registeredServices = await db
+    .select({ name: services.name })
+    .from(services)
+    .where(eq(services.projectId, projectId));
+  let failedTargetService: string | undefined;
+  if (run.status === "failed" && run.mockApiId) {
+    const [target] = await db
+      .select({ name: services.name })
+      .from(mockApis)
+      .innerJoin(serviceEndpoints, eq(mockApis.targetEndpointId, serviceEndpoints.id))
+      .innerJoin(services, eq(serviceEndpoints.serviceId, services.id))
+      .where(and(eq(mockApis.id, run.mockApiId), eq(mockApis.projectId, projectId)));
+    failedTargetService = target?.name;
+  }
+  const registeredName = (name: string) => {
+    const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return (
+      registeredServices.find(
+        (service) => service.name.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized,
+      )?.name ?? name
+    );
+  };
   const config = getAppConfig();
   const age = Date.now() - run.startedAt.getTime();
   const quiet = run.lastTelemetryAt
@@ -36,8 +58,8 @@ export default defineEventHandler(async (event) => {
     if (parent && parent.serviceName !== span.serviceName) {
       const key = `${parent.serviceName}\0${span.serviceName}`;
       edgeMap.set(key, {
-        sourceService: parent.serviceName,
-        targetService: span.serviceName,
+        sourceService: registeredName(parent.serviceName),
+        targetService: registeredName(span.serviceName),
         sourceSpanId: parent.spanId,
         targetSpanId: span.spanId,
       });
@@ -48,13 +70,21 @@ export default defineEventHandler(async (event) => {
     traceId: run.traceId,
     runStatus: run.status,
     status: pending ? "pending" : "complete",
-    incomplete: timedOut,
+    incomplete: timedOut && !quiet,
     spans: records,
     edges: [...edgeMap.values()],
     errorServices: [
-      ...new Set(
-        records.filter((span) => span.statusCode === "ERROR").map((span) => span.serviceName),
-      ),
+      ...new Set([
+        ...records
+          .filter((span) => {
+            const httpStatus = Number(
+              span.attributes["http.response.status_code"] ?? span.attributes["http.status_code"],
+            );
+            return span.statusCode === "ERROR" || httpStatus >= 400;
+          })
+          .map((span) => registeredName(span.serviceName)),
+        ...(failedTargetService ? [failedTargetService] : []),
+      ]),
     ],
   };
 });
