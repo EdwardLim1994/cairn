@@ -10,6 +10,8 @@ Lets users define services, endpoints, and call relationships in a visual graph,
 
 The system SHALL let users add a service node from the canvas context menu and register its name, framework, base URL, and available endpoints.
 
+The framework SHALL be selected from the supported framework list, which initially includes Spring Boot and .NET. The system SHALL check each service's framework-specific health endpoint and show whether it is online.
+
 #### Scenario: Add a service from the canvas
 
 - **WHEN** a user opens the canvas context menu and selects Add node
@@ -19,6 +21,12 @@ The system SHALL let users add a service node from the canvas context menu and r
 
 - **WHEN** a user submits a valid service form
 - **THEN** the system adds the service and its registered endpoints to the graph
+
+#### Scenario: Show service health
+
+- **WHEN** a service health check succeeds or fails
+- **THEN** the node displays Online or Offline based on the health endpoint response
+- **AND** the system refreshes health status periodically
 
 ### Requirement: Users can register service endpoints
 

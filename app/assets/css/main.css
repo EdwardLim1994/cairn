@@ -279,6 +279,13 @@ body {
     500 11px "IBM Plex Mono",
     monospace;
 }
+.framework-icon {
+  background: transparent;
+}
+.framework-icon img {
+  width: 25px;
+  height: 25px;
+}
 .mock-icon {
   background: var(--accent);
   color: var(--accent-ink);
@@ -291,11 +298,18 @@ body {
   background: var(--post-bg);
 }
 .service-state.off {
-  background: var(--panel2);
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 .service-state.off i {
-  background: transparent;
-  border: 1px solid var(--muted);
+  background: var(--danger);
+}
+.service-state.checking {
+  color: var(--muted);
+  background: var(--panel2);
+}
+.service-state.checking i {
+  background: var(--muted);
 }
 .endpoint-heading,
 .section-title,

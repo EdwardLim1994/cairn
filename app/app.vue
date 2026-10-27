@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   Handle,
   Position,
@@ -52,11 +52,11 @@ type LogEntry = {
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
 const services = ref<Service[]>([]);
+const serviceHealth = ref<Record<string, boolean | null>>({});
 const mockApis = ref<MockApi[]>([]);
 const serviceEdges = ref<{ id: string; sourceServiceId: string; targetEndpointId: string }[]>([]);
 const viewport = ref({ x: 0, y: 0, zoom: 1 });
 const mockNodePosition = ref({ x: 560, y: 160 });
-const locked = ref(false);
 const dark = ref(false);
 const loading = ref(true);
 const saving = ref(false);
@@ -79,6 +79,7 @@ const observedErrorServices = ref<string[]>([]);
 const observedServices = ref<string[]>([]);
 const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
 const observedMockApiId = ref<string | null>(null);
+let healthTimer: ReturnType<typeof setInterval> | undefined;
 const { fitView, screenToFlowCoordinate, setViewport } = useVueFlow();
 
 type ServiceDraft = {
@@ -125,6 +126,10 @@ function mockEndpoint(entry: MockApi) {
     .find((item) => item.id === entry.targetEndpointId);
 }
 
+function frameworkLabel(framework: string) {
+  return framework.toLowerCase().includes(".net") ? ".NET" : framework;
+}
+
 function serviceNode(service: Service): Node {
   return {
     id: service.id,
@@ -132,8 +137,8 @@ function serviceNode(service: Service): Node {
     position: { x: service.positionX, y: service.positionY },
     data: {
       name: service.name,
-      framework: service.framework,
-      active: service.active,
+      framework: frameworkLabel(service.framework),
+      online: serviceHealth.value[service.id] ?? null,
       endpoints: service.endpoints,
     },
     class: [
@@ -242,10 +247,21 @@ async function loadCanvas() {
     syncNodes();
     if (viewport.value.zoom !== 1 || viewport.value.x || viewport.value.y)
       await setViewport(viewport.value);
+    await loadServiceHealth();
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not load the graph";
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadServiceHealth() {
+  try {
+    const results = await api<{ id: string; online: boolean }[]>("/api/services/health");
+    serviceHealth.value = Object.fromEntries(results.map(({ id, online }) => [id, online]));
+    syncNodes();
+  } catch {
+    /* leave the last known health state visible */
   }
 }
 
@@ -363,7 +379,7 @@ function editService(id: string) {
   editingServiceId.value = id;
   serviceDraft.value = {
     name: service.name,
-    framework: service.framework,
+    framework: frameworkLabel(service.framework),
     baseUrl: service.baseUrl,
     active: service.active,
     endpoints: service.endpoints.map((endpoint) => ({ ...endpoint })),
@@ -585,6 +601,11 @@ onMounted(async () => {
   );
   await loadCanvas();
   await loadLogs();
+  healthTimer = setInterval(() => void loadServiceHealth(), 10000);
+});
+
+onUnmounted(() => {
+  if (healthTimer) clearInterval(healthTimer);
 });
 </script>
 
@@ -599,10 +620,6 @@ onMounted(async () => {
       <div class="brand"><strong>Service Graph</strong><span>DATA FLOW OBSERVABILITY</span></div>
       <div class="top-actions">
         <span class="project-label"><i></i> {{ services.length }} services</span>
-        <button class="button secondary" @click.stop="openMockPanel">Mock API settings</button>
-        <button class="button secondary" @click.stop="locked = !locked">
-          {{ locked ? "Unlock canvas" : "Lock positions" }}
-        </button>
         <button class="button primary" :disabled="saving" @click.stop="saveCanvas">
           {{ saving ? "Saving..." : "Save graph" }}
         </button>
@@ -632,8 +649,6 @@ onMounted(async () => {
         v-model:nodes="nodes"
         v-model:edges="edges"
         class="graph-flow"
-        :nodes-draggable="!locked"
-        :nodes-connectable="!locked"
         :select-nodes-on-drag="false"
         :elements-selectable="true"
         :min-zoom="0.2"
@@ -664,18 +679,24 @@ onMounted(async () => {
             />
             <div class="node-header">
               <div class="framework-icon">
-                {{
-                  String(data.framework || "?")
-                    .slice(0, 2)
-                    .toUpperCase()
-                }}
+                <img
+                  v-if="String(data.framework).toLowerCase().includes('spring')"
+                  src="/icons/spring-boot.svg"
+                  alt="Spring Boot"
+                />
+                <img v-else src="/icons/dotnet.svg" alt=".NET" />
               </div>
               <div class="node-heading">
                 <strong>{{ data.name }}</strong
                 ><span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>
               </div>
-              <span class="service-state" :class="data.active ? 'on' : 'off'"
-                ><i></i>{{ data.active ? "Active" : "Inactive" }}</span
+              <span
+                class="service-state"
+                :class="data.online === true ? 'on' : data.online === false ? 'off' : 'checking'"
+                ><i></i
+                >{{
+                  data.online === true ? "Online" : data.online === false ? "Offline" : "Checking"
+                }}</span
               >
             </div>
             <div class="endpoint-heading">
@@ -816,7 +837,7 @@ onMounted(async () => {
         <select v-model="logService" class="control" aria-label="Filter by service">
           <option value="">All services</option>
           <option
-            v-for="name in [...new Set(logs.map((item) => item.serviceName))]"
+            v-for="name in [...new Set(services.map((service) => service.name))].sort()"
             :key="name"
             :value="name"
           >
@@ -889,10 +910,11 @@ onMounted(async () => {
           <div class="field-row">
             <label class="field"
               ><span>Framework</span
-              ><input
-                v-model="serviceDraft.framework"
-                class="control"
-                placeholder="e.g. Nuxt" /></label
+              ><select v-model="serviceDraft.framework" class="control" required>
+                <option disabled value="">Select framework</option>
+                <option>Spring Boot</option>
+                <option>.NET</option>
+              </select></label
             ><label class="field"
               ><span>Base URL</span
               ><input
@@ -901,12 +923,6 @@ onMounted(async () => {
                 placeholder="http://localhost:4000"
             /></label>
           </div>
-          <label class="switch-row"
-            ><span
-              ><strong>Service active</strong
-              ><small>Show this service as available in the graph</small></span
-            ><input v-model="serviceDraft.active" type="checkbox"
-          /></label>
           <div class="section-title">
             <strong>Available endpoints</strong
             ><button class="button secondary small" @click="addEndpoint">+ Add endpoint</button>
