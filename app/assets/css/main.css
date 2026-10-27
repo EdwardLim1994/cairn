@@ -234,6 +234,13 @@ body {
   width: 288px;
   overflow: visible;
 }
+.vue-flow__node.service-observed .service-node,
+.vue-flow__node.mock-node-observed .mock-node {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px var(--accent-soft),
+    var(--shadow);
+}
 .vue-flow__node.service-error .service-node {
   border-color: var(--danger);
   box-shadow:

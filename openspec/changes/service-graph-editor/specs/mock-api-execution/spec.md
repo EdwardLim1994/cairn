@@ -60,6 +60,12 @@ The system SHALL show whether a triggered mock API call is running, completed, o
 - **WHEN** the target endpoint call fails
 - **THEN** the run status becomes failed and the failure is available
 
+#### Scenario: Highlight a completed request flow
+
+- **WHEN** a mock API call finishes and its trace includes downstream service calls
+- **THEN** the graph highlights the mock API connection and every service connection in the trace
+- **AND** the mock API node and every participating service node have highlighted borders
+
 #### Scenario: Show the running entry
 
 - **WHEN** a mock API entry is running

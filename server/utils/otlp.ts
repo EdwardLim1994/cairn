@@ -57,6 +57,19 @@ export function resourceAttributes(resource: unknown) {
   return otlpAttributes(row.attributes);
 }
 
+export function normalizeSeverity(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "UNSPECIFIED";
+  const severity = value.trim().toUpperCase();
+  return (
+    {
+      INFORMATION: "INFO",
+      WARNING: "WARN",
+      CRITICAL: "FATAL",
+      TRACE: "DEBUG",
+    }[severity] ?? severity.slice(0, 20)
+  );
+}
+
 export function validHex(value: unknown, length: number, label: string): string {
   if (typeof value !== "string" || !new RegExp(`^[a-fA-F0-9]{${length}}$`).test(value)) {
     throw createError({

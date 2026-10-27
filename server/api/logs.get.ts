@@ -1,14 +1,27 @@
-import { and, desc, eq, like } from "drizzle-orm";
+import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { getDb } from "../db";
 import { logs, services } from "../db/schema";
 import { ensureProject } from "../utils/project";
+import { normalizeSeverity } from "../utils/otlp";
 
 export default defineEventHandler(async (event) => {
   const projectId = await ensureProject();
   const query = getQuery(event);
   const conditions = [eq(logs.projectId, projectId)];
-  if (typeof query.severity === "string" && query.severity.trim())
-    conditions.push(eq(logs.severity, query.severity.trim().toUpperCase()));
+  if (typeof query.severity === "string" && query.severity.trim()) {
+    const severity = normalizeSeverity(query.severity);
+    const aliases =
+      severity === "INFO"
+        ? ["INFO", "INFORMATION"]
+        : severity === "WARN"
+          ? ["WARN", "WARNING"]
+          : severity === "FATAL"
+            ? ["FATAL", "CRITICAL"]
+            : severity === "DEBUG"
+              ? ["DEBUG", "TRACE"]
+              : [severity];
+    conditions.push(inArray(logs.severity, aliases));
+  }
   if (typeof query.search === "string" && query.search.trim()) {
     const escaped = query.search.trim().replace(/[\\%_]/g, "\\$&");
     conditions.push(like(logs.message, `%${escaped}%`));
@@ -29,7 +42,7 @@ export default defineEventHandler(async (event) => {
       registeredServices.find(
         (service) => service.name.toLowerCase().replace(/[^a-z0-9]/g, "") === key,
       )?.name ?? record.serviceName;
-    return { ...record, serviceName };
+    return { ...record, serviceName, severity: normalizeSeverity(record.severity) };
   });
   const requestedService = typeof query.service === "string" ? query.service.trim() : "";
   return requestedService

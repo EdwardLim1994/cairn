@@ -76,7 +76,9 @@ const logSeverity = ref("");
 const runningMockId = ref<string | null>(null);
 const runResults = ref<Record<string, RunResult>>({});
 const observedErrorServices = ref<string[]>([]);
+const observedServices = ref<string[]>([]);
 const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
+const observedMockApiId = ref<string | null>(null);
 const { fitView, screenToFlowCoordinate, setViewport } = useVueFlow();
 
 type ServiceDraft = {
@@ -134,7 +136,12 @@ function serviceNode(service: Service): Node {
       active: service.active,
       endpoints: service.endpoints,
     },
-    class: observedErrorServices.value.includes(service.name) ? "service-error" : "",
+    class: [
+      observedServices.value.includes(service.name) ? "service-observed" : "",
+      observedErrorServices.value.includes(service.name) ? "service-error" : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 
@@ -144,6 +151,7 @@ function mockNode(): Node {
     type: "mockApis",
     position: mockNodePosition.value,
     data: { entries: mockApis.value },
+    class: observedMockApiId.value ? "mock-node-observed" : "",
   };
 }
 
@@ -182,7 +190,12 @@ function buildEdges() {
         target,
         targetHandle: entry.targetEndpointId,
         type: "smoothstep",
-        class: entry.id === runningMockId.value ? "running-edge" : "",
+        class:
+          entry.id === runningMockId.value
+            ? "running-edge"
+            : entry.id === observedMockApiId.value
+              ? "observed"
+              : "",
       },
     ];
   });
@@ -455,7 +468,14 @@ async function saveMockDraft() {
 
 async function runMock(entry: MockApi) {
   if (!entry.id) return;
+  const targetService = services.value.find((service) =>
+    service.endpoints.some((endpoint) => endpoint.id === entry.targetEndpointId),
+  );
   runningMockId.value = entry.id;
+  observedMockApiId.value = entry.id;
+  observedEdges.value = [];
+  observedErrorServices.value = [];
+  observedServices.value = targetService ? [targetService.name] : [];
   runResults.value[entry.id] = {
     id: "",
     traceId: "",
@@ -464,7 +484,7 @@ async function runMock(entry: MockApi) {
     responseBody: null,
     error: null,
   };
-  buildEdges();
+  syncNodes();
   try {
     const result = await api<RunResult>(`/api/mock-apis/${entry.id}/runs`, { method: "POST" });
     runResults.value[entry.id] = result;
@@ -485,6 +505,9 @@ async function runMock(entry: MockApi) {
     if (flow) {
       observedErrorServices.value = flow.errorServices;
       observedEdges.value = flow.edges;
+      const participants = flow.edges.flatMap((edge) => [edge.sourceService, edge.targetService]);
+      if (targetService) participants.push(targetService.name);
+      observedServices.value = [...new Set(participants)];
       runResults.value[entry.id] = { ...result, flow };
       syncNodes();
     }

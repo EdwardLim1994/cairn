@@ -7,6 +7,7 @@ import {
   otlpArray,
   otlpAttributes,
   otlpTimestamp,
+  normalizeSeverity,
   readOtlpBody,
   resourceAttributes,
   validHex,
@@ -49,10 +50,7 @@ export default defineEventHandler(async (event) => {
           projectId,
           traceId: item.traceId ? validHex(item.traceId, 32, "Trace id") : null,
           serviceName,
-          severity:
-            typeof item.severityText === "string" && item.severityText
-              ? item.severityText.slice(0, 20)
-              : "UNSPECIFIED",
+          severity: normalizeSeverity(item.severityText),
           timestamp: otlpTimestamp(item.timeUnixNano || item.observedTimeUnixNano, "Log timestamp"),
           message: typeof rawMessage === "string" ? rawMessage : JSON.stringify(rawMessage),
           attributes: otlpAttributes(item.attributes),
