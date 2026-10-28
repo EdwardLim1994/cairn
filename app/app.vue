@@ -613,7 +613,7 @@ async function runMock(entry: MockApi) {
     runResults.value[entry.id] = result;
     if (result.status === "failed") {
       logService.value = targetService ? [targetService.name] : [];
-      logSeverity.value = ["ERROR"];
+      logSeverity.value = [];
       logsOpen.value = true;
       await loadLogs();
     }
@@ -654,7 +654,7 @@ async function runMock(entry: MockApi) {
       error: cause instanceof Error ? cause.message : "Call failed",
     };
     logService.value = targetService ? [targetService.name] : [];
-    logSeverity.value = ["ERROR"];
+    logSeverity.value = [];
     logsOpen.value = true;
     await loadLogs();
   } finally {
@@ -983,7 +983,12 @@ onUnmounted(() => {
                   class="mock-endpoint-link"
                   @click.stop="entry.id && openMockPanel(entry.id)"
                 >
-                  <b>{{ mockEndpoint(entry)?.method ?? "No endpoint" }}</b>
+                  <span
+                    v-if="mockEndpoint(entry)"
+                    class="method-tag"
+                    :class="`method-${mockEndpoint(entry)?.method.toLowerCase()}`"
+                    >{{ mockEndpoint(entry)?.method }}</span
+                  ><span v-else class="mock-no-endpoint">No endpoint</span>
                   {{ mockEndpoint(entry)?.url ?? "Select a service endpoint" }}
                 </button>
               </div>

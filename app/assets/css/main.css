@@ -550,8 +550,8 @@ body {
 .mock-endpoint-link:hover {
   color: var(--accent);
 }
-.mock-copy b {
-  color: var(--accent);
+.mock-no-endpoint {
+  color: var(--muted);
 }
 .run-state {
   @apply uppercase;
