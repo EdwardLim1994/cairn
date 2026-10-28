@@ -63,7 +63,6 @@ const dark = useCookie("cairn-dark-mode", {
   sameSite: "lax",
 });
 const loading = ref(true);
-const saving = ref(false);
 const errorMessage = ref("");
 const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
 const serviceDialog = ref(false);
@@ -315,7 +314,6 @@ function canvasPayload() {
 }
 
 async function saveCanvas() {
-  saving.value = true;
   try {
     await api("/api/canvas", { method: "PUT", body: canvasPayload() });
     for (const node of nodes.value) {
@@ -331,13 +329,12 @@ async function saveCanvas() {
     errorMessage.value = "";
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not save the graph";
-  } finally {
-    saving.value = false;
   }
 }
 
 function onMoveEnd(event: { x: number; y: number; zoom: number }) {
   viewport.value = { x: event.x, y: event.y, zoom: event.zoom };
+  void saveCanvas();
 }
 
 async function onConnect(connection: Connection) {
@@ -703,9 +700,6 @@ onUnmounted(() => {
       <div class="brand"><strong>Cairn</strong><span>DATA FLOW OBSERVABILITY</span></div>
       <div class="top-actions">
         <span class="project-label"><i></i> {{ services.length }} services</span>
-        <button class="button primary" :disabled="saving" @click.stop="saveCanvas">
-          {{ saving ? "Saving..." : "Save graph" }}
-        </button>
         <button
           class="icon-button"
           :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
