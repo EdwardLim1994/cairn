@@ -52,6 +52,7 @@ type LogEntry = {
 const nodes = ref<Node[]>([]);
 const edges = ref<Edge[]>([]);
 const services = ref<Service[]>([]);
+const collapsedServiceEndpoints = ref<Record<string, boolean>>({});
 const serviceHealth = ref<Record<string, boolean | null>>({});
 const mockApis = ref<MockApi[]>([]);
 const serviceEdges = ref<{ id: string; sourceServiceId: string; targetEndpointId: string }[]>([]);
@@ -68,6 +69,7 @@ const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } |
 const serviceDialog = ref(false);
 const editingServiceId = ref<string | null>(null);
 const serviceDraft = ref<ServiceDraft>(newServiceDraft());
+const frameworkMenuOpen = ref(false);
 const mockPanel = ref(false);
 const mockDraft = ref<MockApi[]>([]);
 const logsOpen = ref(false);
@@ -82,8 +84,16 @@ const observedErrorServices = ref<string[]>([]);
 const observedServices = ref<string[]>([]);
 const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
 const observedMockApiId = ref<string | null>(null);
+const mockConnectionsCollapsed = ref(false);
+const allNodesCollapsed = computed(
+  () =>
+    mockConnectionsCollapsed.value &&
+    services.value
+      .filter((service) => service.endpoints.length)
+      .every((service) => collapsedServiceEndpoints.value[service.id]),
+);
 let healthTimer: ReturnType<typeof setInterval> | undefined;
-const { fitView, screenToFlowCoordinate, setViewport } = useVueFlow();
+const { fitView, screenToFlowCoordinate, setViewport, updateNodeInternals } = useVueFlow();
 
 type ServiceDraft = {
   name: string;
@@ -129,6 +139,15 @@ function mockEndpoint(entry: MockApi) {
     .find((item) => item.id === entry.targetEndpointId);
 }
 
+function endpointHandle(endpointId: string) {
+  const service = services.value.find((item) =>
+    item.endpoints.some((endpoint) => endpoint.id === endpointId),
+  );
+  return service && collapsedServiceEndpoints.value[service.id]
+    ? service.endpoints[0]?.id
+    : endpointId;
+}
+
 function frameworkLabel(framework: string) {
   return framework.toLowerCase().includes(".net") ? ".NET" : framework;
 }
@@ -139,10 +158,12 @@ function serviceNode(service: Service): Node {
     type: "service",
     position: { x: service.positionX, y: service.positionY },
     data: {
+      serviceId: service.id,
       name: service.name,
       framework: frameworkLabel(service.framework),
       online: serviceHealth.value[service.id] ?? null,
       endpoints: service.endpoints,
+      endpointsCollapsed: collapsedServiceEndpoints.value[service.id] ?? false,
     },
     class: [
       observedServices.value.includes(service.name) ? "service-observed" : "",
@@ -173,7 +194,7 @@ function buildEdges() {
         source: edge.sourceServiceId,
         sourceHandle: "service-out",
         target,
-        targetHandle: edge.targetEndpointId,
+        targetHandle: endpointHandle(edge.targetEndpointId),
         type: "default",
         class: observedEdges.value.some(
           (item) =>
@@ -193,9 +214,11 @@ function buildEdges() {
       {
         id: `mock-${entry.id}`,
         source: "mock-apis",
-        sourceHandle: entry.id,
+        sourceHandle: mockConnectionsCollapsed.value
+          ? mockApis.value.find((item) => item.id)?.id
+          : entry.id,
         target,
-        targetHandle: entry.targetEndpointId,
+        targetHandle: endpointHandle(entry.targetEndpointId),
         type: "default",
         class:
           entry.id === runningMockId.value
@@ -226,8 +249,38 @@ function buildEdges() {
   edges.value = [...declared, ...mock, ...observed];
 }
 
+async function toggleMockConnections() {
+  mockConnectionsCollapsed.value = !mockConnectionsCollapsed.value;
+  await nextTick();
+  updateNodeInternals(["mock-apis"]);
+  await nextTick();
+  buildEdges();
+}
+
 function syncNodes() {
   nodes.value = [...services.value.map(serviceNode), mockNode()];
+  buildEdges();
+}
+
+async function toggleServiceEndpoints(serviceId: string) {
+  collapsedServiceEndpoints.value[serviceId] = !collapsedServiceEndpoints.value[serviceId];
+  syncNodes();
+  await nextTick();
+  updateNodeInternals([serviceId]);
+  await nextTick();
+  buildEdges();
+}
+
+async function toggleAllNodes() {
+  const collapsed = !allNodesCollapsed.value;
+  collapsedServiceEndpoints.value = Object.fromEntries(
+    services.value.map((service) => [service.id, collapsed]),
+  );
+  mockConnectionsCollapsed.value = collapsed;
+  syncNodes();
+  await nextTick();
+  updateNodeInternals([...services.value.map((service) => service.id), "mock-apis"]);
+  await nextTick();
   buildEdges();
 }
 
@@ -389,6 +442,7 @@ function handleCanvasContextMenu(event: MouseEvent) {
 function beginAddService() {
   if (!contextMenu.value) return;
   serviceDraft.value = newServiceDraft();
+  frameworkMenuOpen.value = false;
   editingServiceId.value = null;
   addPosition.value = { x: contextMenu.value.flowX, y: contextMenu.value.flowY };
   serviceDialog.value = true;
@@ -400,6 +454,7 @@ const addPosition = ref({ x: 160, y: 120 });
 function editService(id: string, focusEndpointId?: string) {
   const service = services.value.find((item) => item.id === id);
   if (!service) return;
+  frameworkMenuOpen.value = false;
   editingServiceId.value = id;
   serviceDraft.value = {
     name: service.name,
@@ -655,11 +710,15 @@ function adjustLogsPanelHeight(delta: number) {
 function closeSettings() {
   serviceDialog.value = false;
   mockPanel.value = false;
+  frameworkMenuOpen.value = false;
   nodes.value = nodes.value.map((node) => (node.selected ? { ...node, selected: false } : node));
 }
 
 function closeSettingsOutside(event: PointerEvent) {
-  if (event.target instanceof Element && event.target.closest(".side-dialog")) return;
+  if (event.target instanceof Element && event.target.closest(".side-dialog")) {
+    if (!event.target.closest(".framework-select")) frameworkMenuOpen.value = false;
+    return;
+  }
   closeSettings();
 }
 
@@ -700,6 +759,17 @@ onUnmounted(() => {
       <div class="brand"><strong>Cairn</strong><span>DATA FLOW OBSERVABILITY</span></div>
       <div class="top-actions">
         <span class="project-label"><i></i> {{ services.length }} services</span>
+        <button
+          class="icon-button"
+          :aria-label="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
+          :title="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
+          @click.stop="toggleAllNodes"
+        >
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path v-if="allNodesCollapsed" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+            <path v-else d="M8 8H3V3m13 5h5V3M3 16h5v5m13-5h-5v5" />
+          </svg>
+        </button>
         <button
           class="icon-button"
           :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
@@ -764,23 +834,74 @@ onUnmounted(() => {
                 <img v-else src="/icons/dotnet.svg" alt=".NET" />
               </div>
               <div class="node-heading">
-                <strong>{{ data.name }}</strong
-                ><span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>
+                <div class="node-name-line">
+                  <span
+                    class="service-state-dot"
+                    :class="
+                      data.online === true ? 'on' : data.online === false ? 'off' : 'checking'
+                    "
+                    :aria-label="
+                      data.online === true
+                        ? 'Service online'
+                        : data.online === false
+                          ? 'Service offline'
+                          : 'Checking service status'
+                    "
+                    :title="
+                      data.online === true
+                        ? 'Online'
+                        : data.online === false
+                          ? 'Offline'
+                          : 'Checking'
+                    "
+                    role="img"
+                  ></span>
+                  <strong>{{ data.name }}</strong>
+                </div>
+                <span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>
               </div>
-              <span
-                class="service-state"
-                :class="data.online === true ? 'on' : data.online === false ? 'off' : 'checking'"
-                ><i></i
-                >{{
-                  data.online === true ? "Online" : data.online === false ? "Offline" : "Checking"
-                }}</span
+              <button
+                v-if="data.endpoints.length"
+                type="button"
+                class="collapse-connections nodrag"
+                :aria-label="
+                  data.endpointsCollapsed ? 'Show service endpoints' : 'Collapse service endpoints'
+                "
+                :title="
+                  data.endpointsCollapsed ? 'Show service endpoints' : 'Collapse service endpoints'
+                "
+                @click.stop="toggleServiceEndpoints(data.serviceId)"
               >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path v-if="data.endpointsCollapsed" d="M12 5v14m-7-7h14" />
+                  <path v-else d="M5 12h14" />
+                </svg>
+              </button>
             </div>
-            <div class="endpoint-heading">
-              <span>REGISTERED ENDPOINTS</span>
+            <div
+              class="endpoint-heading"
+              :class="{ 'endpoint-heading-collapsed': data.endpointsCollapsed }"
+            >
+              <span>{{
+                data.endpointsCollapsed
+                  ? `${data.endpoints.length} endpoints · incoming connections bundled`
+                  : "REGISTERED ENDPOINTS"
+              }}</span>
             </div>
-            <div v-for="endpoint in data.endpoints" :key="endpoint.id" class="endpoint-row">
+            <div
+              v-for="endpoint in data.endpoints"
+              :key="endpoint.id"
+              class="endpoint-row"
+              :class="{
+                'endpoint-row-collapsed': data.endpointsCollapsed,
+                'endpoint-row-bundle':
+                  data.endpointsCollapsed && endpoint.id === data.endpoints[0]?.id,
+              }"
+            >
               <Handle
+                v-if="
+                  endpoint.id && (!data.endpointsCollapsed || endpoint.id === data.endpoints[0]?.id)
+                "
                 :id="endpoint.id"
                 type="target"
                 :position="Position.Left"
@@ -810,18 +931,46 @@ onUnmounted(() => {
               <div class="node-heading">
                 <strong>Mock APIs</strong><span>Reusable REST calls</span>
               </div>
+              <button
+                type="button"
+                class="collapse-connections nodrag"
+                :aria-label="
+                  mockConnectionsCollapsed
+                    ? 'Show outgoing connections'
+                    : 'Hide outgoing connections'
+                "
+                :title="
+                  mockConnectionsCollapsed
+                    ? 'Show outgoing connections'
+                    : 'Hide outgoing connections'
+                "
+                @click.stop="toggleMockConnections"
+              >
+                <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path v-if="mockConnectionsCollapsed" d="M12 5v14m-7-7h14" />
+                  <path v-else d="M5 12h14" />
+                </svg>
+              </button>
             </div>
             <div v-if="!mockApis.length" class="empty-endpoints">
               Add a mock API to trigger calls
+            </div>
+            <div v-if="mockConnectionsCollapsed && mockApis.length" class="mock-collapsed-summary">
+              {{ mockApis.length }} mock API{{ mockApis.length === 1 ? "" : "s" }} · outgoing calls
+              bundled
             </div>
             <div
               v-for="entry in mockApis"
               :key="entry.id"
               class="mock-row"
-              :class="{ running: runningMockId === entry.id }"
+              :class="{
+                running: runningMockId === entry.id,
+                'mock-row-collapsed': mockConnectionsCollapsed,
+                'mock-row-bundle': mockConnectionsCollapsed && entry.id === mockApis[0]?.id,
+              }"
             >
               <Handle
-                v-if="entry.id"
+                v-if="entry.id && (!mockConnectionsCollapsed || entry.id === mockApis[0]?.id)"
                 :id="entry.id"
                 type="source"
                 :position="Position.Right"
@@ -866,7 +1015,6 @@ onUnmounted(() => {
                 </svg>
               </button>
             </div>
-            <button class="add-mock nodrag" @click.stop="openMockPanel">+ Manage mock APIs</button>
           </article>
         </template>
       </VueFlow>
@@ -889,7 +1037,7 @@ onUnmounted(() => {
         :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
         @click.stop
       >
-        <button @click="beginAddService"><b>+</b> Add service node</button>
+        <button @click="beginAddService"><b>+</b> Add new service</button>
       </div>
     </section>
 
@@ -1018,40 +1166,99 @@ onUnmounted(() => {
             <strong>{{ editingServiceId ? "Service settings" : "Add service node" }}</strong
             ><span>Configure the service and its endpoints</span>
           </div>
-          <button class="icon-button" aria-label="Close" @click="closeSettings">
+          <button
+            v-if="editingServiceId"
+            class="icon-button danger-icon"
+            aria-label="Remove service"
+            title="Remove service"
+            @click="
+              deleteService(editingServiceId);
+              closeSettings();
+            "
+          >
             <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
+              <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
             </svg>
           </button>
         </header>
         <div class="dialog-body">
-          <label class="field"
-            ><span>Service name</span
-            ><input
-              v-model="serviceDraft.name"
-              class="control"
-              placeholder="e.g. Checkout API"
-              required
-          /></label>
-          <div class="field-row">
+          <div class="service-config-fields">
             <label class="field"
-              ><span>Framework</span
-              ><select v-model="serviceDraft.framework" class="control" required>
-                <option disabled value="">Select framework</option>
-                <option>Spring Boot</option>
-                <option>.NET</option>
-              </select></label
-            ><label class="field"
-              ><span>Base URL</span
+              ><span>Service name</span
               ><input
-                v-model="serviceDraft.baseUrl"
+                v-model="serviceDraft.name"
                 class="control"
-                placeholder="http://localhost:4000"
+                placeholder="e.g. Checkout API"
+                required
             /></label>
+            <div class="field-row">
+              <div class="field">
+                <span>Framework</span>
+                <div class="framework-select">
+                  <button
+                    type="button"
+                    class="control framework-select-trigger"
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    :aria-expanded="frameworkMenuOpen"
+                    :aria-label="`Framework: ${serviceDraft.framework || 'Select framework'}`"
+                    @click.stop="frameworkMenuOpen = !frameworkMenuOpen"
+                  >
+                    <img
+                      v-if="serviceDraft.framework"
+                      :src="
+                        serviceDraft.framework.toLowerCase().includes('spring')
+                          ? '/icons/spring-boot.svg'
+                          : '/icons/dotnet.svg'
+                      "
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    <span>{{ serviceDraft.framework || "Select framework" }}</span>
+                    <svg class="ui-icon framework-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <div v-if="frameworkMenuOpen" class="framework-options" role="listbox">
+                    <button
+                      type="button"
+                      role="option"
+                      :aria-selected="serviceDraft.framework === 'Spring Boot'"
+                      @click.stop="
+                        serviceDraft.framework = 'Spring Boot';
+                        frameworkMenuOpen = false;
+                      "
+                    >
+                      <img src="/icons/spring-boot.svg" alt="" aria-hidden="true" />
+                      Spring Boot
+                    </button>
+                    <button
+                      type="button"
+                      role="option"
+                      :aria-selected="serviceDraft.framework === '.NET'"
+                      @click.stop="
+                        serviceDraft.framework = '.NET';
+                        frameworkMenuOpen = false;
+                      "
+                    >
+                      <img src="/icons/dotnet.svg" alt="" aria-hidden="true" />
+                      .NET
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <label class="field"
+                ><span>Base URL</span
+                ><input
+                  v-model="serviceDraft.baseUrl"
+                  class="control"
+                  placeholder="http://localhost:4000"
+              /></label>
+            </div>
           </div>
           <div class="section-title">
             <strong>Available endpoints</strong
-            ><button class="button secondary small" @click="addEndpoint">+ Add endpoint</button>
+            ><button class="button secondary small" @click="addEndpoint">+ New endpoint</button>
           </div>
           <details
             v-for="(endpoint, index) in serviceDraft.endpoints"
@@ -1060,14 +1267,24 @@ onUnmounted(() => {
             :id="endpoint.id ? `service-endpoint-${endpoint.id}` : undefined"
           >
             <summary class="endpoint-form-head endpoint-form-summary">
-              <strong>{{ endpoint.name || `Endpoint ${index + 1}` }}</strong>
-              <span>{{ endpoint.method }} {{ endpoint.url }}</span>
+              <div class="endpoint-summary-title">
+                <button
+                  type="button"
+                  class="endpoint-delete-button"
+                  :aria-label="`Remove ${endpoint.name || `Endpoint ${index + 1}`}`"
+                  :title="`Remove ${endpoint.name || `Endpoint ${index + 1}`}`"
+                  @click.stop.prevent="removeEndpoint(index)"
+                >
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
+                  </svg>
+                </button>
+                <div class="endpoint-summary-copy">
+                  <strong>{{ endpoint.name || `Endpoint ${index + 1}` }}</strong>
+                  <span>{{ endpoint.method }} {{ endpoint.url }}</span>
+                </div>
+              </div>
             </summary>
-            <div class="endpoint-form-actions">
-              <button class="text-button danger-text" @click="removeEndpoint(index)">
-                Remove endpoint
-              </button>
-            </div>
             <label class="field"
               ><span>Name</span
               ><input v-model="endpoint.name" class="control" placeholder="e.g. Get order"
@@ -1093,20 +1310,10 @@ onUnmounted(() => {
               ><span>URL</span><input v-model="endpoint.url" class="control" placeholder="/orders"
             /></label>
           </details>
-          <button
-            v-if="editingServiceId"
-            class="button danger-outline delete-service"
-            @click="
-              deleteService(editingServiceId);
-              closeSettings();
-            "
-          >
-            Remove service
-          </button>
         </div>
         <footer class="dialog-footer">
           <button class="button secondary" @click="closeSettings">Discard</button
-          ><button class="button primary" @click="saveService">Save service</button>
+          ><button class="button primary" @click="saveService">Save</button>
         </footer>
       </section>
     </div>
@@ -1131,7 +1338,7 @@ onUnmounted(() => {
         <div class="dialog-body">
           <div class="section-title">
             <strong>Registered mock APIs</strong
-            ><button class="button secondary small" @click="addMockDraft">+ Add row</button>
+            ><button class="button secondary small" @click="addMockDraft">+ New API</button>
           </div>
           <details
             v-for="(entry, index) in mockDraft"
@@ -1140,17 +1347,27 @@ onUnmounted(() => {
             :id="entry.id ? `mock-api-${entry.id}` : undefined"
           >
             <summary class="endpoint-form-head endpoint-form-summary">
-              <strong>{{ entry.name || `Mock API ${index + 1}` }}</strong
-              ><span>{{
-                servicesForSelect.find((option) => option.id === entry.targetEndpointId)?.label ??
-                "Select service endpoint"
-              }}</span>
+              <div class="endpoint-summary-title">
+                <button
+                  type="button"
+                  class="endpoint-delete-button"
+                  :aria-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
+                  :title="`Remove ${entry.name || `Mock API ${index + 1}`}`"
+                  @click.stop.prevent="removeMockDraft(index)"
+                >
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
+                  </svg>
+                </button>
+                <div class="endpoint-summary-copy">
+                  <strong>{{ entry.name || `Mock API ${index + 1}` }}</strong>
+                  <span>{{
+                    servicesForSelect.find((option) => option.id === entry.targetEndpointId)
+                      ?.label ?? "Select service endpoint"
+                  }}</span>
+                </div>
+              </div>
             </summary>
-            <div class="endpoint-form-actions">
-              <button class="text-button danger-text" @click="removeMockDraft(index)">
-                Remove mock API
-              </button>
-            </div>
             <label class="field"
               ><span>Name</span
               ><input v-model="entry.name" class="control" placeholder="e.g. Create order"
@@ -1188,7 +1405,7 @@ onUnmounted(() => {
         </div>
         <footer class="dialog-footer">
           <button class="button secondary" @click="closeSettings">Discard</button
-          ><button class="button primary" @click="saveMockDraft">Save mock APIs</button>
+          ><button class="button primary" @click="saveMockDraft">Save</button>
         </footer>
       </section>
     </div>

@@ -119,8 +119,7 @@ body {
   @apply px-2 text-xs;
   color: var(--muted);
 }
-.project-label i,
-.service-state i {
+.project-label i {
   @apply mr-1.5 inline-block rounded-full;
   width: 7px;
   height: 7px;
@@ -160,6 +159,12 @@ body {
   border-color: var(--border);
   background: var(--panel);
   line-height: 1;
+}
+.icon-button.danger-icon {
+  color: var(--danger);
+}
+.icon-button.danger-icon:hover {
+  background: var(--danger-soft);
 }
 .ui-icon {
   display: block;
@@ -264,10 +269,23 @@ body {
 .node-heading strong {
   @apply truncate font-semibold;
 }
-.node-heading span,
-.service-state.off {
+.node-name-line {
+  @apply flex min-w-0 items-center gap-1.5;
+}
+.node-heading span {
   color: var(--muted);
   font-size: 10px;
+}
+.collapse-connections {
+  @apply grid shrink-0 place-items-center rounded-md border;
+  width: 24px;
+  height: 24px;
+  border-color: var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+}
+.collapse-connections:hover {
+  color: var(--text);
 }
 .framework-icon,
 .mock-icon {
@@ -291,25 +309,21 @@ body {
   background: var(--accent);
   color: var(--accent-ink);
 }
-.service-state {
-  @apply whitespace-nowrap rounded-xl px-2 py-1 text-[10px];
+.service-state-dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
 }
-.service-state.on {
-  color: #047857;
-  background: var(--post-bg);
+.service-state-dot.on {
+  background: #15966f;
 }
-.service-state.off {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
-.service-state.off i {
+.service-state-dot.off {
   background: var(--danger);
 }
-.service-state.checking {
-  color: var(--muted);
-  background: var(--panel2);
-}
-.service-state.checking i {
+.service-state-dot.checking {
   background: var(--muted);
 }
 .endpoint-heading,
@@ -323,6 +337,11 @@ body {
   color: var(--muted);
   font-size: 9px;
   letter-spacing: 0.08em;
+}
+.endpoint-heading-collapsed {
+  font-size: 9px;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 .text-button {
   border: 0;
@@ -339,6 +358,23 @@ body {
   height: 47px;
   border-color: var(--border);
   min-width: 0;
+}
+.endpoint-row-collapsed {
+  display: none;
+}
+.endpoint-row-collapsed.endpoint-row-bundle {
+  display: flex;
+  position: absolute;
+  top: 75px;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+}
+.endpoint-row-bundle > :not(.endpoint-handle) {
+  display: none;
 }
 .endpoint-row code,
 .mock-copy span,
@@ -443,6 +479,30 @@ body {
 .mock-row.running {
   background: var(--accent-soft);
 }
+.mock-row-collapsed {
+  display: none;
+}
+.mock-row-collapsed.mock-row-bundle {
+  display: flex;
+  position: absolute;
+  top: 29px;
+  right: 0;
+  width: 0;
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+}
+.mock-row-collapsed > :not(.mock-handle) {
+  display: none;
+}
+.mock-collapsed-summary {
+  @apply border-b px-3 py-3;
+  border-color: var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
 .run-button {
   @apply flex items-center justify-center rounded-full;
   flex: none;
@@ -503,13 +563,6 @@ body {
 }
 .run-state.failed {
   color: var(--danger);
-}
-.add-mock {
-  @apply w-full p-2.5;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 10px;
 }
 .canvas-hint {
   @apply absolute rounded-lg px-3 py-2;
@@ -646,6 +699,44 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
+.framework-select {
+  position: relative;
+}
+.framework-select-trigger {
+  @apply flex items-center gap-2 text-left;
+  min-height: 38px;
+  cursor: pointer;
+}
+.framework-select-trigger img,
+.framework-options img {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+.framework-select-trigger > span {
+  @apply min-w-0 flex-1 truncate;
+  color: var(--text);
+}
+.framework-chevron {
+  flex: none;
+  color: var(--muted);
+}
+.framework-options {
+  @apply absolute left-0 right-0 z-30 mt-1 flex flex-col gap-1 rounded-lg border p-1.5 shadow-lg;
+  border-color: var(--border);
+  background: var(--panel);
+}
+.framework-options button {
+  @apply flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+.framework-options button:hover,
+.framework-options button[aria-selected="true"] {
+  background: var(--panel2);
+}
 .logs-toolbar .control {
   width: auto;
   min-width: 130px;
@@ -745,6 +836,9 @@ body {
 .dialog-body {
   @apply flex flex-1 flex-col gap-3 overflow-auto px-5 py-4;
 }
+.service-config-fields {
+  @apply flex flex-col gap-0;
+}
 .dialog-footer {
   @apply flex justify-end gap-2 border-t px-5 py-3;
   border-color: var(--border);
@@ -784,12 +878,36 @@ body {
 }
 .endpoint-form-card {
   @apply flex flex-col gap-2.5 rounded-xl border p-3;
+  padding-bottom: 0px;
   border-color: var(--border);
   background: var(--panel2);
 }
 .endpoint-form-summary {
   @apply cursor-pointer gap-2;
   list-style: none;
+}
+.endpoint-summary-title {
+  @apply flex min-w-0 items-center gap-2;
+}
+.endpoint-summary-copy {
+  @apply flex min-w-0 flex-1 flex-col;
+}
+.endpoint-summary-copy span {
+  @apply truncate;
+}
+.endpoint-delete-button {
+  @apply grid shrink-0 place-items-center rounded-md border;
+  width: 24px;
+  height: 24px;
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+.endpoint-delete-button .ui-icon {
+  stroke: var(--danger);
+}
+.endpoint-delete-button:hover {
+  background: var(--danger-soft);
 }
 .endpoint-form-summary::-webkit-details-marker {
   display: none;
@@ -800,6 +918,13 @@ body {
 }
 .endpoint-form-card[open] > .endpoint-form-summary::after {
   content: "−";
+}
+.endpoint-form-card:not([open]) {
+  min-height: 56px;
+  justify-content: center;
+}
+.endpoint-form-card:not([open]) > .endpoint-form-summary {
+  width: 100%;
 }
 .endpoint-form-summary span {
   color: var(--muted);
@@ -815,9 +940,6 @@ body {
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
   resize: vertical;
-}
-.delete-service {
-  align-self: flex-start;
 }
 .run-drawer {
   @apply absolute z-30 overflow-hidden rounded-xl;
