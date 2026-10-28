@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   Handle,
   Position,
@@ -57,7 +57,11 @@ const mockApis = ref<MockApi[]>([]);
 const serviceEdges = ref<{ id: string; sourceServiceId: string; targetEndpointId: string }[]>([]);
 const viewport = ref({ x: 0, y: 0, zoom: 1 });
 const mockNodePosition = ref({ x: 560, y: 160 });
-const dark = ref(false);
+const dark = useCookie("cairn-dark-mode", {
+  default: () => false,
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: "lax",
+});
 const loading = ref(true);
 const saving = ref(false);
 const errorMessage = ref("");
@@ -71,8 +75,8 @@ const logsOpen = ref(false);
 const logsPanelHeight = ref(280);
 const logs = ref<LogEntry[]>([]);
 const logSearch = ref("");
-const logService = ref("");
-const logSeverity = ref("");
+const logService = ref<string[]>([]);
+const logSeverity = ref<string[]>([]);
 const runningMockId = ref<string | null>(null);
 const runResults = ref<Record<string, RunResult>>({});
 const observedErrorServices = ref<string[]>([]);
@@ -171,8 +175,7 @@ function buildEdges() {
         sourceHandle: "service-out",
         target,
         targetHandle: edge.targetEndpointId,
-        type: "smoothstep",
-        label: "calls",
+        type: "default",
         class: observedEdges.value.some(
           (item) =>
             item.sourceService ===
@@ -194,7 +197,7 @@ function buildEdges() {
         sourceHandle: entry.id,
         target,
         targetHandle: entry.targetEndpointId,
-        type: "smoothstep",
+        type: "default",
         class:
           entry.id === runningMockId.value
             ? "running-edge"
@@ -215,7 +218,7 @@ function buildEdges() {
         sourceHandle: "service-out",
         target,
         targetHandle: services.value.find((service) => service.id === target)?.endpoints[0]?.id,
-        type: "smoothstep",
+        type: "default",
         class: "observed",
         animated: true,
       },
@@ -268,8 +271,8 @@ async function loadServiceHealth() {
 async function loadLogs() {
   const query = new URLSearchParams();
   if (logSearch.value.trim()) query.set("search", logSearch.value.trim());
-  if (logService.value) query.set("service", logService.value);
-  if (logSeverity.value) query.set("severity", logSeverity.value);
+  for (const service of logService.value) query.append("service", service);
+  for (const severity of logSeverity.value) query.append("severity", severity);
   try {
     logs.value = await api<LogEntry[]>(`/api/logs${query.size ? `?${query}` : ""}`);
   } catch {
@@ -277,8 +280,20 @@ async function loadLogs() {
   }
 }
 
+function toggleLogService(name: string) {
+  logService.value = logService.value.includes(name)
+    ? logService.value.filter((service) => service !== name)
+    : [...logService.value, name];
+}
+
+function toggleLogSeverity(severity: string) {
+  logSeverity.value = logSeverity.value.includes(severity)
+    ? logSeverity.value.filter((level) => level !== severity)
+    : [...logSeverity.value, severity];
+}
+
 let logTimer: ReturnType<typeof setTimeout>;
-watch([logSearch, logService, logSeverity], () => {
+watch([logSearch, () => logService.value.join("\0"), () => logSeverity.value.join("\0")], () => {
   clearTimeout(logTimer);
   logTimer = setTimeout(loadLogs, 180);
 });
@@ -303,6 +318,16 @@ async function saveCanvas() {
   saving.value = true;
   try {
     await api("/api/canvas", { method: "PUT", body: canvasPayload() });
+    for (const node of nodes.value) {
+      if (node.id === "mock-apis") mockNodePosition.value = { ...node.position };
+      else {
+        const service = services.value.find((item) => item.id === node.id);
+        if (service) {
+          service.positionX = node.position.x;
+          service.positionY = node.position.y;
+        }
+      }
+    }
     errorMessage.value = "";
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not save the graph";
@@ -321,12 +346,14 @@ async function onConnect(connection: Connection) {
     const entry = mockApis.value.find((item) => item.id === connection.sourceHandle);
     if (!entry?.id) return;
     try {
+      await saveCanvas();
       await api(`/api/mock-apis/${entry.id}`, {
         method: "PUT",
         body: { ...entry, targetEndpointId: connection.targetHandle },
       });
       mockApis.value = await api<MockApi[]>("/api/mock-apis");
       syncNodes();
+      await saveCanvas();
     } catch (cause) {
       errorMessage.value = cause instanceof Error ? cause.message : "Could not connect mock API";
     }
@@ -373,7 +400,7 @@ function beginAddService() {
 
 const addPosition = ref({ x: 160, y: 120 });
 
-function editService(id: string) {
+function editService(id: string, focusEndpointId?: string) {
   const service = services.value.find((item) => item.id === id);
   if (!service) return;
   editingServiceId.value = id;
@@ -385,6 +412,19 @@ function editService(id: string) {
     endpoints: service.endpoints.map((endpoint) => ({ ...endpoint })),
   };
   serviceDialog.value = true;
+  if (focusEndpointId)
+    void nextTick(() => {
+      const card = document.getElementById(`service-endpoint-${focusEndpointId}`);
+      if (card instanceof HTMLDetailsElement) card.open = true;
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+}
+
+function openServiceEndpoint(endpointId: string) {
+  const service = services.value.find((item) =>
+    item.endpoints.some((endpoint) => endpoint.id === endpointId),
+  );
+  if (service) editService(service.id, endpointId);
 }
 
 function onNodeClick(event: { node: { id: string } }) {
@@ -408,6 +448,7 @@ function removeEndpoint(index: number) {
 
 async function saveService() {
   try {
+    await saveCanvas();
     const path = editingServiceId.value
       ? `/api/services/${editingServiceId.value}`
       : "/api/services";
@@ -415,8 +456,9 @@ async function saveService() {
       ? serviceDraft.value
       : { ...serviceDraft.value, positionX: addPosition.value.x, positionY: addPosition.value.y };
     await api(path, { method: editingServiceId.value ? "PUT" : "POST", body });
-    serviceDialog.value = false;
+    closeSettings();
     await loadCanvas();
+    await saveCanvas();
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not save service";
   }
@@ -425,19 +467,29 @@ async function saveService() {
 async function deleteService(id: string) {
   if (!confirm("Remove this service and its endpoints from the graph?")) return;
   try {
+    await saveCanvas();
     await api(`/api/services/${id}`, { method: "DELETE" });
     await loadCanvas();
+    await saveCanvas();
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not remove service";
   }
 }
 
-function openMockPanel() {
+function openMockPanel(focusMockApiId?: string) {
   mockDraft.value = mockApis.value.map((entry) => ({
     ...entry,
     requestJson: JSON.stringify(entry.requestJson ?? {}, null, 2),
   }));
   mockPanel.value = true;
+  if (focusMockApiId)
+    void nextTick(() => {
+      const card = document.getElementById(`mock-api-${focusMockApiId}`);
+      if (card instanceof HTMLDetailsElement) card.open = true;
+      document
+        .getElementById(`mock-endpoint-${focusMockApiId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
 }
 function addMockDraft() {
   const endpoint =
@@ -455,6 +507,7 @@ function removeMockDraft(index: number) {
 
 async function saveMockDraft() {
   try {
+    await saveCanvas();
     const entries = mockDraft.value.map((entry) => {
       let requestJson: unknown;
       try {
@@ -475,8 +528,9 @@ async function saveMockDraft() {
       if (entry.id) await api(`/api/mock-apis/${entry.id}`, { method: "PUT", body: entry });
       else await api("/api/mock-apis", { method: "POST", body: entry });
     }
-    mockPanel.value = false;
+    closeSettings();
     await loadCanvas();
+    await saveCanvas();
   } catch (cause) {
     errorMessage.value = cause instanceof Error ? cause.message : "Could not save mock APIs";
   }
@@ -484,6 +538,7 @@ async function saveMockDraft() {
 
 async function runMock(entry: MockApi) {
   if (!entry.id) return;
+  await saveCanvas();
   const targetService = services.value.find((service) =>
     service.endpoints.some((endpoint) => endpoint.id === entry.targetEndpointId),
   );
@@ -504,6 +559,12 @@ async function runMock(entry: MockApi) {
   try {
     const result = await api<RunResult>(`/api/mock-apis/${entry.id}/runs`, { method: "POST" });
     runResults.value[entry.id] = result;
+    if (result.status === "failed") {
+      logService.value = targetService ? [targetService.name] : [];
+      logSeverity.value = ["ERROR"];
+      logsOpen.value = true;
+      await loadLogs();
+    }
     const deadline = Date.now() + 11_000;
     let flow:
       | {
@@ -527,7 +588,10 @@ async function runMock(entry: MockApi) {
       runResults.value[entry.id] = { ...result, flow };
       syncNodes();
     }
-    if (logsOpen.value) await loadLogs();
+    if (result.status === "failed") {
+      if (flow?.errorServices.length) logService.value = flow.errorServices;
+      await loadLogs();
+    } else if (logsOpen.value) await loadLogs();
   } catch (cause) {
     runResults.value[entry.id] = {
       id: "",
@@ -537,9 +601,14 @@ async function runMock(entry: MockApi) {
       responseBody: null,
       error: cause instanceof Error ? cause.message : "Call failed",
     };
+    logService.value = targetService ? [targetService.name] : [];
+    logSeverity.value = ["ERROR"];
+    logsOpen.value = true;
+    await loadLogs();
   } finally {
     runningMockId.value = null;
     buildEdges();
+    await saveCanvas();
   }
 }
 
@@ -585,6 +654,18 @@ function adjustLogsPanelHeight(delta: number) {
     Math.min(window.innerHeight - 32, logsPanelHeight.value + delta),
   );
 }
+
+function closeSettings() {
+  serviceDialog.value = false;
+  mockPanel.value = false;
+  nodes.value = nodes.value.map((node) => (node.selected ? { ...node, selected: false } : node));
+}
+
+function closeSettingsOutside(event: PointerEvent) {
+  if (event.target instanceof Element && event.target.closest(".side-dialog")) return;
+  closeSettings();
+}
+
 const servicesForSelect = computed(() =>
   services.value.flatMap((service) =>
     service.endpoints.map((endpoint) => ({
@@ -595,6 +676,7 @@ const servicesForSelect = computed(() =>
 );
 
 onMounted(async () => {
+  document.addEventListener("pointerdown", closeSettingsOutside);
   logsPanelHeight.value = Math.max(
     160,
     Math.round(window.innerHeight * (window.innerWidth <= 720 ? 0.34 : 0.25)),
@@ -605,6 +687,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("pointerdown", closeSettingsOutside);
   if (healthTimer) clearInterval(healthTimer);
 });
 </script>
@@ -617,7 +700,7 @@ onUnmounted(() => {
   >
     <header class="topbar float">
       <div class="brand-mark">SG</div>
-      <div class="brand"><strong>Service Graph</strong><span>DATA FLOW OBSERVABILITY</span></div>
+      <div class="brand"><strong>Cairn</strong><span>DATA FLOW OBSERVABILITY</span></div>
       <div class="top-actions">
         <span class="project-label"><i></i> {{ services.length }} services</span>
         <button class="button primary" :disabled="saving" @click.stop="saveCanvas">
@@ -712,7 +795,13 @@ onUnmounted(() => {
               <span class="method-tag" :class="`method-${endpoint.method.toLowerCase()}`">{{
                 endpoint.method
               }}</span>
-              <span class="endpoint-name">{{ endpoint.name }}</span>
+              <button
+                type="button"
+                class="endpoint-name endpoint-link"
+                @click.stop="openServiceEndpoint(endpoint.id)"
+              >
+                {{ endpoint.name }}
+              </button>
             </div>
             <div v-if="!data.endpoints.length" class="empty-endpoints">No endpoints registered</div>
             <div v-if="observedErrorServices.includes(data.name)" class="error-indicator">
@@ -744,27 +833,16 @@ onUnmounted(() => {
                 :position="Position.Right"
                 class="mock-handle"
               />
-              <button
-                class="run-button nodrag"
-                :disabled="!!runningMockId"
-                :title="`Run ${entry.name}`"
-                @click.stop="runMock(entry)"
-              >
-                <svg
-                  v-if="runningMockId !== entry.id"
-                  class="ui-icon"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M8 5v14l11-7z" /></svg
-                ><span>{{ runningMockId === entry.id ? "Running..." : "Run" }}</span>
-              </button>
               <div class="mock-copy">
                 <strong>{{ entry.name }}</strong
-                ><span
-                  ><b>{{ mockEndpoint(entry)?.method ?? "No endpoint" }}</b>
-                  {{ mockEndpoint(entry)?.url ?? "Select a service endpoint" }}</span
+                ><button
+                  type="button"
+                  class="mock-endpoint-link"
+                  @click.stop="entry.id && openMockPanel(entry.id)"
                 >
+                  <b>{{ mockEndpoint(entry)?.method ?? "No endpoint" }}</b>
+                  {{ mockEndpoint(entry)?.url ?? "Select a service endpoint" }}
+                </button>
               </div>
               <span
                 v-if="runResults[entry.id || '']"
@@ -772,6 +850,27 @@ onUnmounted(() => {
                 :class="runResults[entry.id || ''].status"
                 >{{ runResults[entry.id || ""].status }}</span
               >
+              <button
+                class="run-button nodrag"
+                :disabled="!!runningMockId"
+                :aria-label="
+                  runningMockId === entry.id ? `Running ${entry.name}` : `Run ${entry.name}`
+                "
+                :title="runningMockId === entry.id ? `Running ${entry.name}` : `Run ${entry.name}`"
+                @click.stop="runMock(entry)"
+              >
+                <svg
+                  v-if="runningMockId === entry.id"
+                  class="ui-icon run-spinner"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="8" />
+                </svg>
+                <svg v-else class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
             </div>
             <button class="add-mock nodrag" @click.stop="openMockPanel">+ Manage mock APIs</button>
           </article>
@@ -834,23 +933,56 @@ onUnmounted(() => {
           placeholder="Search log messages..."
           aria-label="Search log messages"
         />
-        <select v-model="logService" class="control" aria-label="Filter by service">
-          <option value="">All services</option>
-          <option
-            v-for="name in [...new Set(services.map((service) => service.name))].sort()"
-            :key="name"
-            :value="name"
-          >
-            {{ name }}
-          </option>
-        </select>
-        <select v-model="logSeverity" class="control" aria-label="Filter by severity">
-          <option value="">All levels</option>
-          <option>ERROR</option>
-          <option>WARN</option>
-          <option>INFO</option>
-          <option>DEBUG</option>
-        </select>
+        <details class="log-service-filter">
+          <summary class="control" aria-label="Filter by service">
+            {{ logService.length ? `${logService.length} selected` : "All services" }}
+          </summary>
+          <div class="log-service-options">
+            <button
+              type="button"
+              :class="{ selected: !logService.length }"
+              :aria-pressed="!logService.length"
+              @click="logService = []"
+            >
+              All services
+            </button>
+            <button
+              v-for="name in [...new Set(services.map((service) => service.name))].sort()"
+              :key="name"
+              type="button"
+              :class="{ selected: logService.includes(name) }"
+              :aria-pressed="logService.includes(name)"
+              @click="toggleLogService(name)"
+            >
+              {{ name }}
+            </button>
+          </div>
+        </details>
+        <details class="log-service-filter">
+          <summary class="control" aria-label="Filter by severity">
+            {{ logSeverity.length ? `${logSeverity.length} selected` : "All levels" }}
+          </summary>
+          <div class="log-service-options">
+            <button
+              type="button"
+              :class="{ selected: !logSeverity.length }"
+              :aria-pressed="!logSeverity.length"
+              @click="logSeverity = []"
+            >
+              All levels
+            </button>
+            <button
+              v-for="level in ['ERROR', 'WARN', 'INFO', 'DEBUG']"
+              :key="level"
+              type="button"
+              :class="{ selected: logSeverity.includes(level) }"
+              :aria-pressed="logSeverity.includes(level)"
+              @click="toggleLogSeverity(level)"
+            >
+              {{ level }}
+            </button>
+          </div>
+        </details>
         <button class="icon-button" aria-label="Refresh logs" @click="loadLogs">
           <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 7v5h-5M20 12a8 8 0 1 1-2.34-5.66L20 7" />
@@ -880,7 +1012,7 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <div v-if="serviceDialog" class="dialog-backdrop" @click.self="serviceDialog = false">
+    <div v-if="serviceDialog" class="dialog-backdrop" @click.self="closeSettings">
       <section
         class="side-dialog float"
         role="dialog"
@@ -892,7 +1024,7 @@ onUnmounted(() => {
             <strong>{{ editingServiceId ? "Service settings" : "Add service node" }}</strong
             ><span>Configure the service and its endpoints</span>
           </div>
-          <button class="icon-button" aria-label="Close" @click="serviceDialog = false">
+          <button class="icon-button" aria-label="Close" @click="closeSettings">
             <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 6 12 12M18 6 6 18" />
             </svg>
@@ -927,15 +1059,19 @@ onUnmounted(() => {
             <strong>Available endpoints</strong
             ><button class="button secondary small" @click="addEndpoint">+ Add endpoint</button>
           </div>
-          <article
+          <details
             v-for="(endpoint, index) in serviceDraft.endpoints"
             :key="endpoint.id || index"
             class="endpoint-form-card"
+            :id="endpoint.id ? `service-endpoint-${endpoint.id}` : undefined"
           >
-            <div class="endpoint-form-head">
-              <strong>Endpoint {{ index + 1 }}</strong
-              ><button class="text-button danger-text" @click="removeEndpoint(index)">
-                Remove
+            <summary class="endpoint-form-head endpoint-form-summary">
+              <strong>{{ endpoint.name || `Endpoint ${index + 1}` }}</strong>
+              <span>{{ endpoint.method }} {{ endpoint.url }}</span>
+            </summary>
+            <div class="endpoint-form-actions">
+              <button class="text-button danger-text" @click="removeEndpoint(index)">
+                Remove endpoint
               </button>
             </div>
             <label class="field"
@@ -962,26 +1098,26 @@ onUnmounted(() => {
             <label class="field"
               ><span>URL</span><input v-model="endpoint.url" class="control" placeholder="/orders"
             /></label>
-          </article>
+          </details>
           <button
             v-if="editingServiceId"
             class="button danger-outline delete-service"
             @click="
               deleteService(editingServiceId);
-              serviceDialog = false;
+              closeSettings();
             "
           >
             Remove service
           </button>
         </div>
         <footer class="dialog-footer">
-          <button class="button secondary" @click="serviceDialog = false">Discard</button
+          <button class="button secondary" @click="closeSettings">Discard</button
           ><button class="button primary" @click="saveService">Save service</button>
         </footer>
       </section>
     </div>
 
-    <div v-if="mockPanel" class="dialog-backdrop" @click.self="mockPanel = false">
+    <div v-if="mockPanel" class="dialog-backdrop" @click.self="closeSettings">
       <section
         class="side-dialog float"
         role="dialog"
@@ -992,7 +1128,7 @@ onUnmounted(() => {
           <div>
             <strong>Mock APIs</strong><span>Calls linked to registered service endpoints</span>
           </div>
-          <button class="icon-button" aria-label="Close" @click="mockPanel = false">
+          <button class="icon-button" aria-label="Close" @click="closeSettings">
             <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 6 12 12M18 6 6 18" />
             </svg>
@@ -1003,15 +1139,22 @@ onUnmounted(() => {
             <strong>Registered mock APIs</strong
             ><button class="button secondary small" @click="addMockDraft">+ Add row</button>
           </div>
-          <article
+          <details
             v-for="(entry, index) in mockDraft"
             :key="entry.id || `new-${index}`"
             class="endpoint-form-card mock-form-card"
+            :id="entry.id ? `mock-api-${entry.id}` : undefined"
           >
-            <div class="endpoint-form-head">
+            <summary class="endpoint-form-head endpoint-form-summary">
               <strong>{{ entry.name || `Mock API ${index + 1}` }}</strong
-              ><button class="text-button danger-text" @click="removeMockDraft(index)">
-                Remove
+              ><span>{{
+                servicesForSelect.find((option) => option.id === entry.targetEndpointId)?.label ??
+                "Select service endpoint"
+              }}</span>
+            </summary>
+            <div class="endpoint-form-actions">
+              <button class="text-button danger-text" @click="removeMockDraft(index)">
+                Remove mock API
               </button>
             </div>
             <label class="field"
@@ -1020,7 +1163,11 @@ onUnmounted(() => {
             /></label>
             <label class="field"
               ><span>Service endpoint</span
-              ><select v-model="entry.targetEndpointId" class="control">
+              ><select
+                :id="entry.id ? `mock-endpoint-${entry.id}` : undefined"
+                v-model="entry.targetEndpointId"
+                class="control"
+              >
                 <option value="" disabled>Select endpoint</option>
                 <option v-for="option in servicesForSelect" :key="option.id" :value="option.id">
                   {{ option.label }}
@@ -1040,13 +1187,13 @@ onUnmounted(() => {
               ><span>Description</span
               ><input v-model="entry.description" class="control" placeholder="Optional note"
             /></label>
-          </article>
+          </details>
           <div v-if="!mockDraft.length" class="empty-logs">
             No mock API rows yet. Add one to get started.
           </div>
         </div>
         <footer class="dialog-footer">
-          <button class="button secondary" @click="mockPanel = false">Discard</button
+          <button class="button secondary" @click="closeSettings">Discard</button
           ><button class="button primary" @click="saveMockDraft">Save mock APIs</button>
         </footer>
       </section>

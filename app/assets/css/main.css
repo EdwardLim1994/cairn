@@ -153,9 +153,10 @@ body {
   border-color: var(--danger);
 }
 .icon-button {
-  @apply rounded-lg border text-lg;
+  @apply inline-grid place-items-center rounded-lg border;
   width: 34px;
   height: 34px;
+  padding: 0;
   border-color: var(--border);
   background: var(--panel);
   line-height: 1;
@@ -357,6 +358,17 @@ body {
   @apply max-w-24 truncate whitespace-nowrap;
   font-size: 11px;
 }
+.endpoint-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.endpoint-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
 .method-tag {
   @apply rounded px-1 py-0.5;
   font-size: 9px;
@@ -432,17 +444,29 @@ body {
   background: var(--accent-soft);
 }
 .run-button {
-  @apply flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5;
+  @apply flex items-center justify-center rounded-full;
   flex: none;
-  min-width: 70px;
+  width: 34px;
   height: 34px;
+  margin-left: auto;
   border: 0;
   background: var(--accent);
   color: var(--accent-ink) !important;
-  font-size: 12px;
 }
 .run-button:disabled {
   @apply opacity-50;
+}
+.run-spinner {
+  fill: none;
+  stroke: currentColor;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 12;
+  animation: run-spin 1s linear infinite;
+}
+@keyframes run-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .mock-copy {
   @apply flex min-w-0 flex-1 flex-col gap-1;
@@ -454,9 +478,17 @@ body {
 .mock-copy strong {
   font-size: 11px;
 }
-.mock-copy span {
+.mock-endpoint-link {
+  @apply block w-full truncate whitespace-nowrap;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: var(--muted);
   font-size: 9px;
+  text-align: left;
+}
+.mock-endpoint-link:hover {
+  color: var(--accent);
 }
 .mock-copy b {
   color: var(--accent);
@@ -619,6 +651,35 @@ body {
   min-width: 130px;
   padding: 7px 9px;
 }
+.log-service-filter {
+  position: relative;
+}
+.log-service-filter summary {
+  cursor: pointer;
+  list-style: none;
+}
+.log-service-filter summary::-webkit-details-marker {
+  display: none;
+}
+.log-service-options {
+  @apply absolute right-0 z-20 mt-1 flex max-h-48 min-w-full flex-col gap-1 overflow-auto rounded-lg border p-1.5 shadow-lg;
+  border-color: var(--border);
+  background: var(--panel);
+}
+.log-service-options button {
+  @apply cursor-pointer whitespace-nowrap rounded px-2 py-1.5 text-left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+.log-service-options button:hover {
+  background: var(--panel2);
+}
+.log-service-options button.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .logs-toolbar .search {
   width: min(250px, 26vw);
 }
@@ -725,6 +786,27 @@ body {
   @apply flex flex-col gap-2.5 rounded-xl border p-3;
   border-color: var(--border);
   background: var(--panel2);
+}
+.endpoint-form-summary {
+  @apply cursor-pointer gap-2;
+  list-style: none;
+}
+.endpoint-form-summary::-webkit-details-marker {
+  display: none;
+}
+.endpoint-form-summary::after {
+  color: var(--muted);
+  content: "+";
+}
+.endpoint-form-card[open] > .endpoint-form-summary::after {
+  content: "−";
+}
+.endpoint-form-summary span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.endpoint-form-actions {
+  @apply flex justify-end;
 }
 .endpoint-form-head strong {
   font-size: 11px;

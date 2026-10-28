@@ -8,9 +8,12 @@ export default defineEventHandler(async (event) => {
   const projectId = await ensureProject();
   const query = getQuery(event);
   const conditions = [eq(logs.projectId, projectId)];
-  if (typeof query.severity === "string" && query.severity.trim()) {
-    const severity = normalizeSeverity(query.severity);
-    const aliases =
+  const requestedSeverities = (Array.isArray(query.severity) ? query.severity : [query.severity])
+    .filter((severity): severity is string => typeof severity === "string")
+    .map((severity) => normalizeSeverity(severity.trim()))
+    .filter(Boolean);
+  if (requestedSeverities.length) {
+    const aliases = requestedSeverities.flatMap((severity) =>
       severity === "INFO"
         ? ["INFO", "INFORMATION"]
         : severity === "WARN"
@@ -19,8 +22,9 @@ export default defineEventHandler(async (event) => {
             ? ["FATAL", "CRITICAL"]
             : severity === "DEBUG"
               ? ["DEBUG", "TRACE"]
-              : [severity];
-    conditions.push(inArray(logs.severity, aliases));
+              : [severity],
+    );
+    conditions.push(inArray(logs.severity, [...new Set(aliases)]));
   }
   if (typeof query.search === "string" && query.search.trim()) {
     const escaped = query.search.trim().replace(/[\\%_]/g, "\\$&");
@@ -44,8 +48,11 @@ export default defineEventHandler(async (event) => {
       )?.name ?? record.serviceName;
     return { ...record, serviceName, severity: normalizeSeverity(record.severity) };
   });
-  const requestedService = typeof query.service === "string" ? query.service.trim() : "";
-  return requestedService
-    ? normalized.filter((record) => record.serviceName === requestedService)
+  const requestedServices = (Array.isArray(query.service) ? query.service : [query.service])
+    .filter((service): service is string => typeof service === "string")
+    .map((service) => service.trim())
+    .filter(Boolean);
+  return requestedServices.length
+    ? normalized.filter((record) => requestedServices.includes(record.serviceName))
     : normalized;
 });

@@ -15,6 +15,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - default
+      - adminer
 
   app:
     build: .
@@ -35,10 +38,18 @@ services:
     ports:
       - "${PORT:-3001}:${PORT:-3001}"
 
+  adminer:
+    image: adminer:latest
+    ports:
+      - 8888:8080
+    networks:
+      - adminer
+
 volumes:
   mysql_data:
 
 networks:
+  adminer:
   java-microservices:
     external: true
     name: java-microservices_default
