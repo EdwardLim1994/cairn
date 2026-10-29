@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { services } from "../../db/schema";
 import { ensureProject } from "../../utils/project";
+import { getOutboundUrl } from "../../utils/outbound-url";
 
 export default defineEventHandler(async () => {
   const projectId = await ensureProject();
@@ -22,7 +23,7 @@ export default defineEventHandler(async () => {
       if (!healthPath) return { id: service.id, online: false };
 
       try {
-        const response = await fetch(new URL(healthPath, service.baseUrl), {
+        const response = await fetch(getOutboundUrl(healthPath, service.baseUrl), {
           signal: AbortSignal.timeout(2000),
         });
         return { id: service.id, online: response.ok };

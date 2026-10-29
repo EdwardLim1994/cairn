@@ -3,13 +3,13 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { mockApis, serviceEndpoints } from "../../db/schema";
 import { ensureProject } from "../../utils/project";
-import { mockApiInput } from "../../utils/mock-api-validation";
+import { mockApiInput, validateEndpointPathParameters } from "../../utils/mock-api-validation";
 
 export default defineEventHandler(async (event) => {
   const input = mockApiInput(await readBody(event));
   const projectId = await ensureProject();
   const [endpoint] = await getDb()
-    .select({ id: serviceEndpoints.id })
+    .select({ id: serviceEndpoints.id, url: serviceEndpoints.url })
     .from(serviceEndpoints)
     .where(
       and(
@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
       statusCode: 400,
       statusMessage: "Selected endpoint is not in this project",
     });
+  validateEndpointPathParameters(input.pathParameters, endpoint.url);
   const id = randomUUID();
   await getDb()
     .insert(mockApis)

@@ -53,6 +53,20 @@ For GET requests, send query parameters in the manually entered URL and do not s
 
 Create a W3C trace ID for each run and pass a valid `traceparent` header to the selected service. Downstream services that honor W3C Trace Context will emit spans with the run's trace ID. Do not infer service flow from configured edges; use collected spans for observed flow and errors.
 
+### Resolve mock API path parameters and shared variables
+
+Keep registered endpoint URLs as route templates, for example `/payments/{orderId:guid}`. Add a JSON `pathParameters` value to each mock API entry, keyed by the route parameter name. The settings panel derives fields from the selected endpoint template and saves literal values or `{{variableName}}` references with that mock API. URL-encode each resolved path segment when building the outbound URL; never send route-template braces literally.
+
+Add a project-scoped `environment_variables` table with a unique variable name per project and a text value column. The first version has one shared set per project rather than named profiles. Show saved variables as cards with their name and value, and stage edits until the panel's Save action. Resolve `{{name}}` references in path parameter values and JSON request strings on the server by substituting the string value. Keep placeholders inside valid JSON strings to preserve the existing `request_json` JSON-column contract and avoid storing arbitrary request text. Migrate existing JSON values to their textual representation when changing the column to text.
+
+### Use an extensible Vue code editor
+
+Use CodeMirror 6 through the Vue 3 `vue-codemirror` component with the JSON language package. Add formatting, diagnostics, bracket matching/indentation, and variable-name completion using the shared environment variable names. Since references stay inside valid JSON strings, the normal JSON parser can validate documents while the editor decorates `{{...}}` references and offers completions. Keep language setup modular so GraphQL syntax highlighting can be added later without changing request storage; GraphQL request execution remains out of scope. A larger editor such as Monaco was considered but is unnecessary for the current single request editor.
+
+### Future direction: chained calls
+
+Keep automatically generated values separate from the shared environment variables. A future chained-call feature should define an ordered scenario of mock API steps, capture selected values from a successful step response using a JSONPath-like extractor, and expose them only in that scenario's run-scoped variable context for later steps. Preserve each step's request, response, status, and trace association. A failing step should stop later steps by default while retaining prior results. This avoids mutating shared variables and prevents values from concurrent runs leaking into each other. The chain editor and failure/continue controls need separate requirements before implementation.
+
 ### Accept Collector telemetry with OTLP/HTTP JSON
 
 Configure the OpenTelemetry Collector to export traces and logs separately to `/v1/traces` and `/v1/logs` using OTLP/HTTP JSON. Decode only the fields needed for trace assembly, log display, and filtering, and persist the records in MySQL. Require a configured ingestion token on these routes so arbitrary clients cannot write telemetry.
@@ -76,6 +90,8 @@ Keep `DATABASE_URL`, `OTEL_COLLECTOR_URL`, `PROJECT_ID`, `PORT`, the telemetry i
 - Services without OpenTelemetry instrumentation or trace-context propagation produce incomplete flows. Show the call response even when no trace arrives, and mark the flow incomplete after the maximum wait.
 - A quiet interval can return before a late span arrives. Bound the wait and leave later logs available in the log panel.
 - MySQL telemetry volume can grow without limit. Add retention only after expected volume and deployment policy are known.
+- [A variable placeholder is missing or has a value unsuitable for its use] → Resolve variables before the outbound call, report the variable name and use, and send no request when resolution fails.
+- [Environment values may contain reserved URL characters] → URL-encode each resolved path segment before making an outbound request.
 - Server-side calls to manually entered URLs can reach unintended hosts. Restrict outbound targets to the deployment's service network before exposing this app to untrusted users.
 - A missing or misconfigured runtime variable can prevent startup or break telemetry. Document each variable in `.env.example` and fail clearly when required values are absent.
 - Baking credentials into an image makes them recoverable from image layers. Keep actual values in ignored `.env` or deployment secrets and pass them at runtime.
@@ -87,10 +103,13 @@ There is no existing product schema or user data to migrate. Add Drizzle schema 
 ## Open Questions
 
 - What telemetry retention period and cleanup schedule fit the expected log and trace volume?
+- How should secrets be visually masked in the shared environment variable editor? (Can be decided before implementation if sensitive values are introduced.)
 
 ## References
 
 - [Vue Flow guide](https://vueflow.dev/guide/)
+- [Vue CodeMirror (CodeMirror 6 for Vue 3)](https://github.com/surmon-china/vue-codemirror)
+- [CodeMirror language support](https://codemirror.net/)
 - [Nuxt server engine](https://nuxt.com/docs/guide/concepts/server-engine/)
 - [Drizzle ORM with MySQL](https://orm.drizzle.team/docs/get-started/mysql-new)
 - [OpenTelemetry Protocol specification](https://opentelemetry.io/docs/specs/otlp/)

@@ -18,14 +18,34 @@
 
 ## 3. Graph editor and panels
 
-- [ ] 3.1 Build the Vue Flow canvas with service nodes, endpoint handles, the shared Mock APIs node, per-row connections, background, minimap, zoom, fit-view, and position locking; verify the updated design layout and graph interactions.
-- [ ] 3.2 Build service add/edit forms with name, framework, base URL, endpoint name, REST API type, method, and URL; show only endpoint names and methods on service nodes.
-- [ ] 3.3 Build Mock API settings with editable rows, selected endpoint, JSON request, description, and add/remove/save/discard actions; verify each row's edge targets its selected endpoint.
-- [ ] 3.4 Add per-row run controls, response display, and running/completed/failed states; verify the active row and endpoint connection highlight during a run.
-- [ ] 3.5 Build the logs panel with search, severity and service filters, and timestamp/service/message rows; verify observed trace edges and the error service appear on the graph after a run.
+- [x] 3.1 Build the Vue Flow canvas with service nodes, endpoint handles, the shared Mock APIs node, per-row connections, background, minimap, zoom, fit-view, and automatic position saving; verify the updated design layout and graph interactions.
+- [x] 3.2 Build service add/edit forms with name, framework, base URL, endpoint name, REST API type, method, and URL; show only endpoint names and methods on service nodes.
+- [x] 3.3 Build Mock API settings with editable rows, selected endpoint, JSON request, description, and add/remove/save/discard actions; verify each row's edge targets its selected endpoint.
+- [x] 3.4 Add per-row run controls, response display, and running/completed/failed states; verify the active row and endpoint connection highlight during a run.
+- [x] 3.5 Build the logs panel with search, severity and service filters, and timestamp/service/message rows; verify observed trace edges and the error service appear on the graph after a run.
 
 ## 4. Integration and operation
 
-- [ ] 4.1 Connect the UI to the Nuxt APIs and restore saved canvas state on load; verify edits, run responses, flow updates, and logs stay consistent after reload.
+- [x] 4.1 Connect the UI to the Nuxt APIs and restore saved canvas state on load; verify edits, run responses, flow updates, and logs stay consistent after reload.
 - [x] 4.2 Document environment settings, Compose startup, and an OpenTelemetry Collector pipeline that exports REST service traces and logs to the app; verify the documented configuration matches the container service names and ingestion routes.
-- [ ] 4.3 Walk through one successful and one failing REST call with an instrumented service and Collector; verify response capture, trace correlation, graph highlighting, and log filtering.
+- [x] 4.3 Walk through one successful and one failing REST call with an instrumented service and Collector; verify response capture, trace correlation, graph highlighting, and log filtering.
+
+## 5. Mock API path parameters and shared variables
+
+- [x] 5.1 Add a Drizzle migration for saved mock API path parameters and project-scoped string environment variables; preserve existing request JSON values and convert prior environment values to text.
+- [x] 5.2 Update mock API and environment variable APIs with validation and CRUD behavior; verify project scoping, string values, and rejection of unknown variables or invalid resolved requests.
+- [x] 5.3 Add one shared environment variable section to the UI with create, edit, delete, and string value controls; verify edits persist and are available across mock APIs.
+- [x] 5.4 Generate saved path parameter fields from the selected endpoint route template; substitute literal values and shared variable references with URL-encoded path segments when triggering a call.
+- [x] 5.5 Preserve concrete path values and unresolved Postman variable references when importing matched collection requests; verify route parameter names map to the right path segments.
+- [x] 5.6 Add focused server and importer tests for string substitution, path encoding, undefined variables, and endpoint changes.
+
+## 6. Structured request editor
+
+- [x] 6.1 Integrate Vue CodeMirror 6 with JSON language support in the Mock API settings panel; verify Nuxt client rendering, theme compatibility, editor lifecycle, and accessible keyboard editing.
+- [x] 6.2 Add formatting, JSON diagnostics, placeholder highlighting, and autocomplete for shared variable names; verify malformed requests and unresolved variables are clearly reported.
+
+## Future enhancements
+
+- Multiple named environment profiles instead of one shared variable set.
+- Chained mock API execution with ordered calls, response value extraction, run-scoped variable propagation, per-step results and trace association, and fail-fast behavior by default. Define the chain editor and continue-on-error controls in a separate plan.
+- GraphQL syntax highlighting in the request editor. GraphQL request execution remains out of scope until separately specified.

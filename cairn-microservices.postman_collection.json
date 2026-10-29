@@ -1,0 +1,332 @@
+{
+  "info": {
+    "_postman_id": "e6a0e4c7-98cf-4d69-9016-65e2cdb9c500",
+    "name": "Cairn Microservices API Test Collection",
+    "description": "Local API requests routed through Traefik in the Java Spring Boot and .NET microservices Compose stacks. Start each repository with Docker Compose before sending requests. Register services in Cairn with the same localhost base URLs and ports used here.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [{ "key": "dotnetOrderId", "value": "" }],
+  "item": [
+    {
+      "name": "Java Spring Boot",
+      "item": [
+        {
+          "name": "Catalog Service",
+          "item": [
+            {
+              "name": "List products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8081/api/products",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8081",
+                  "path": ["api", "products"]
+                }
+              }
+            },
+            {
+              "name": "Get coffee with inventory",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8081/api/products/coffee",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8081",
+                  "path": ["api", "products", "coffee"]
+                }
+              }
+            },
+            {
+              "name": "Get unknown product (404)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8081/api/products/unknown",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8081",
+                  "path": ["api", "products", "unknown"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order Service",
+          "item": [
+            {
+              "name": "List orders",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8082/api/orders",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8082",
+                  "path": ["api", "orders"]
+                }
+              }
+            },
+            {
+              "name": "Create order",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": \"coffee\",\n  \"quantity\": 2\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "http://localhost:8082/api/orders",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8082",
+                  "path": ["api", "orders"]
+                }
+              }
+            },
+            {
+              "name": "Create invalid order (400)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": \"coffee\",\n  \"quantity\": 0\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "http://localhost:8082/api/orders",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8082",
+                  "path": ["api", "orders"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventory Service",
+          "item": [
+            {
+              "name": "Get coffee inventory",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8083/api/inventory/coffee",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8083",
+                  "path": ["api", "inventory", "coffee"]
+                }
+              }
+            },
+            {
+              "name": "Get unknown inventory (404)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:8083/api/inventory/unknown",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "8083",
+                  "path": ["api", "inventory", "unknown"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": ".NET",
+      "item": [
+        {
+          "name": "Catalog Service",
+          "item": [
+            {
+              "name": "Get product 1",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5001/products/1",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5001",
+                  "path": ["products", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get unknown product (404)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5001/products/99",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5001",
+                  "path": ["products", "99"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventory Service",
+          "item": [
+            {
+              "name": "Get inventory for product 1",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5002/inventory/1",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5002",
+                  "path": ["inventory", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get inventory for product 2 (simulated 503)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5002/inventory/2",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5002",
+                  "path": ["inventory", "2"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Order Service",
+          "item": [
+            {
+              "name": "Create order (success)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  pm.collectionVariables.set('dotnetOrderId', pm.response.json().id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 1,\n  \"quantity\": 2\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "http://localhost:5003/orders",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5003",
+                  "path": ["orders"]
+                }
+              }
+            },
+            {
+              "name": "Create order with failed inventory (500)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 2,\n  \"quantity\": 1\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "http://localhost:5003/orders",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5003",
+                  "path": ["orders"]
+                }
+              }
+            },
+            {
+              "name": "Get created order",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5003/orders/{{dotnetOrderId}}",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5003",
+                  "path": ["orders", "{{dotnetOrderId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payments Service",
+          "item": [
+            {
+              "name": "Create payment for latest order",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5004/payments/{{dotnetOrderId}}",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5004",
+                  "path": ["payments", "{{dotnetOrderId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Shipping Service",
+          "item": [
+            {
+              "name": "Create shipment for latest order",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:5005/shipments/{{dotnetOrderId}}",
+                  "protocol": "http",
+                  "host": ["localhost"],
+                  "port": "5005",
+                  "path": ["shipments", "{{dotnetOrderId}}"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

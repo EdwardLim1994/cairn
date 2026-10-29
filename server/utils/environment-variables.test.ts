@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vite-plus/test";
+import { resolveJsonVariables } from "./environment-variables";
+import { resolveEndpointPath } from "./mock-api-paths";
+import { validateEndpointPathParameters } from "./mock-api-validation";
+
+describe("shared environment variable resolution", () => {
+  const variables = new Map<string, string>([
+    ["count", "3"],
+    ["enabled", "true"],
+    ["segment", "a/b c"],
+  ]);
+
+  it("substitutes a whole placeholder as a string value", () => {
+    expect(resolveJsonVariables({ count: "{{count}}", enabled: "{{enabled}}" }, variables)).toEqual(
+      {
+        count: "3",
+        enabled: "true",
+      },
+    );
+  });
+
+  it("interpolates scalar values inside strings", () => {
+    expect(resolveJsonVariables("count={{count}}", variables)).toBe("count=3");
+  });
+
+  it("encodes substituted path values as one segment", () => {
+    expect(resolveEndpointPath("/items/{itemId:guid}", { itemId: "{{segment}}" }, variables)).toBe(
+      "/items/a%2Fb%20c",
+    );
+  });
+
+  it("rejects undefined variables and missing path values", () => {
+    expect(() => resolveJsonVariables("{{missing}}", variables)).toThrow(
+      /Undefined environment variable/,
+    );
+    expect(() => resolveEndpointPath("/items/:id", {}, variables)).toThrow(/no saved value/);
+  });
+
+  it("rejects path parameters that do not belong to the selected endpoint", () => {
+    expect(() => validateEndpointPathParameters({ oldId: "1" }, "/items/{id}")).toThrow(
+      /Unknown path parameter/,
+    );
+  });
+});

@@ -30,6 +30,53 @@ The system SHALL let users add, edit, and remove named mock API entries in one s
 - **WHEN** a user removes an entry and saves the changes
 - **THEN** the system removes that row and its endpoint connection
 
+### Requirement: Users can configure endpoint path parameters per mock API
+
+The system SHALL let users save values for route parameters declared by the selected endpoint. Values SHALL be stored on the mock API entry, kept when the canvas is reloaded, and substituted into the endpoint path when the mock API runs.
+
+#### Scenario: Save a literal route parameter value
+
+- **WHEN** a user configures a mock API for an endpoint such as `/payments/{orderId:guid}` and enters a concrete `orderId`
+- **THEN** the system saves that value with the mock API
+- **AND** a run sends the concrete value in the corresponding URL path segment
+
+#### Scenario: Import a Postman path value
+
+- **WHEN** an imported Postman request matches an endpoint with route parameters
+- **THEN** the system copies concrete request path segments into the corresponding mock API path parameter values
+- **AND** it preserves unresolved Postman variable references for resolution through the shared environment variables
+
+### Requirement: Users can manage one shared set of environment variables
+
+The system SHALL let users create, edit, and remove named string values in one environment variable set shared by all mock APIs in the current project. The settings panel SHALL present each saved variable as a card showing its name and value.
+
+#### Scenario: Reuse a shared variable
+
+- **WHEN** a user references an environment variable from a mock API path parameter or JSON request template
+- **THEN** the system resolves it from the current project's shared variable set when the API is triggered
+- **AND** the string value replaces the placeholder wherever it appears in the request
+
+#### Scenario: Report an undefined variable
+
+- **WHEN** a mock API references a variable that is not defined in the current project
+- **THEN** the system marks the run as failed with a clear variable name in the error
+- **AND** the system does not send the outbound request
+
+### Requirement: Users can edit JSON request templates in a structured editor
+
+The system SHALL provide a JSON-aware editor for mock API request values with indentation, syntax highlighting, formatting, validation, and autocomplete for shared environment variables. Variable references SHALL be valid JSON strings in the editor and SHALL resolve to string values.
+
+#### Scenario: Format and validate a request template
+
+- **WHEN** a user formats or edits a request template
+- **THEN** the editor indents and highlights JSON and reports syntax errors before the mock API is saved or triggered
+- **AND** it recognizes variable placeholders inside JSON strings during validation
+
+#### Scenario: Complete an environment variable reference
+
+- **WHEN** a user enters a variable placeholder in the request editor
+- **THEN** the editor offers names from the current project's shared variable set as completions
+
 ### Requirement: Users can trigger a mock API call
 
 The system SHALL send the selected service endpoint's method and URL with the mock API entry's JSON request when a user triggers it.

@@ -73,11 +73,29 @@ export const mockApis = mysqlTable(
       () => serviceEndpoints.id,
       { onDelete: "set null" },
     ),
+    pathParameters: json("path_parameters").$type<Record<string, string>>().notNull().default({}),
     requestJson: json("request_json").$type<unknown>().notNull(),
     description: text("description").notNull().default(""),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("mock_apis_project_idx").on(table.projectId)],
+);
+
+export const environmentVariables = mysqlTable(
+  "environment_variables",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("environment_variables_project_name_unique").on(table.projectId, table.name),
+    index("environment_variables_project_idx").on(table.projectId),
+  ],
 );
 
 export const serviceEdges = mysqlTable(

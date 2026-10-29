@@ -1,8 +1,18 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { logs, mockApis, runs, serviceEndpoints, services } from "../../../db/schema";
+import {
+  environmentVariables,
+  logs,
+  mockApis,
+  runs,
+  serviceEndpoints,
+  services,
+} from "../../../db/schema";
 import { getAppConfig } from "../../../utils/config";
+import { resolveJsonVariables } from "../../../utils/environment-variables";
+import { resolveEndpointPath } from "../../../utils/mock-api-paths";
+import { getOutboundUrl } from "../../../utils/outbound-url";
 import { ensureProject } from "../../../utils/project";
 
 export default defineEventHandler(async (event) => {
@@ -16,6 +26,7 @@ export default defineEventHandler(async (event) => {
       method: serviceEndpoints.method,
       url: serviceEndpoints.url,
       requestJson: mockApis.requestJson,
+      pathParameters: mockApis.pathParameters,
       mockApiName: mockApis.name,
       baseUrl: services.baseUrl,
       serviceName: services.name,
@@ -42,9 +53,7 @@ export default defineEventHandler(async (event) => {
   const runId = randomUUID();
   await db.insert(runs).values({ id: runId, projectId, mockApiId: id, traceId, status: "running" });
 
-  const target = /^https?:\/\//i.test(row.url)
-    ? new URL(row.url)
-    : new URL(row.url, `${row.baseUrl.replace(/\/$/, "")}/`);
+  const target = getOutboundUrl(row.url, row.baseUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), getAppConfig().outboundRequestTimeoutMs);
   const logFailure = async (message: string, responseStatus: number | null) => {
@@ -69,13 +78,22 @@ export default defineEventHandler(async (event) => {
     }
   };
   try {
+    const variableRows = await db
+      .select({ name: environmentVariables.name, value: environmentVariables.value })
+      .from(environmentVariables)
+      .where(eq(environmentVariables.projectId, projectId));
+    const variables = new Map(variableRows.map(({ name, value }) => [name, value]));
+    const urlWithPathParameters = resolveEndpointPath(row.url, row.pathParameters ?? {}, variables);
+    const target = getOutboundUrl(urlWithPathParameters, row.baseUrl);
+    const requestJson =
+      row.method === "GET" ? row.requestJson : resolveJsonVariables(row.requestJson, variables);
     const response = await fetch(target, {
       method: row.method,
       headers: {
         traceparent: `00-${traceId}-${spanId}-01`,
         ...(row.method === "GET" ? {} : { "content-type": "application/json" }),
       },
-      ...(row.method === "GET" ? {} : { body: JSON.stringify(row.requestJson) }),
+      ...(row.method === "GET" ? {} : { body: JSON.stringify(requestJson) }),
       signal: controller.signal,
     });
     const responseBody = await response.text();

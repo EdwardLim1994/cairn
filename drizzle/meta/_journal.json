@@ -22,6 +22,20 @@
       "when": 1793077426116,
       "tag": "0002_great_doctor_doom",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1793254934046,
+      "tag": "0003_daily_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1793257927344,
+      "tag": "0004_stale_nuke",
+      "breakpoints": true
     }
   ]
 }
