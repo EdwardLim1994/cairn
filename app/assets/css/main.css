@@ -622,7 +622,7 @@ body {
   right: 16px;
   bottom: 16px;
   height: 46px;
-  min-width: 150px;
+  /* min-width: 150px; */
   background: var(--panel);
   font-size: 12px;
 }

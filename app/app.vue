@@ -702,7 +702,7 @@ function resizeLogsPanel(event: PointerEvent) {
 
 function adjustLogsPanelHeight(delta: number) {
   logsPanelHeight.value = Math.max(
-    160,
+    200,
     Math.min(window.innerHeight - 32, logsPanelHeight.value + delta),
   );
 }
@@ -1053,7 +1053,7 @@ onUnmounted(() => {
     >
       <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 6h16M4 12h16M4 18h10" /></svg
-      ><b>Logs</b><em>{{ logs.length }}</em>
+      ><b>Logs</b>
     </button>
     <section
       v-if="logsOpen"
@@ -1072,7 +1072,7 @@ onUnmounted(() => {
       ></div>
       <div class="logs-toolbar">
         <div class="logs-title">
-          <strong>Logs</strong><span>{{ logs.length }} entries</span>
+          <strong>Logs</strong>
         </div>
         <input
           v-model="logSearch"
