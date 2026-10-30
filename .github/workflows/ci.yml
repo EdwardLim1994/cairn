@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - run: bun install --frozen-lockfile
+
+      - name: Check formatting, lint, and types
+        run: bun run vp check
+
+      - name: Lint
+        run: bun run vp lint
+
+      - name: Test
+        run: bun run vp test run
+
+      - name: Check formatting
+        run: bun run vp fmt --check
