@@ -1605,7 +1605,11 @@ onUnmounted(() => {
               <button class="button secondary small" @click="addMockDraft">+ New API</button>
             </div>
           </div>
-          <div id="registered-mock-apis-content" v-show="registeredMockApisOpen">
+          <div
+            class="flex flex-col gap-y-3"
+            id="registered-mock-apis-content"
+            v-show="registeredMockApisOpen"
+          >
             <details
               v-for="(entry, index) in mockDraft"
               :key="entry.id || `new-${index}`"
