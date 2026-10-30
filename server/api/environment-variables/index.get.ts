@@ -1,13 +1,13 @@
-import { asc, eq } from "drizzle-orm";
-import { getDb } from "../../db";
-import { environmentVariables } from "../../db/schema";
+import { environmentVariableListResponseSchema } from "#shared/api/environment-variables";
+import { listEnvironmentVariables } from "../../repositories/environment-variables";
 import { ensureProject } from "../../utils/project";
+import { createListEnvironmentVariablesUseCase } from "../../use-cases/environment-variables/list-environment-variables";
 
-export default defineEventHandler(async () => {
-  const projectId = await ensureProject();
-  return getDb()
-    .select()
-    .from(environmentVariables)
-    .where(eq(environmentVariables.projectId, projectId))
-    .orderBy(asc(environmentVariables.name));
+const listEnvironmentVariablesUseCase = createListEnvironmentVariablesUseCase({
+  ensureProject,
+  listEnvironmentVariables,
 });
+
+export default defineEventHandler(async () =>
+  environmentVariableListResponseSchema.parse(await listEnvironmentVariablesUseCase()),
+);

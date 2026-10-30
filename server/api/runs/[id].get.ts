@@ -1,15 +1,17 @@
-import { and, eq } from "drizzle-orm";
-import { getDb } from "../../db";
-import { runs } from "../../db/schema";
+import { runGetResponseSchema } from "#shared/api/observability";
+import { findRun } from "../../repositories/runs";
+import { RunNotFoundError } from "../../repositories/runs/errors";
 import { ensureProject } from "../../utils/project";
+import { createGetRunUseCase } from "../../use-cases/runs/get-run";
+
+const getRunUseCase = createGetRunUseCase({ ensureProject, findRun });
 
 export default defineEventHandler(async (event) => {
-  const projectId = await ensureProject();
-  const id = getRouterParam(event, "id")!;
-  const [run] = await getDb()
-    .select()
-    .from(runs)
-    .where(and(eq(runs.id, id), eq(runs.projectId, projectId)));
-  if (!run) throw createError({ statusCode: 404, statusMessage: "Run not found" });
-  return run;
+  try {
+    return runGetResponseSchema.parse(await getRunUseCase(getRouterParam(event, "id")!));
+  } catch (error) {
+    if (error instanceof RunNotFoundError)
+      throw createError({ statusCode: 404, statusMessage: error.message, cause: error });
+    throw error;
+  }
 });

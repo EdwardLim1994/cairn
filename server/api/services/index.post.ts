@@ -1,34 +1,17 @@
-import { randomUUID } from "node:crypto";
-import { getDb } from "../../db";
-import { serviceEndpoints, services } from "../../db/schema";
+import { serviceCreateRequestSchema, serviceCreateResponseSchema } from "#shared/api/services";
+import { createService } from "../../repositories/services";
 import { finiteNumber, record, serviceInput } from "../../utils/graph-validation";
 import { ensureProject } from "../../utils/project";
+import { createCreateServiceUseCase } from "../../use-cases/services/create-service";
+
+const createServiceUseCase = createCreateServiceUseCase({ ensureProject, createService });
 
 export default defineEventHandler(async (event) => {
   const body = record(await readBody(event), "Service");
-  const input = serviceInput(body);
-  const projectId = await ensureProject();
-  const serviceId = randomUUID();
-  await getDb().transaction(async (tx) => {
-    await tx.insert(services).values({
-      id: serviceId,
-      projectId,
-      name: input.name,
-      framework: input.framework,
-      baseUrl: input.baseUrl,
-      active: input.active,
-      positionX: finiteNumber(body.positionX, "Service x", 0),
-      positionY: finiteNumber(body.positionY, "Service y", 0),
-    });
-    if (input.endpoints.length)
-      await tx.insert(serviceEndpoints).values(
-        input.endpoints.map(({ id: _id, ...endpoint }) => ({
-          ...endpoint,
-          id: randomUUID(),
-          projectId,
-          serviceId,
-        })),
-      );
+  const input = serviceCreateRequestSchema.parse({
+    ...serviceInput(body),
+    positionX: finiteNumber(body.positionX, "Service x", 0),
+    positionY: finiteNumber(body.positionY, "Service y", 0),
   });
-  return { id: serviceId };
+  return serviceCreateResponseSchema.parse(await createServiceUseCase(input));
 });

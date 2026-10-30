@@ -4,11 +4,18 @@ import * as schema from "./schema";
 import { getAppConfig } from "../utils/config";
 
 let db: MySql2Database<typeof schema> | undefined;
+let pool: mysql.Pool | undefined;
 
 export function getDb(): MySql2Database<typeof schema> {
   if (!db) {
-    const pool = mysql.createPool(getAppConfig().databaseUrl);
+    pool = mysql.createPool(getAppConfig().databaseUrl);
     db = drizzle({ client: pool, schema, mode: "default" });
   }
   return db;
+}
+
+export async function closeDb(): Promise<void> {
+  await pool?.end();
+  db = undefined;
+  pool = undefined;
 }

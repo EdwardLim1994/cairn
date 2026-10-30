@@ -1,35 +1,14 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "../../db";
-import { services } from "../../db/schema";
+import { serviceHealthResponseSchema } from "#shared/api/services";
+import { listHealthTargets } from "../../repositories/services";
 import { ensureProject } from "../../utils/project";
-import { getOutboundUrl } from "../../utils/outbound-url";
+import { createCheckServiceHealthUseCase } from "../../use-cases/services/check-service-health";
 
-export default defineEventHandler(async () => {
-  const projectId = await ensureProject();
-  const rows = await getDb()
-    .select({ id: services.id, framework: services.framework, baseUrl: services.baseUrl })
-    .from(services)
-    .where(eq(services.projectId, projectId));
-
-  return await Promise.all(
-    rows.map(async (service) => {
-      const framework = service.framework.toLowerCase();
-      const healthPath =
-        framework === "spring boot"
-          ? "/actuator/health"
-          : framework.includes(".net")
-            ? "/health"
-            : null;
-      if (!healthPath) return { id: service.id, online: false };
-
-      try {
-        const response = await fetch(getOutboundUrl(healthPath, service.baseUrl), {
-          signal: AbortSignal.timeout(2000),
-        });
-        return { id: service.id, online: response.ok };
-      } catch {
-        return { id: service.id, online: false };
-      }
-    }),
-  );
+const checkServiceHealthUseCase = createCheckServiceHealthUseCase({
+  ensureProject,
+  listHealthTargets,
+  fetch: globalThis.fetch,
 });
+
+export default defineEventHandler(async () =>
+  serviceHealthResponseSchema.parse(await checkServiceHealthUseCase()),
+);

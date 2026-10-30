@@ -32,7 +32,7 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Cairn project context
 
-Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. The app is styled with Tailwind CSS and the existing theme variables in `app/assets/css/main.css`.
+Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. The app uses Tailwind utilities and native CSS nesting in `app/app.vue`. Keep app-specific selectors in BEM form (`app__element`, `app__element--modifier`); leave Tailwind utility and third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
 
 ### Mock APIs and shared variables
 

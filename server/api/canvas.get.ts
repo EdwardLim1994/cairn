@@ -1,35 +1,17 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "../db";
-import { mockApis, projects, serviceEdges, serviceEndpoints, services } from "../db/schema";
 import { ensureProject } from "../utils/project";
+import { getCanvas } from "../repositories/canvas";
+import { createGetCanvasUseCase } from "../use-cases/canvas/get-canvas";
+
+const getCanvasUseCase = createGetCanvasUseCase({ ensureProject, getCanvas });
 
 export default defineEventHandler(async () => {
-  const projectId = await ensureProject();
-  const db = getDb();
-  const [[project], serviceRows, endpoints, edges, mockApiRows] = await Promise.all([
-    db.select().from(projects).where(eq(projects.id, projectId)),
-    db.select().from(services).where(eq(services.projectId, projectId)),
-    db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
-    db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
-    db.select().from(mockApis).where(eq(mockApis.projectId, projectId)),
-  ]);
-  if (!project)
+  try {
+    return await getCanvasUseCase();
+  } catch (error) {
     throw createError({
       statusCode: 500,
       statusMessage: "Project canvas could not be initialized",
+      cause: error,
     });
-  return {
-    viewport: { x: project.viewportX, y: project.viewportY, zoom: project.viewportZoom },
-    mockNode: { x: project.mockNodeX, y: project.mockNodeY },
-    services: serviceRows.map((service) => ({
-      ...service,
-      endpoints: endpoints.filter((endpoint) => endpoint.serviceId === service.id),
-    })),
-    edges: edges.map(({ id, sourceServiceId, targetEndpointId }) => ({
-      id,
-      sourceServiceId,
-      targetEndpointId,
-    })),
-    mockApis: mockApiRows,
-  };
+  }
 });

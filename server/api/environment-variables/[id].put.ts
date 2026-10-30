@@ -1,37 +1,45 @@
-import { and, eq, ne } from "drizzle-orm";
-import { getDb } from "../../db";
-import { environmentVariables } from "../../db/schema";
+import {
+  environmentVariableUpdateRequestSchema,
+  environmentVariableUpdateResponseSchema,
+} from "#shared/api/environment-variables";
+import {
+  findEnvironmentVariable,
+  findEnvironmentVariableByName,
+  updateEnvironmentVariable,
+} from "../../repositories/environment-variables";
+import {
+  DuplicateEnvironmentVariableError,
+  EnvironmentVariableNotFoundError,
+} from "../../repositories/environment-variables/errors";
 import { environmentVariableInput } from "../../utils/environment-variables";
 import { ensureProject } from "../../utils/project";
+import { createUpdateEnvironmentVariableUseCase } from "../../use-cases/environment-variables/update-environment-variable";
+
+const updateEnvironmentVariableUseCase = createUpdateEnvironmentVariableUseCase({
+  ensureProject,
+  findEnvironmentVariable,
+  findByName: findEnvironmentVariableByName,
+  updateEnvironmentVariable,
+});
 
 export default defineEventHandler(async (event) => {
-  const input = environmentVariableInput(await readBody(event));
-  const projectId = await ensureProject();
   const id = getRouterParam(event, "id")!;
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: environmentVariables.id })
-    .from(environmentVariables)
-    .where(and(eq(environmentVariables.id, id), eq(environmentVariables.projectId, projectId)));
-  if (!existing)
-    throw createError({ statusCode: 404, statusMessage: "Environment variable not found" });
-
-  const [duplicate] = await db
-    .select({ id: environmentVariables.id })
-    .from(environmentVariables)
-    .where(
-      and(
-        eq(environmentVariables.projectId, projectId),
-        eq(environmentVariables.name, input.name),
-        ne(environmentVariables.id, id),
-      ),
+  const input = environmentVariableUpdateRequestSchema.parse(
+    environmentVariableInput(await readBody(event)),
+  );
+  try {
+    return environmentVariableUpdateResponseSchema.parse(
+      await updateEnvironmentVariableUseCase(id, input),
     );
-  if (duplicate)
-    throw createError({
-      statusCode: 409,
-      statusMessage: `Variable "${input.name}" already exists`,
-    });
-
-  await db.update(environmentVariables).set(input).where(eq(environmentVariables.id, id));
-  return { id };
+  } catch (error) {
+    if (error instanceof DuplicateEnvironmentVariableError)
+      throw createError({ statusCode: 409, statusMessage: error.message, cause: error });
+    if (error instanceof EnvironmentVariableNotFoundError)
+      throw createError({
+        statusCode: 404,
+        statusMessage: "Environment variable not found",
+        cause: error,
+      });
+    throw error;
+  }
 });

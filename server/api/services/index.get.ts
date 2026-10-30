@@ -1,22 +1,10 @@
-import { asc, eq } from "drizzle-orm";
-import { serviceEndpoints, services } from "../../db/schema";
-import { getDb } from "../../db";
+import { serviceListResponseSchema } from "#shared/api/services";
+import { listServices } from "../../repositories/services";
 import { ensureProject } from "../../utils/project";
+import { createListServicesUseCase } from "../../use-cases/services/list-services";
 
-export default defineEventHandler(async () => {
-  const projectId = await ensureProject();
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(services)
-    .where(eq(services.projectId, projectId))
-    .orderBy(asc(services.createdAt));
-  const endpoints = await db
-    .select()
-    .from(serviceEndpoints)
-    .where(eq(serviceEndpoints.projectId, projectId));
-  return rows.map((service) => ({
-    ...service,
-    endpoints: endpoints.filter((endpoint) => endpoint.serviceId === service.id),
-  }));
-});
+const listServicesUseCase = createListServicesUseCase({ ensureProject, listServices });
+
+export default defineEventHandler(async () =>
+  serviceListResponseSchema.parse(await listServicesUseCase()),
+);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { resolveJsonVariables } from "./environment-variables";
 import { resolveEndpointPath } from "./mock-api-paths";
 import { validateEndpointPathParameters } from "./mock-api-validation";
+import { environmentVariableInput } from "./environment-variables";
 
 describe("shared environment variable resolution", () => {
   const variables = new Map<string, string>([
@@ -40,5 +41,16 @@ describe("shared environment variable resolution", () => {
     expect(() => validateEndpointPathParameters({ oldId: "1" }, "/items/{id}")).toThrow(
       /Unknown path parameter/,
     );
+  });
+
+  it("validates shared variable names and string values", () => {
+    expect(environmentVariableInput({ name: "API_KEY", value: "secret" })).toEqual({
+      name: "API_KEY",
+      value: "secret",
+    });
+    expect(() => environmentVariableInput({ name: "bad name", value: "x" })).toThrow(
+      /Variable name/,
+    );
+    expect(() => environmentVariableInput({ name: "API_KEY", value: 42 })).toThrow(/must be text/);
   });
 });
