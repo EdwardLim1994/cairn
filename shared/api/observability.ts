@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { idParamsSchema, isoDateTimeSchema, jsonObjectSchema } from "./common";
+import { isoDateTimeSchema, jsonObjectSchema } from "./common";
+export {
+  idParamsSchema as runGetRequestSchema,
+  idParamsSchema as runFlowRequestSchema,
+} from "./common";
 
 const severitySchema = z.string().min(1).max(20);
 export const logListRequestSchema = z.object({
@@ -21,7 +25,6 @@ export const logListResponseSchema = z.array(
   }),
 );
 
-export const runGetRequestSchema = idParamsSchema;
 export const runGetResponseSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -36,7 +39,6 @@ export const runGetResponseSchema = z.object({
   finishedAt: isoDateTimeSchema.nullable(),
   lastTelemetryAt: isoDateTimeSchema.nullable(),
 });
-export const runFlowRequestSchema = idParamsSchema;
 export const runFlowResponseSchema = z.object({
   runId: z.string(),
   traceId: z.string(),
@@ -73,10 +75,10 @@ export const runFlowResponseSchema = z.object({
 const otlpValueSchema = z.record(z.string(), z.unknown());
 export const otlpLogsRequestSchema = z
   .object({ resourceLogs: z.array(otlpValueSchema).optional() })
-  .passthrough();
+  .loose();
 export const otlpTracesRequestSchema = z
   .object({ resourceSpans: z.array(otlpValueSchema).optional() })
-  .passthrough();
+  .loose();
 export const otlpIngestResponseSchema = z.object({ accepted: z.number().int().nonnegative() });
 
 export type LogListRequest = z.infer<typeof logListRequestSchema>;

@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { isoDateTimeSchema } from "./common";
 
-const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
+const pointSchema = z.object({ x: z.number(), y: z.number() });
 const canvasViewportSchema = z
   .object({
-    x: z.number().finite().catch(0),
-    y: z.number().finite().catch(0),
+    x: z.number().catch(0),
+    y: z.number().catch(0),
     zoom: z.number().positive().catch(1),
   })
   .catch({ x: 0, y: 0, zoom: 1 });

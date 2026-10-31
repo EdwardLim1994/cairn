@@ -137,8 +137,12 @@ describe("ServiceSettingsPanel", () => {
     });
 
     expect(wrapper.find('[aria-label="Service settings"]').exists()).toBe(true);
+    expect(wrapper.get('label[for="service-name"]').attributes("for")).toBe("service-name");
     expect(wrapper.text()).toContain("List orders");
     await wrapper.get('[aria-expanded="false"]').trigger("click");
+    expect(wrapper.get('label[for="service-endpoint-name-endpoint-1"]').attributes("for")).toBe(
+      "service-endpoint-name-endpoint-1",
+    );
     const framework = wrapper.get('[aria-label="Framework: Spring Boot"]');
     await framework.trigger("click");
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true]]);

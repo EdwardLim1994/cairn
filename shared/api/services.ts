@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { idParamsSchema, idResponseSchema, isoDateTimeSchema } from "./common";
+import { isoDateTimeSchema } from "./common";
+export { idParamsSchema as serviceIdRequestSchema } from "./common";
+export {
+  idResponseSchema as serviceCreateResponseSchema,
+  idResponseSchema as serviceUpdateResponseSchema,
+  idResponseSchema as serviceDeleteResponseSchema,
+} from "./common";
 
 const methodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const endpointInputSchema = z.object({
@@ -24,15 +30,11 @@ export const serviceInputSchema = z.object({
   endpoints: z.array(endpointInputSchema),
 });
 export const serviceCreateRequestSchema = serviceInputSchema.extend({
-  positionX: z.number().finite().optional(),
-  positionY: z.number().finite().optional(),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
 });
 export const serviceUpdateRequestSchema = serviceInputSchema;
 export const serviceListRequestSchema = z.void();
-export const serviceIdRequestSchema = idParamsSchema;
-export const serviceCreateResponseSchema = idResponseSchema;
-export const serviceUpdateResponseSchema = idResponseSchema;
-export const serviceDeleteResponseSchema = idResponseSchema;
 export const serviceListResponseSchema = z.array(
   z.object({
     id: z.string(),

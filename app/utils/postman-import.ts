@@ -33,8 +33,9 @@ export type PostmanImportResult = {
 };
 
 function pathSegments(url: URL) {
-  return url.pathname
-    .replace(/\/+$/, "")
+  const path = url.pathname;
+  return path
+    .slice(0, trimTrailingSlashes(path))
     .split("/")
     .slice(1)
     .map((segment) => {
@@ -44,6 +45,12 @@ function pathSegments(url: URL) {
         return segment;
       }
     });
+}
+
+function trimTrailingSlashes(path: string) {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === "/") end -= 1;
+  return end;
 }
 
 function normalizedQuery(url: URL) {
@@ -101,7 +108,10 @@ function postmanText(value: unknown) {
 function matchesEndpointUrl(requestValue: string, service: Service, endpoint: Endpoint) {
   try {
     const requestUrl = new URL(requestValue);
-    const endpointUrl = new URL(endpoint.url, `${service.baseUrl.replace(/\/+$/, "")}/`);
+    const endpointUrl = new URL(
+      endpoint.url,
+      `${service.baseUrl.slice(0, trimTrailingSlashes(service.baseUrl))}/`,
+    );
     if (
       requestUrl.origin !== endpointUrl.origin ||
       normalizedQuery(requestUrl) !== normalizedQuery(endpointUrl)
@@ -125,7 +135,10 @@ function matchesEndpointUrl(requestValue: string, service: Service, endpoint: En
 
 function routeParameters(requestValue: string, service: Service, endpoint: Endpoint) {
   const requestUrl = new URL(requestValue);
-  const endpointUrl = new URL(endpoint.url, `${service.baseUrl.replace(/\/+$/, "")}/`);
+  const endpointUrl = new URL(
+    endpoint.url,
+    `${service.baseUrl.slice(0, trimTrailingSlashes(service.baseUrl))}/`,
+  );
   const requestPath = pathSegments(requestUrl);
   const endpointPath = pathSegments(endpointUrl);
   const values: Record<string, string> = {};

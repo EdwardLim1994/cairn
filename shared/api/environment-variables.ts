@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { idParamsSchema, idResponseSchema, isoDateTimeSchema } from "./common";
+import { isoDateTimeSchema } from "./common";
+export { idParamsSchema as environmentVariableIdRequestSchema } from "./common";
+export {
+  idResponseSchema as environmentVariableCreateResponseSchema,
+  idResponseSchema as environmentVariableUpdateResponseSchema,
+  idResponseSchema as environmentVariableDeleteResponseSchema,
+} from "./common";
 
 export const environmentVariableInputSchema = z.object({
   name: z
@@ -12,7 +18,6 @@ export const environmentVariableInputSchema = z.object({
 export const environmentVariableListRequestSchema = z.void();
 export const environmentVariableCreateRequestSchema = environmentVariableInputSchema;
 export const environmentVariableUpdateRequestSchema = environmentVariableInputSchema;
-export const environmentVariableIdRequestSchema = idParamsSchema;
 export const environmentVariableListResponseSchema = z.array(
   z.object({
     id: z.string(),
@@ -22,9 +27,6 @@ export const environmentVariableListResponseSchema = z.array(
     createdAt: isoDateTimeSchema,
   }),
 );
-export const environmentVariableCreateResponseSchema = idResponseSchema;
-export const environmentVariableUpdateResponseSchema = idResponseSchema;
-export const environmentVariableDeleteResponseSchema = idResponseSchema;
 
 export type EnvironmentVariableInput = z.infer<typeof environmentVariableInputSchema>;
 export type EnvironmentVariable = z.infer<typeof environmentVariableListResponseSchema>[number];

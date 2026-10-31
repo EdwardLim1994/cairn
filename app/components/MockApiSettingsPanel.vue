@@ -98,13 +98,21 @@ function endpointOptions() {
                       @delete="emit('deleteVariable', variable)"
                     >
                       <template v-if="props.editingEnvironmentVariableId === variable.id">
-                        <label class="app__field">
+                        <label :for="`environment-variable-name-${variable.id}`" class="app__field">
                           <span>Name</span>
-                          <UInput v-model="variableDraft.name" :ui="{ base: 'app__control' }" />
+                          <UInput
+                            :id="`environment-variable-name-${variable.id}`"
+                            v-model="variableDraft.name"
+                            :ui="{ base: 'app__control' }"
+                          />
                         </label>
-                        <label class="app__field">
+                        <label
+                          :for="`environment-variable-value-${variable.id}`"
+                          class="app__field"
+                        >
                           <span>Value</span>
                           <UTextarea
+                            :id="`environment-variable-value-${variable.id}`"
                             v-model="variableDraft.value"
                             :ui="{ base: 'app__control' }"
                             :rows="2"
@@ -173,18 +181,19 @@ function endpointOptions() {
                   :delete-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
                   @delete="emit('removeMockApi', index)"
                 >
-                  <label class="app__field">
+                  <label :for="`mock-api-name-${entry.id || index}`" class="app__field">
                     <span>Name</span>
                     <UInput
+                      :id="`mock-api-name-${entry.id || index}`"
                       v-model="entry.name"
                       :ui="{ base: 'app__control' }"
                       placeholder="e.g. Create order"
                     />
                   </label>
-                  <label class="app__field">
+                  <label :for="`mock-api-endpoint-${entry.id || index}`" class="app__field">
                     <span>Service endpoint</span>
                     <USelect
-                      :id="entry.id ? `mock-endpoint-${entry.id}` : undefined"
+                      :id="`mock-api-endpoint-${entry.id || index}`"
                       v-model="entry.targetEndpointId"
                       :items="endpointOptions()"
                       :ui="{ base: 'app__control' }"
@@ -194,10 +203,12 @@ function endpointOptions() {
                   <label
                     v-for="name in props.endpointPathParameterNames(entry)"
                     :key="name"
+                    :for="`mock-api-path-${entry.id || index}-${name}`"
                     class="app__field"
                   >
                     <span>Path parameter: {{ name }}</span>
                     <UInput
+                      :id="`mock-api-path-${entry.id || index}-${name}`"
                       v-model="entry.pathParameters[name]"
                       :ui="{ base: 'app__control' }"
                       :placeholder="`Value or {{${name}}}`"
@@ -222,9 +233,10 @@ function endpointOptions() {
                       @update:model-value="entry.requestJson = $event"
                     />
                   </fieldset>
-                  <label class="app__field">
+                  <label :for="`mock-api-description-${entry.id || index}`" class="app__field">
                     <span>Description</span>
                     <UInput
+                      :id="`mock-api-description-${entry.id || index}`"
                       v-model="entry.description"
                       :ui="{ base: 'app__control' }"
                       placeholder="Optional note"

@@ -161,7 +161,7 @@ export function useMockApiViewModel(options: {
       if (!variable) throw new Error("Environment variable no longer exists");
       const value = options.environmentCardDraft.value.value;
       const saved = options.store.savedEnvironmentVariableValues[id];
-      const changed = !saved || saved.name !== name || saved.value !== value;
+      const changed = saved?.name !== name || saved?.value !== value;
       if (changed && !variable.pendingCreate)
         await options.apiClient.updateEnvironmentVariable(id, { name, value });
       Object.assign(variable, { name, value });
@@ -226,7 +226,7 @@ export function useMockApiViewModel(options: {
         continue;
       }
       const saved = options.store.savedEnvironmentVariableValues[id];
-      if (!saved || saved.name !== name || saved.value !== value) {
+      if (saved?.name !== name || saved?.value !== value) {
         await options.apiClient.updateEnvironmentVariable(id, { name, value });
         options.store.savedEnvironmentVariableValues[id] = { name, value };
       }

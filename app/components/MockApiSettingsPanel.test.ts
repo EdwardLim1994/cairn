@@ -128,6 +128,12 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.text()).toContain("Import Postman");
     expect(wrapper.text()).toContain("New variable");
     expect(wrapper.find('[aria-label="Close"]').exists()).toBe(false);
+    expect(wrapper.get('label[for="environment-variable-name-var-1"]').attributes("for")).toBe(
+      "environment-variable-name-var-1",
+    );
+    expect(wrapper.get('label[for="environment-variable-value-var-1"]').attributes("for")).toBe(
+      "environment-variable-value-var-1",
+    );
   });
 
   it("emits variable, import, mock API, save, and discard interactions", async () => {

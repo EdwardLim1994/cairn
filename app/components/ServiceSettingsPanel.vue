@@ -99,9 +99,10 @@ function toggleEndpoint(endpoint: EndpointDraft, index: number, open: boolean) {
       </header>
       <div class="app__dialog-body">
         <div class="app__service-config-fields">
-          <label class="app__field">
+          <label for="service-name" class="app__field">
             <span>Service name</span>
             <UInput
+              id="service-name"
               v-model="draft.name"
               :ui="{ base: 'app__control' }"
               placeholder="e.g. Checkout API"
@@ -137,9 +138,10 @@ function toggleEndpoint(endpoint: EndpointDraft, index: number, open: boolean) {
                 </template>
               </USelect>
             </div>
-            <label class="app__field">
+            <label for="service-base-url" class="app__field">
               <span>Base URL</span>
               <UInput
+                id="service-base-url"
                 v-model="draft.baseUrl"
                 :ui="{ base: 'app__control' }"
                 placeholder="http://localhost:4000"
@@ -189,31 +191,43 @@ function toggleEndpoint(endpoint: EndpointDraft, index: number, open: boolean) {
           @toggle="toggleEndpoint(endpoint, index, $event)"
           @delete="emit('removeEndpoint', index)"
         >
-          <label class="app__field">
+          <label :for="`service-endpoint-name-${endpoint.id || index}`" class="app__field">
             <span>Name</span>
             <UInput
+              :id="`service-endpoint-name-${endpoint.id || index}`"
               v-model="endpoint.name"
               :ui="{ base: 'app__control' }"
               placeholder="e.g. Get order"
             />
           </label>
           <div class="app__field-row">
-            <label class="app__field">
+            <label :for="`service-endpoint-type-${endpoint.id || index}`" class="app__field">
               <span>API type</span>
               <USelect
+                :id="`service-endpoint-type-${endpoint.id || index}`"
                 v-model="endpoint.apiType"
                 :items="apiTypes"
                 :ui="{ base: 'app__control' }"
               />
             </label>
-            <label class="app__field">
+            <label :for="`service-endpoint-method-${endpoint.id || index}`" class="app__field">
               <span>Method</span>
-              <USelect v-model="endpoint.method" :items="methods" :ui="{ base: 'app__control' }" />
+              <USelect
+                :id="`service-endpoint-method-${endpoint.id || index}`"
+                v-model="endpoint.method"
+                :items="methods"
+                :ui="{ base: 'app__control' }"
+              />
             </label>
           </div>
-          <label class="app__field">
+          <label :for="`service-endpoint-url-${endpoint.id || index}`" class="app__field">
             <span>URL</span>
-            <UInput v-model="endpoint.url" :ui="{ base: 'app__control' }" placeholder="/orders" />
+            <UInput
+              :id="`service-endpoint-url-${endpoint.id || index}`"
+              v-model="endpoint.url"
+              :ui="{ base: 'app__control' }"
+              placeholder="/orders"
+            />
           </label>
         </SettingsAccordionCard>
       </div>

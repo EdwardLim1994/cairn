@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { idParamsSchema, idResponseSchema, isoDateTimeSchema } from "./common";
+import { isoDateTimeSchema } from "./common";
+export {
+  idParamsSchema as mockApiIdRequestSchema,
+  idParamsSchema as mockApiRunRequestSchema,
+} from "./common";
+export {
+  idResponseSchema as mockApiCreateResponseSchema,
+  idResponseSchema as mockApiUpdateResponseSchema,
+  idResponseSchema as mockApiDeleteResponseSchema,
+} from "./common";
 
 const mockApiInputSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -12,7 +21,6 @@ const mockApiInputSchema = z.object({
 export const mockApiListRequestSchema = z.void();
 export const mockApiCreateRequestSchema = mockApiInputSchema;
 export const mockApiUpdateRequestSchema = mockApiInputSchema;
-export const mockApiIdRequestSchema = idParamsSchema;
 export const mockApiListResponseSchema = z.array(
   z.object({
     id: z.string(),
@@ -25,10 +33,6 @@ export const mockApiListResponseSchema = z.array(
     createdAt: isoDateTimeSchema,
   }),
 );
-export const mockApiCreateResponseSchema = idResponseSchema;
-export const mockApiUpdateResponseSchema = idResponseSchema;
-export const mockApiDeleteResponseSchema = idResponseSchema;
-export const mockApiRunRequestSchema = idParamsSchema;
 export const mockApiRunResponseSchema = z.object({
   id: z.string(),
   traceId: z.string(),
