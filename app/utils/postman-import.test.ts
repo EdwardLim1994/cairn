@@ -25,6 +25,31 @@ describe("Postman path parameter import", () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it("normalizes trailing slashes from the service URL and route paths", () => {
+    const result = parsePostmanCollection(
+      JSON.stringify({
+        info: { name: "items" },
+        item: [
+          {
+            name: "Get item",
+            request: { method: "GET", url: "http://localhost:8080/items/42///" },
+          },
+        ],
+      }),
+      [
+        {
+          baseUrl: "http://localhost:8080///",
+          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/items/{id}///" }],
+        },
+      ],
+    );
+
+    expect(result.drafts).toMatchObject([
+      { targetEndpointId: "endpoint-1", pathParameters: { id: "42" } },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
   it("walks nested folders, expands collection variables, and matches query parameters regardless of order", () => {
     const result = parsePostmanCollection(
       JSON.stringify({

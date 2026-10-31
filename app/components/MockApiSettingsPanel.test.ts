@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
-import { defineComponent, h } from "vue";
+import { defineComponent, h, ref } from "vue";
 import MockApiSettingsPanel from "./MockApiSettingsPanel.vue";
 
 function formControlStub(tag: "input" | "textarea" | "select") {
@@ -47,12 +47,17 @@ const settingsUiStubs = {
   USelect: formControlStub("select"),
   UAccordion: defineComponent({
     inheritAttrs: false,
-    props: { modelValue: [String, Array], ui: Object },
+    props: { modelValue: [String, Array], ui: Object, items: Array },
     emits: ["update:modelValue"],
     setup(props, { attrs, emit, slots }) {
+      const uncontrolledValue = ref<string | undefined>();
       return () => {
-        const open = Boolean(props.modelValue);
-        const value = Array.isArray(props.modelValue) ? props.modelValue[0] : props.modelValue;
+        const selected = props.modelValue ?? uncontrolledValue.value;
+        const open = Boolean(selected);
+        const firstItem = props.items?.[0] as { value?: string } | undefined;
+        const value = ((Array.isArray(selected) ? selected[0] : selected) ?? firstItem?.value) as
+          | string
+          | undefined;
         return h("div", attrs, [
           h(
             "button",
@@ -60,7 +65,11 @@ const settingsUiStubs = {
               type: "button",
               class: props.ui?.trigger,
               "aria-expanded": String(open),
-              onClick: () => emit("update:modelValue", open ? undefined : value),
+              onClick: () => {
+                const next = open ? undefined : value;
+                if (props.modelValue === undefined) uncontrolledValue.value = next;
+                emit("update:modelValue", next);
+              },
             },
             slots.default?.(),
           ),
@@ -105,7 +114,7 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.emitted("discard")).toEqual([[]]);
   });
 
-  it("renders shared variables, mock APIs, and import controls", () => {
+  it("renders shared variables, mock APIs, and import controls", async () => {
     const wrapper = mount(MockApiSettingsPanel, {
       props: {
         mockDraft: structuredClone(mockDraft),
@@ -117,7 +126,7 @@ describe("MockApiSettingsPanel", () => {
         editingEnvironmentVariableId: "var-1",
         expandedEnvironmentVariableId: "var-1",
         servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
-        endpointPathParameterNames: () => [],
+        endpointPathParameterNames: () => ["orderId"],
       },
       global: { components: settingsUiStubs },
     });
@@ -134,6 +143,17 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.get('label[for="environment-variable-value-var-1"]').attributes("for")).toBe(
       "environment-variable-value-var-1",
     );
+    await wrapper.get("#mock-api-mock-1 [aria-expanded='false']").trigger("click");
+    expect(wrapper.get('label[for="mock-api-name-mock-1"]').attributes("for")).toBe(
+      "mock-api-name-mock-1",
+    );
+    expect(wrapper.get('label[for="mock-api-endpoint-mock-1"]').attributes("for")).toBe(
+      "mock-api-endpoint-mock-1",
+    );
+    expect(wrapper.get('label[for="mock-api-path-mock-1-orderId"]').attributes("for")).toBe(
+      "mock-api-path-mock-1-orderId",
+    );
+    expect(wrapper.get("fieldset legend").text()).toBe("Request (JSON)");
   });
 
   it("emits variable, import, mock API, save, and discard interactions", async () => {
