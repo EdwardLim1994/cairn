@@ -1243,27 +1243,39 @@ body {
   border-radius: 18px;
 }
 
-.app__logs-resize-handle {
+.app__logs-resize-control {
   @apply absolute left-0 right-0 top-0 z-10 flex justify-center;
   height: 12px;
+}
+
+.app__logs-resize-grip {
+  position: absolute;
+  top: 4px;
+  left: calc(50% - 20px);
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.app__logs-resize-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
   border: 0;
   padding: 0;
+  appearance: none;
+  background: transparent;
+  opacity: 0;
   cursor: ns-resize;
   touch-action: none;
 }
 
-.app__logs-resize-handle::after {
-  content: "";
-  width: 40px;
-  height: 4px;
-  margin-top: 4px;
-  border-radius: 999px;
-  background: var(--muted);
-  opacity: 0.55;
-}
-
-.app__logs-resize-handle:focus-visible {
+.app__logs-resize-control:focus-within {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }

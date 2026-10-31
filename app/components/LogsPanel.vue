@@ -87,21 +87,24 @@ const severityFilterItems = computed(() => [
     class="app__logs-panel app__surface"
     :style="{ '--logs-panel-height': `${props.height}px` }"
   >
-    <div
-      class="app__logs-resize-handle"
-      role="slider"
-      aria-label="Resize logs panel"
-      aria-orientation="vertical"
-      tabindex="0"
-      aria-controls="logs-panel"
-      aria-valuetext="Panel height in pixels"
-      :aria-valuenow="props.height"
-      aria-valuemin="160"
-      aria-valuemax="1200"
-      @pointerdown.prevent="emit('resize', $event)"
-      @keydown.up.prevent="emit('adjustHeight', 24)"
-      @keydown.down.prevent="emit('adjustHeight', -24)"
-    />
+    <div class="app__logs-resize-control">
+      <span class="app__logs-resize-grip" aria-hidden="true"></span>
+      <input
+        type="range"
+        class="app__logs-resize-handle"
+        aria-label="Resize logs panel"
+        aria-orientation="vertical"
+        aria-controls="logs-panel"
+        aria-valuetext="Panel height in pixels"
+        :value="props.height"
+        min="160"
+        max="1200"
+        step="24"
+        @pointerdown.prevent="emit('resize', $event)"
+        @keydown.up.prevent="emit('adjustHeight', 24)"
+        @keydown.down.prevent="emit('adjustHeight', -24)"
+      />
+    </div>
     <div class="app__logs-toolbar">
       <div class="app__logs-title"><strong>Logs</strong></div>
       <UInput
