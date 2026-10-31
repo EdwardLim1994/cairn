@@ -1,6 +1,11 @@
 # Service Graph Editor
 
+[![Tests](https://github.com/EdwardLim1994/cairn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/ci.yml)
+[![SonarCloud Scan](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml)
+
 A Nuxt single page app for editing a microservice graph, triggering registered REST calls, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+
+GitHub Actions runs unit, component, and MySQL-backed integration tests in the CI workflow. SonarCloud analysis runs separately on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
 ## Run with Docker Compose
 
