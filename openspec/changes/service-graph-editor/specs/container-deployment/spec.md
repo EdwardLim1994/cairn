@@ -47,3 +47,27 @@ The repository SHALL provide a tracked `.env.example` for application and Compos
 
 - **WHEN** an operator sets database credentials in `.env`
 - **THEN** the repository excludes `.env` from version control and the example contains placeholders instead of real credentials
+
+### Requirement: Container startup applies pending database migrations
+
+The production app image SHALL include a migration runner and the checked-in Drizzle migrations. Each container startup SHALL apply pending migrations before starting the web server, using the runtime `DATABASE_URL`.
+
+#### Scenario: Initialize a fresh database
+
+- **WHEN** the app starts after MySQL is healthy with an empty database
+- **THEN** it applies all checked-in migrations before serving requests
+
+#### Scenario: Restart with an up-to-date database
+
+- **WHEN** the app restarts with all checked-in migrations already recorded
+- **THEN** it skips those migrations and starts the server without changing the schema
+
+#### Scenario: Deploy a new schema migration
+
+- **WHEN** a rebuilt image includes a new migration
+- **THEN** startup applies only pending migrations and retains existing data according to their SQL
+
+#### Scenario: Migration fails
+
+- **WHEN** database connection or migration execution fails
+- **THEN** the container exits with a nonzero status without starting the web server

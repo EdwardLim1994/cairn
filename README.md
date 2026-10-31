@@ -11,25 +11,19 @@ GitHub Actions reports unit/component tests and MySQL-backed integration tests i
 ## Run with Docker Compose
 
 1. Copy `.env.example` to `.env` and replace the `replace-me` database passwords.
-2. Start MySQL and apply the Drizzle migration from the host:
+2. Build and start the stack:
 
    ```sh
-   docker compose up -d mysql
-   vp install
-   vp run db:migrate
+   docker compose up -d --build
    ```
 
-3. Build and start the app:
-
-   ```sh
-   docker compose up -d --build app
-   ```
+After MySQL is healthy, the app container applies pending Drizzle migrations before starting Cairn. A fresh database receives all migrations; subsequent starts skip recorded migrations. Migration failures stop the container before the web server starts. Generate new migrations with `vp run db:generate`, commit the SQL and metadata, then rebuild the image. Run one app container during migration; concurrent migration runners are not supported.
 
 Open `http://localhost:3001`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3306` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
 
 Register microservices in Cairn with the same `http://localhost:<port>` base URLs used by Postman. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
 
-The production image contains the Nuxt `.output` bundle. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
+The production image contains the Nuxt `.output` bundle, a bundled migration runner, and Drizzle migration files. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
 
 ## Environment
 
@@ -65,9 +59,12 @@ The Collector ingestion routes are `POST /v1/traces` and `POST /v1/logs`. Both a
 
 ## Local development
 
-Start MySQL and migrate as shown above, then run:
+For host-run development, start MySQL and apply migrations before starting Nuxt:
 
 ```sh
+docker compose up -d mysql
+vp install
+vp run db:migrate
 vp run dev
 ```
 

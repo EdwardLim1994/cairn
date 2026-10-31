@@ -6,6 +6,7 @@ RUN bun install --frozen-lockfile --ignore-scripts && bun run nuxt prepare
 
 COPY . .
 RUN bun run build
+RUN bun build scripts/migrate.mjs --target=node --format=cjs --outfile=/app/migrate.cjs
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
@@ -17,6 +18,8 @@ ENV DATABASE_URL="" \
     HOST=0.0.0.0
 
 COPY --from=build /app/.output ./.output
+COPY --from=build /app/migrate.cjs ./migrate.cjs
+COPY --from=build /app/drizzle ./drizzle
 
 EXPOSE 3001
-CMD ["node", ".output/server/index.mjs"]
+CMD ["sh", "-c", "node migrate.cjs && exec node .output/server/index.mjs"]

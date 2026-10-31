@@ -75,7 +75,7 @@ After a trigger returns, the frontend polls the run-flow route. The route report
 
 ### Package the app and MySQL with Docker
 
-Use a multi-stage Dockerfile: build the Nuxt app, then copy only `.output` into a production Node image. Declare runtime environment keys in the image without embedding deployment values: `DATABASE_URL`, `OTEL_COLLECTOR_URL`, `PROJECT_ID`, and `PORT` (default `3000`). Set the server host to `0.0.0.0` so the container accepts published traffic.
+Use a multi-stage Dockerfile: build the Nuxt app, then copy `.output`, a bundled Drizzle migration runner, and the migration SQL and journal into a production Node image. After MySQL is healthy, run the migrator before starting the server. Drizzle records applied migrations and only executes pending migrations; a migration failure prevents the server from starting. Deploy one app container during migration to avoid concurrent runners. Declare runtime environment keys in the image without embedding deployment values: `DATABASE_URL`, `OTEL_COLLECTOR_URL`, `PROJECT_ID`, and `PORT` (default `3000`). Set the server host to `0.0.0.0` so the container accepts published traffic.
 
 Use `docker-compose.yml` to build and run the app with a MySQL service, named persistent database volume, health check, and app dependency on healthy MySQL. Keep the Collector external; set `OTEL_COLLECTOR_URL` in the app container to the Collector endpoint. Configure the Collector separately to export service telemetry to the app's `/v1/traces` and `/v1/logs` routes.
 
