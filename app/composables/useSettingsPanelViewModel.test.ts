@@ -50,6 +50,21 @@ describe("settings panel view model", () => {
     document.body.removeChild(panel);
   });
 
+  it("keeps the settings panel and framework dropdown open for its portaled options", () => {
+    const context = setup();
+    const options = document.createElement("div");
+    options.className = "app__framework-select-menu";
+    document.body.append(options);
+    const event = new PointerEvent("pointerdown", { bubbles: true });
+    options.dispatchEvent(event);
+    context.model.closeSettingsOutside(event);
+
+    expect(context.serviceDialog.value).toBe(true);
+    expect(context.mockPanel.value).toBe(true);
+    expect(context.frameworkMenuOpen.value).toBe(true);
+    document.body.removeChild(options);
+  });
+
   it("closes panels when clicking outside", () => {
     const context = setup();
     context.model.closeSettingsOutside(new PointerEvent("pointerdown"));

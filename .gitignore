@@ -27,3 +27,7 @@ logs
 !.vscode/extensions.json
 
 # dotenv environment variable files
+.*.env
+
+# Test coverage output
+coverage/

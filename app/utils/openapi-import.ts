@@ -15,9 +15,45 @@ const supportedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const operationMethods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 type SupportedMethod = (typeof supportedMethods)[number];
 
+function parseOperation(
+  path: string,
+  methodKey: string,
+  operation: unknown,
+  knownKeys: Set<string>,
+): { endpoint?: ServiceEndpointDraft; warning?: string } | undefined {
+  if (!operation || typeof operation !== "object") return undefined;
+
+  const method = methodKey.toUpperCase();
+  const url = path.startsWith("/") ? path : `/${path}`;
+  const normalizedUrl = normalizePath(url);
+  if (!supportedMethods.includes(method as SupportedMethod)) {
+    return { warning: `Skipped ${method} ${normalizedUrl}: this HTTP method is not supported.` };
+  }
+
+  const key = `${method} ${normalizedUrl}`;
+  if (knownKeys.has(key)) {
+    return { warning: `Skipped duplicate ${key}: this endpoint is already registered.` };
+  }
+
+  const details = operation as { summary?: unknown; operationId?: unknown };
+  const summary = typeof details.summary === "string" ? details.summary.trim() : "";
+  const operationId = typeof details.operationId === "string" ? details.operationId.trim() : "";
+  knownKeys.add(key);
+  return {
+    endpoint: {
+      name: summary || operationId || `${method} ${url}`,
+      apiType: "REST",
+      method: method as SupportedMethod,
+      url,
+    },
+  };
+}
+
 function normalizePath(path: string) {
-  const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
-  return withLeadingSlash.length > 1 ? withLeadingSlash.replace(/\/+$/, "") : withLeadingSlash;
+  let normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  while (normalizedPath.length > 1 && normalizedPath.endsWith("/"))
+    normalizedPath = normalizedPath.slice(0, -1);
+  return normalizedPath;
 }
 
 export async function parseOpenApiEndpoints(
@@ -49,32 +85,9 @@ export async function parseOpenApiEndpoints(
   for (const [path, pathItem] of Object.entries(paths)) {
     for (const methodKey of operationMethods) {
       const operation = pathItem[methodKey as keyof typeof pathItem];
-      if (!operation || typeof operation !== "object") continue;
-
-      const method = methodKey.toUpperCase();
-      const url = path.startsWith("/") ? path : `/${path}`;
-      const normalizedUrl = normalizePath(url);
-      if (!supportedMethods.includes(method as SupportedMethod)) {
-        warnings.push(`Skipped ${method} ${normalizedUrl}: this HTTP method is not supported.`);
-        continue;
-      }
-
-      const key = `${method} ${normalizedUrl}`;
-      if (knownKeys.has(key)) {
-        warnings.push(`Skipped duplicate ${key}: this endpoint is already registered.`);
-        continue;
-      }
-
-      const details = operation as { summary?: unknown; operationId?: unknown };
-      const summary = typeof details.summary === "string" ? details.summary.trim() : "";
-      const operationId = typeof details.operationId === "string" ? details.operationId.trim() : "";
-      endpoints.push({
-        name: summary || operationId || `${method} ${url}`,
-        apiType: "REST",
-        method: method as SupportedMethod,
-        url,
-      });
-      knownKeys.add(key);
+      const result = parseOperation(path, methodKey, operation, knownKeys);
+      if (result?.endpoint) endpoints.push(result.endpoint);
+      if (result?.warning) warnings.push(result.warning);
     }
   }
 

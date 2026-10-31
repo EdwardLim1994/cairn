@@ -1,14 +1,27 @@
 <script setup lang="ts">
-const props = defineProps<{ position: { x: number; y: number } }>();
+const open = defineModel<boolean>("open", { required: true });
 const emit = defineEmits<{ addService: [] }>();
+const items = [
+  [
+    {
+      label: "Add new service",
+      icon: "i-lucide-plus",
+      onSelect: () => emit("addService"),
+    },
+  ],
+];
 </script>
 
 <template>
-  <div
-    class="app__context-menu app__surface"
-    :style="{ left: `${props.position.x}px`, top: `${props.position.y}px` }"
-    @click.stop
+  <UContextMenu
+    v-model:open="open"
+    :items="items"
+    :ui="{
+      content: 'app__context-menu app__surface',
+      item: 'app__context-menu-item',
+      itemLeadingIcon: 'app__context-menu-icon',
+    }"
   >
-    <button type="button" @click="emit('addService')"><b>+</b> Add new service</button>
-  </div>
+    <slot />
+  </UContextMenu>
 </template>

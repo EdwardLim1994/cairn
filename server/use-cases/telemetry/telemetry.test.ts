@@ -41,11 +41,21 @@ describe("telemetry endpoint use cases", () => {
 
   it("normalizes OTLP logs and skips records from a different project", async () => {
     const insertLogs = vi.fn().mockResolvedValue(undefined);
+    const events: string[] = [];
     const useCase = createIngestOtlpLogsUseCase({
-      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      ensureProject: vi.fn(async () => {
+        events.push("ensure-project");
+        return "project-1";
+      }),
       configuredProjectId: () => "project-1",
-      listServiceNames: vi.fn().mockResolvedValue([{ name: "Order Service" }]),
-      insertLogs,
+      listServiceNames: vi.fn(async () => {
+        events.push("list-services");
+        return [{ name: "Order Service" }];
+      }),
+      insertLogs: vi.fn(async (...args) => {
+        events.push("insert-logs");
+        await insertLogs(...args);
+      }),
     });
     const result = await useCase({
       resourceLogs: [
@@ -82,14 +92,22 @@ describe("telemetry endpoint use cases", () => {
         message: "created",
       }),
     ]);
+    expect(events).toEqual(["ensure-project", "list-services", "insert-logs"]);
   });
 
   it("normalizes OTLP spans, status, and attributes before persistence", async () => {
     const insertSpans = vi.fn().mockResolvedValue(undefined);
+    const events: string[] = [];
     const useCase = createIngestOtlpTracesUseCase({
-      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      ensureProject: vi.fn(async () => {
+        events.push("ensure-project");
+        return "project-1";
+      }),
       configuredProjectId: () => "project-1",
-      insertSpans,
+      insertSpans: vi.fn(async (...args) => {
+        events.push("insert-spans");
+        await insertSpans(...args);
+      }),
     });
     const result = await useCase({
       resourceSpans: [
@@ -124,5 +142,6 @@ describe("telemetry endpoint use cases", () => {
         attributes: { "http.status_code": 500 },
       }),
     ]);
+    expect(events).toEqual(["ensure-project", "insert-spans"]);
   });
 });

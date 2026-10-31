@@ -5,26 +5,30 @@ const emit = defineEmits<{ dismissError: []; dismissWarning: [id: number] }>();
 
 <template>
   <div v-if="errorMessage || warnings.length" class="app__toast-stack">
-    <div v-if="errorMessage" class="app__toast app__toast--error" role="alert">
-      <span>{{ errorMessage }}</span>
-      <button aria-label="Dismiss error" @click="emit('dismissError')">
-        <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m6 6 12 12M18 6 6 18" />
-        </svg>
-      </button>
-    </div>
-    <div
+    <UAlert
+      v-if="errorMessage"
+      :title="errorMessage"
+      color="error"
+      variant="soft"
+      :close="{ 'aria-label': 'Dismiss error' }"
+      class="app__toast app__toast--error"
+      role="alert"
+      @update:open="(open) => !open && emit('dismissError')"
+    />
+    <output
       v-for="warning in warnings"
       :key="warning.id"
       class="app__toast app__toast--warning"
-      role="status"
+      aria-live="polite"
     >
-      <span>{{ warning.message }}</span>
-      <button aria-label="Dismiss import warning" @click="emit('dismissWarning', warning.id)">
-        <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m6 6 12 12M18 18 6 6" />
-        </svg>
-      </button>
-    </div>
+      <UAlert
+        :title="warning.message"
+        color="warning"
+        variant="soft"
+        :close="{ 'aria-label': 'Dismiss import warning' }"
+        class="w-full"
+        @update:open="(open) => !open && emit('dismissWarning', warning.id)"
+      />
+    </output>
   </div>
 </template>

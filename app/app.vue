@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import GraphCanvas from "./components/graph/GraphCanvas.vue";
 import ContextMenu from "./components/ContextMenu.vue";
@@ -59,6 +59,12 @@ const loading = ref(true);
 const errorMessage = ref("");
 const importWarnings = ref<{ id: number; message: string }[]>([]);
 const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
+const contextMenuOpen = computed({
+  get: () => contextMenu.value !== null,
+  set: (open: boolean) => {
+    if (!open) contextMenu.value = null;
+  },
+});
 const serviceDialog = ref(false);
 const editingServiceId = ref<string | null>(null);
 const serviceDraft = ref<ServiceDraft>({
@@ -147,7 +153,8 @@ const latestRunResult = computed(() => Object.values(runResults.value).at(-1));
 type MockApi = MockApiDraft;
 const resetEnvironmentCardEdit = mockApiViewModel.resetEnvironmentCardEdit;
 const dismissImportWarning = mockApiViewModel.dismissImportWarning;
-const handleEnvironmentVariableToggle = mockApiViewModel.handleEnvironmentVariableToggle;
+const openEnvironmentVariable = mockApiViewModel.openEnvironmentVariable;
+const closeEnvironmentVariable = mockApiViewModel.closeEnvironmentVariable;
 const updateEnvironmentVariable = mockApiViewModel.updateEnvironmentVariable;
 const addEnvironmentVariable = mockApiViewModel.addEnvironmentVariable;
 const deleteEnvironmentVariable = mockApiViewModel.deleteEnvironmentVariable;
@@ -266,7 +273,8 @@ async function importPostmanCollection(event: Event) {
 
   errorMessage.value = "";
   try {
-    await mockApiViewModel.importCollection(await file.text());
+    const content = await file.text();
+    mockApiViewModel.importCollection(content);
   } catch (cause) {
     errorMessage.value =
       cause instanceof Error ? cause.message : "Could not import Postman collection";
@@ -336,7 +344,6 @@ onUnmounted(() => {
   <main
     class="relative h-screen min-h-[620px] overflow-hidden text-sm leading-[1.4] app"
     :class="{ 'app--dark': dark, 'app--logs-open': logsOpen }"
-    @click="contextMenu = null"
   >
     <AppToolbar
       :service-count="services.length"
@@ -346,26 +353,24 @@ onUnmounted(() => {
       @toggle-theme="dark = !dark"
     />
 
-    <section
-      class="app__canvas-shell"
-      @click="contextMenu = null"
-      @contextmenu="handleCanvasContextMenu"
-    >
-      <GraphCanvas
-        ref="graphCanvas"
-        v-model:nodes="nodes"
-        v-model:edges="edges"
-        :dark="dark"
-        @connect="onConnect"
-        @node-click="onNodeClick"
-        @move-end="onMoveEnd"
-        @node-drag-stop="saveCanvas"
-        @toggle-service-endpoints="toggleServiceEndpoints"
-        @open-service-endpoint="openServiceEndpoint"
-        @toggle-mock-connections="toggleMockConnections"
-        @open-mock-api="openMockPanel"
-        @run-mock-api="runMock"
-      />
+    <section class="app__canvas-shell" @contextmenu="handleCanvasContextMenu">
+      <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">
+        <GraphCanvas
+          ref="graphCanvas"
+          v-model:nodes="nodes"
+          v-model:edges="edges"
+          :dark="dark"
+          @connect="onConnect"
+          @node-click="onNodeClick"
+          @move-end="onMoveEnd"
+          @node-drag-stop="saveCanvas"
+          @toggle-service-endpoints="toggleServiceEndpoints"
+          @open-service-endpoint="openServiceEndpoint"
+          @toggle-mock-connections="toggleMockConnections"
+          @open-mock-api="openMockPanel"
+          @run-mock-api="runMock"
+        />
+      </ContextMenu>
       <div v-if="loading" class="app__loading-banner app__surface">Loading saved graph...</div>
       <AppToastStack
         :error-message="errorMessage"
@@ -377,7 +382,6 @@ onUnmounted(() => {
         <kbd>Right click</kbd> to add a service <span> | </span> Drag from a node to an endpoint to
         connect
       </div>
-      <ContextMenu v-if="contextMenu" :position="contextMenu" @add-service="beginAddService" />
     </section>
 
     <LogsPanel
@@ -422,7 +426,8 @@ onUnmounted(() => {
       @discard="closeSettings"
       @save="saveMockDraft"
       @add-variable="addEnvironmentVariable"
-      @toggle-variable="handleEnvironmentVariableToggle"
+      @open-variable="openEnvironmentVariable"
+      @close-variable="closeEnvironmentVariable"
       @update-variable="updateEnvironmentVariable"
       @delete-variable="deleteEnvironmentVariable"
       @import-collection="importPostmanCollection"
@@ -441,9 +446,10 @@ onUnmounted(() => {
 </template>
 
 <style>
-@reference "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@import "@nuxt/ui";
+@reference "tailwindcss";
 
 :root {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
@@ -634,7 +640,8 @@ body {
 
 .app__button:hover,
 .app__icon-button:hover,
-.app__context-menu button:hover,
+.app__context-menu [role="menuitem"]:hover,
+.app__context-menu [role="menuitem"][data-highlighted],
 .app__log-row:hover {
   background: var(--panel2);
 }
@@ -682,30 +689,30 @@ body {
   background-color: transparent;
 }
 
-.vue-flow__minimap {
+.app .vue-flow__minimap {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  bottom: 76px !important;
-  right: 16px !important;
-  background: var(--panel) !important;
+  bottom: 76px;
+  right: 16px;
+  background: var(--panel);
 }
 
-.vue-flow__controls {
-  bottom: 76px !important;
-  left: 16px !important;
-  background: var(--panel) !important;
-  border: 1px solid var(--border) !important;
+.app .vue-flow__controls {
+  bottom: 76px;
+  left: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
-.vue-flow__controls-button {
-  background: var(--panel) !important;
-  color: var(--text) !important;
-  border-bottom: 1px solid var(--border) !important;
-  fill: var(--text) !important;
+.app .vue-flow__controls-button {
+  background: var(--panel);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  fill: var(--text);
 }
 
 .vue-flow__controls-button svg,
@@ -850,8 +857,7 @@ body {
 }
 
 .app__endpoint-heading,
-.app__section-title,
-.app__endpoint-form-head {
+.app__section-title {
   @apply flex items-center justify-between;
 }
 
@@ -987,26 +993,26 @@ body {
   font-size: 11px;
 }
 
-.app__endpoint-handle,
-.app__mock-handle,
-.app__service-source {
-  width: 10px !important;
-  height: 10px !important;
-  border: 2px solid var(--panel) !important;
-  background: var(--edge) !important;
+.app .app__endpoint-handle,
+.app .app__mock-handle,
+.app .app__service-source {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--panel);
+  background: var(--edge);
 }
 
-.app__endpoint-handle {
-  left: -5px !important;
+.app .app__endpoint-handle {
+  left: -5px;
 }
 
-.app__mock-handle {
-  right: -5px !important;
+.app .app__mock-handle {
+  right: -5px;
 }
 
-.app__service-source {
-  right: -5px !important;
-  top: 28px !important;
+.app .app__service-source {
+  right: -5px;
+  top: 28px;
 }
 
 .app__error-indicator {
@@ -1060,7 +1066,7 @@ body {
   font-size: 11px;
 }
 
-.app__run-button {
+.app .app__run-button {
   @apply flex items-center justify-center rounded-full;
   flex: none;
   width: 34px;
@@ -1068,7 +1074,7 @@ body {
   margin-left: auto;
   border: 0;
   background: var(--accent);
-  color: var(--accent-ink) !important;
+  color: var(--accent-ink);
 }
 
 .app__run-button:disabled {
@@ -1158,15 +1164,9 @@ body {
   min-width: 180px;
 }
 
-.app__context-menu button {
+.app__context-menu-item {
   @apply w-full rounded-lg px-2.5 py-2 text-left text-xs;
-  border: 0;
-  background: transparent;
-}
-
-.app__context-menu b {
-  @apply mr-2 text-base;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .app__loading-banner {
@@ -1212,7 +1212,6 @@ body {
   height: 46px;
   background: var(--panel);
   font-size: 12px;
-  /* min-width: 150px; */
 
   &.app__logs-toggle--active {
     border-color: var(--accent);
@@ -1247,6 +1246,9 @@ body {
 .app__logs-resize-handle {
   @apply absolute left-0 right-0 top-0 z-10 flex justify-center;
   height: 12px;
+  margin: 0;
+  border: 0;
+  padding: 0;
   cursor: ns-resize;
   touch-action: none;
 }
@@ -1304,50 +1306,14 @@ body {
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
-.app__framework-select {
-  position: relative;
-}
-
 .app__control--framework-select {
-  @apply flex items-center gap-2 text-left;
   min-height: 38px;
-  cursor: pointer;
 }
 
-.app__control--framework-select img,
-.app__framework-options img {
+.app__control--framework-select img {
   width: 19px;
   height: 19px;
   flex: none;
-}
-
-.app__control--framework-select > span {
-  @apply min-w-0 flex-1 truncate;
-  color: var(--text);
-}
-
-.app__framework-chevron {
-  flex: none;
-  color: var(--muted);
-}
-
-.app__framework-options {
-  @apply absolute left-0 right-0 z-30 mt-1 flex flex-col gap-1 rounded-lg border p-1.5 shadow-lg;
-  border-color: var(--border);
-  background: var(--panel);
-}
-
-.app__framework-options button {
-  @apply flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-left;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: 11px;
-}
-
-.app__framework-options button:hover,
-.app__framework-options button[aria-selected="true"] {
-  background: var(--panel2);
 }
 
 .app__logs-toolbar .app__control {
@@ -1356,26 +1322,13 @@ body {
   padding: 7px 9px;
 }
 
-.app__log-service-filter {
-  position: relative;
-}
-
-.app__log-service-filter summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.app__log-service-filter summary::-webkit-details-marker {
-  display: none;
-}
-
 .app__log-service-options {
-  @apply absolute right-0 z-20 mt-1 flex max-h-48 min-w-full flex-col gap-1 overflow-auto rounded-lg border p-1.5 shadow-lg;
+  @apply z-20 flex max-h-48 min-w-full flex-col gap-1 overflow-auto rounded-lg border p-1.5 shadow-lg;
   border-color: var(--border);
   background: var(--panel);
 }
 
-.app__log-service-options button {
+.app__log-service-options .app__filter-option {
   @apply cursor-pointer whitespace-nowrap rounded px-2 py-1.5 text-left;
   border: 0;
   background: transparent;
@@ -1383,11 +1336,12 @@ body {
   font-size: 11px;
 }
 
-.app__log-service-options button:hover {
+.app__log-service-options .app__filter-option:hover,
+.app__log-service-options .app__filter-option[data-highlighted] {
   background: var(--panel2);
 }
 
-.app__log-service-options button.app__filter-option--selected {
+.app__log-service-options .app__filter-option--selected {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1438,7 +1392,19 @@ body {
 
 .app__dialog-backdrop {
   @apply fixed inset-0 z-[70] flex justify-end;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
   background: rgba(20, 24, 28, 0.4);
+}
+
+.app__dialog-backdrop::backdrop {
+  background: transparent;
 }
 
 .app__side-dialog {
@@ -1534,18 +1500,26 @@ body {
 
 .app__endpoint-form-card {
   @apply flex flex-col gap-2.5 rounded-xl border p-3;
+  position: relative;
   padding-bottom: 0px;
   border-color: var(--border);
   background: var(--panel2);
 }
 
+.app__endpoint-accordion,
+.app__endpoint-accordion-item {
+  width: 100%;
+  border: 0;
+}
+
 .app__endpoint-form-summary {
-  @apply cursor-pointer gap-2;
-  list-style: none;
+  @apply flex w-full cursor-pointer items-center gap-2 text-left;
+  min-height: 32px;
+  padding-left: 30px;
 }
 
 .app__endpoint-summary-title {
-  @apply flex min-w-0 items-center gap-2;
+  @apply flex min-w-0 flex-1 items-center;
 }
 
 .app__endpoint-summary-copy {
@@ -1565,6 +1539,16 @@ body {
   color: var(--danger);
 }
 
+.app__endpoint-card-delete {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
 .app__endpoint-delete-button .app__icon {
   stroke: var(--danger);
 }
@@ -1573,26 +1557,21 @@ body {
   background: var(--danger-soft);
 }
 
-.app__endpoint-form-summary::-webkit-details-marker {
-  display: none;
-}
-
-.app__endpoint-form-summary::after {
-  color: var(--muted);
-  content: "+";
-}
-
-.app__endpoint-form-card[open] > .app__endpoint-form-summary::after {
-  content: "−";
-}
-
-.app__endpoint-form-card:not([open]) {
+.app__endpoint-form-card[data-open="false"] {
   min-height: 56px;
   justify-content: center;
 }
 
-.app__endpoint-form-card:not([open]) > .app__endpoint-form-summary {
-  width: 100%;
+.app__settings-accordion-chevron {
+  color: var(--muted);
+}
+
+.app__endpoint-accordion-content {
+  padding-top: 10px;
+}
+
+.app__endpoint-accordion-body {
+  @apply flex flex-col gap-2.5;
 }
 
 .app__endpoint-form-summary span {
@@ -1602,10 +1581,6 @@ body {
 
 .app__endpoint-form-actions {
   @apply flex justify-end;
-}
-
-.app__endpoint-form-head strong {
-  font-size: 11px;
 }
 
 .app__code-input {
@@ -1645,7 +1620,7 @@ body {
   @apply overflow-auto whitespace-pre-wrap;
   margin: 0;
   max-height: 150px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   font-size: 10px;
 }
 
@@ -1734,9 +1709,11 @@ body {
 }
 
 .app__settings-accordion-toggle {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
+  width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1744,12 +1721,25 @@ body {
   text-align: left;
 }
 
-.app__settings-accordion-chevron {
-  transition: transform 0.15s ease;
+.app__settings-section-accordion {
+  flex: 1;
+  min-width: 0;
 }
 
-.app__settings-accordion-chevron.app__settings-accordion-chevron--collapsed {
-  transform: rotate(-90deg);
+.app__settings-section-accordion-item {
+  border: 0;
+}
+
+.app__settings-accordion-content {
+  padding-top: 0.75rem;
+}
+
+.app__settings-accordion-body {
+  width: 100%;
+}
+
+.app__settings-accordion-chevron {
+  transition: transform 0.15s ease;
 }
 
 .app__environment-variable-list {
@@ -1787,7 +1777,7 @@ body {
 
 .cm-variable-placeholder {
   color: #7c3aed;
-  background: rgb(139 92 246 / 12%);
+  background: #f1ebfe;
   border-radius: 3px;
 }
 
@@ -1797,5 +1787,6 @@ body {
 
 .app.app--dark .cm-variable-placeholder {
   color: #c4b5fd;
+  background: #262035;
 }
 </style>

@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { getCanvas, saveCanvas } from ".";
@@ -12,17 +12,19 @@ const integration = describe.skipIf(!connectionString);
 
 integration("canvas repositories with MySQL", () => {
   const projectId = "canvas-integration-project";
-  const pool = mysql.createPool(connectionString!);
-  const db = drizzle({ client: pool, schema, mode: "default" });
+  let pool: mysql.Pool | undefined;
+  let db: MySql2Database<typeof schema> | undefined;
 
   beforeAll(async () => {
+    pool = mysql.createPool(connectionString!);
+    db = drizzle({ client: pool, schema, mode: "default" });
     await pool.query("SELECT 1");
   });
 
   beforeEach(async () => {
-    await db.delete(projects).where(eq(projects.id, projectId));
-    await db.insert(projects).values({ id: projectId });
-    await db.insert(services).values([
+    await db!.delete(projects).where(eq(projects.id, projectId));
+    await db!.insert(projects).values({ id: projectId });
+    await db!.insert(services).values([
       {
         id: "canvas-service-source",
         projectId,
@@ -38,7 +40,7 @@ integration("canvas repositories with MySQL", () => {
         baseUrl: "http://localhost:8082",
       },
     ]);
-    await db.insert(serviceEndpoints).values({
+    await db!.insert(serviceEndpoints).values({
       id: "canvas-target-endpoint",
       projectId,
       serviceId: "canvas-service-target",
@@ -50,18 +52,18 @@ integration("canvas repositories with MySQL", () => {
   });
 
   afterAll(async () => {
-    await pool.end();
+    await pool?.end();
   });
 
   it("reads persisted canvas state and assembles endpoints under their services", async () => {
-    await db.insert(serviceEdges).values({
+    await db!.insert(serviceEdges).values({
       id: "canvas-edge-1",
       projectId,
       sourceServiceId: "canvas-service-source",
       targetEndpointId: "canvas-target-endpoint",
     });
 
-    const canvas = await getCanvas(projectId, db);
+    const canvas = await getCanvas(projectId, db!);
 
     expect(canvas.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
     expect(canvas.services).toHaveLength(2);
@@ -88,10 +90,10 @@ integration("canvas repositories with MySQL", () => {
           { sourceServiceId: "canvas-service-source", targetEndpointId: "canvas-target-endpoint" },
         ],
       },
-      db,
+      db!,
     );
 
-    const canvas = await getCanvas(projectId, db);
+    const canvas = await getCanvas(projectId, db!);
     expect(canvas.viewport).toEqual({ x: 4, y: 5, zoom: 1.25 });
     expect(canvas.mockNode).toEqual({ x: 8, y: 9 });
     expect(canvas.services.find((service) => service.id === "canvas-service-source")).toMatchObject(
@@ -112,11 +114,11 @@ integration("canvas repositories with MySQL", () => {
             { sourceServiceId: "canvas-service-source", targetEndpointId: "missing-endpoint" },
           ],
         },
-        db,
+        db!,
       ),
     ).rejects.toBeInstanceOf(CanvasConstraintError);
 
-    const canvas = await getCanvas(projectId, db);
+    const canvas = await getCanvas(projectId, db!);
     expect(canvas.services.find((service) => service.id === "canvas-service-source")).toMatchObject(
       { positionX: 0, positionY: 0 },
     );

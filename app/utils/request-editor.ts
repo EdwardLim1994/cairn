@@ -6,7 +6,7 @@ export function variableCompletions(
   context: CompletionContext,
   variables: Array<{ name: string }>,
 ) {
-  const match = context.matchBefore(/\{\{[A-Za-z_0-9]*$/);
+  const match = context.matchBefore(/\{\{\w*$/);
   if (!match && !context.explicit) return null;
   return {
     from: match?.from ?? context.pos,
@@ -28,7 +28,7 @@ export const variablePlaceholderExtension = ViewPlugin.fromClass(
     find(view: EditorView) {
       const builder = new RangeSetBuilder<Decoration>();
       const text = view.state.doc.toString();
-      for (const match of text.matchAll(/\{\{[A-Za-z_][A-Za-z0-9_]*\}\}/g))
+      for (const match of text.matchAll(/\{\{[A-Za-z_]\w*\}\}/g))
         builder.add(match.index!, match.index! + match[0].length, placeholderMark);
       return builder.finish();
     }

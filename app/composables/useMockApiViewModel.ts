@@ -78,7 +78,7 @@ export function useMockApiViewModel(options: {
     return entry;
   }
 
-  async function importCollection(content: string) {
+  function importCollection(content: string) {
     options.importWarnings.value = [];
     const result = parsePostmanCollection(content, options.services());
     options.store.mockDraft.push(...result.drafts);
@@ -138,9 +138,12 @@ export function useMockApiViewModel(options: {
     options.environmentCardDraft.value = { name: "", value: "" };
   }
 
-  function handleEnvironmentVariableToggle(variable: EnvironmentVariable, open: boolean) {
-    if (open) editEnvironmentVariable(variable);
-    else if (options.editingEnvironmentVariableId.value === variable.id) resetEnvironmentCardEdit();
+  function openEnvironmentVariable(variable: EnvironmentVariable) {
+    editEnvironmentVariable(variable);
+  }
+
+  function closeEnvironmentVariable(variable: EnvironmentVariable) {
+    if (options.editingEnvironmentVariableId.value === variable.id) resetEnvironmentCardEdit();
   }
 
   async function updateEnvironmentVariable() {
@@ -148,7 +151,7 @@ export function useMockApiViewModel(options: {
       const id = options.editingEnvironmentVariableId.value;
       if (!id) return true;
       const name = options.environmentCardDraft.value.name.trim();
-      if (!/^[A-Za-z_][A-Za-z0-9_]{0,254}$/.test(name))
+      if (!/^[A-Za-z_]\w{0,254}$/.test(name))
         throw new Error(
           "Variable name must start with a letter or underscore and contain only letters, numbers, or underscores",
         );
@@ -189,60 +192,72 @@ export function useMockApiViewModel(options: {
     if (options.editingEnvironmentVariableId.value === variable.id) resetEnvironmentCardEdit();
   }
 
+  function parseMockDrafts() {
+    return options.store.mockDraft.map((entry) => {
+      try {
+        const requestJson =
+          typeof entry.requestJson === "string"
+            ? JSON.parse(entry.requestJson.trim() || "{}")
+            : (entry.requestJson ?? {});
+        return { ...entry, requestJson };
+      } catch {
+        throw new Error(`Request for ${entry.name || "mock API"} must be valid JSON`);
+      }
+    });
+  }
+
+  async function saveEnvironmentVariables() {
+    const variableIds = new Set(
+      options.store.environmentVariables
+        .filter(({ pendingCreate }) => !pendingCreate)
+        .map(({ id }) => id),
+    );
+    for (const id of options.store.savedEnvironmentVariableIds) {
+      if (!variableIds.has(id)) await options.apiClient.deleteEnvironmentVariable(id);
+    }
+    for (const variable of options.store.environmentVariables) {
+      const { id, name, value, pendingCreate } = variable;
+      if (pendingCreate) {
+        const created = await options.apiClient.createEnvironmentVariable({ name, value });
+        delete options.store.savedEnvironmentVariableValues[id];
+        variable.id = created.id;
+        delete variable.pendingCreate;
+        options.store.savedEnvironmentVariableValues[created.id] = { name, value };
+        continue;
+      }
+      const saved = options.store.savedEnvironmentVariableValues[id];
+      if (!saved || saved.name !== name || saved.value !== value) {
+        await options.apiClient.updateEnvironmentVariable(id, { name, value });
+        options.store.savedEnvironmentVariableValues[id] = { name, value };
+      }
+    }
+    options.store.savedEnvironmentVariableIds = options.store.environmentVariables.map(
+      ({ id }) => id,
+    );
+  }
+
+  async function saveMockApis(entries: MockApiDraft[]) {
+    const savedIds = new Set(entries.flatMap((entry) => (entry.id ? [entry.id] : [])));
+    for (const entry of options.store.mockApis) {
+      if (entry.id && !savedIds.has(entry.id)) await options.apiClient.deleteMockApi(entry.id);
+    }
+    for (const entry of entries) {
+      if (!entry.targetEndpointId)
+        throw new Error(`Select a service endpoint for ${entry.name || "mock API"}`);
+      const body = { ...entry, targetEndpointId: entry.targetEndpointId };
+      if (entry.id) await options.apiClient.updateMockApi(entry.id, body);
+      else await options.apiClient.createMockApi(body);
+    }
+  }
+
   async function saveMockDraft() {
     try {
       if (options.editingEnvironmentVariableId.value && !(await updateEnvironmentVariable()))
         return;
       await options.saveCanvas();
-      const entries = options.store.mockDraft.map((entry) => {
-        let requestJson: unknown;
-        try {
-          requestJson =
-            typeof entry.requestJson === "string"
-              ? JSON.parse(entry.requestJson.trim() || "{}")
-              : (entry.requestJson ?? {});
-        } catch {
-          throw new Error(`Request for ${entry.name || "mock API"} must be valid JSON`);
-        }
-        return { ...entry, requestJson };
-      });
-      const variableIds = new Set(
-        options.store.environmentVariables
-          .filter(({ pendingCreate }) => !pendingCreate)
-          .map(({ id }) => id),
-      );
-      for (const id of options.store.savedEnvironmentVariableIds)
-        if (!variableIds.has(id)) await options.apiClient.deleteEnvironmentVariable(id);
-      for (const variable of options.store.environmentVariables) {
-        const { id, name, value, pendingCreate } = variable;
-        if (pendingCreate) {
-          const created = await options.apiClient.createEnvironmentVariable({ name, value });
-          delete options.store.savedEnvironmentVariableValues[id];
-          variable.id = created.id;
-          delete variable.pendingCreate;
-          options.store.savedEnvironmentVariableValues[created.id] = { name, value };
-        } else {
-          const saved = options.store.savedEnvironmentVariableValues[id];
-          if (!saved || saved.name !== name || saved.value !== value) {
-            await options.apiClient.updateEnvironmentVariable(id, { name, value });
-            options.store.savedEnvironmentVariableValues[id] = { name, value };
-          }
-        }
-      }
-      options.store.savedEnvironmentVariableIds = options.store.environmentVariables.map(
-        ({ id }) => id,
-      );
-      const savedIds = new Set(entries.flatMap((entry) => (entry.id ? [entry.id] : [])));
-      for (const entry of options.store.mockApis)
-        if (entry.id && !savedIds.has(entry.id)) await options.apiClient.deleteMockApi(entry.id);
-      for (const entry of entries) {
-        const targetEndpointId = entry.targetEndpointId;
-        if (!targetEndpointId)
-          throw new Error(`Select a service endpoint for ${entry.name || "mock API"}`);
-        const body = { ...entry, targetEndpointId };
-        if (entry.id) await options.apiClient.updateMockApi(entry.id, body);
-        else await options.apiClient.createMockApi(body);
-      }
+      const entries = parseMockDrafts();
+      await saveEnvironmentVariables();
+      await saveMockApis(entries);
       options.closeSettings();
       await options.loadCanvas();
       await options.saveCanvas();
@@ -262,7 +277,8 @@ export function useMockApiViewModel(options: {
     openPanel,
     editEnvironmentVariable,
     resetEnvironmentCardEdit,
-    handleEnvironmentVariableToggle,
+    openEnvironmentVariable,
+    closeEnvironmentVariable,
     updateEnvironmentVariable,
     addEnvironmentVariable,
     deleteEnvironmentVariable,

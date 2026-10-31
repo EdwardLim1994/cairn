@@ -30,18 +30,18 @@ type ServiceViewModelOptions = {
   onImportWarnings: (warnings: string[]) => void;
 };
 
+function newServiceDraft(): ServiceDraft {
+  return {
+    name: "",
+    framework: "",
+    baseUrl: "http://localhost:3000",
+    active: true,
+    endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
+  };
+}
+
 export function useServiceViewModel(options: ServiceViewModelOptions) {
   let initialNewServiceEndpoint: EndpointDraft | null = null;
-
-  function newServiceDraft(): ServiceDraft {
-    return {
-      name: "",
-      framework: "",
-      baseUrl: "http://localhost:3000",
-      active: true,
-      endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
-    };
-  }
 
   function beginAddService(position: Position) {
     const draft = newServiceDraft();

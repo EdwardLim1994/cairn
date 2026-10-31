@@ -107,9 +107,12 @@ export function createRunMockApiUseCase(dependencies: {
       const responseHeaders = Object.fromEntries(response.headers.entries());
       const status = response.ok ? "completed" : "failed";
       const bodyError = responseBody.trim();
-      const error = response.ok
-        ? null
-        : `Target returned HTTP ${response.status}${bodyError ? `: ${bodyError}` : ""}`;
+      const errorPrefix = `Target returned HTTP ${response.status}`;
+      let error: string | null = null;
+      if (!response.ok) {
+        error = errorPrefix;
+        if (bodyError) error = `${errorPrefix}: ${bodyError}`;
+      }
       await dependencies.finishRun(runId, {
         status,
         responseStatus: response.status,
@@ -128,11 +131,9 @@ export function createRunMockApiUseCase(dependencies: {
         error,
       };
     } catch (cause) {
-      const message = controller.signal.aborted
-        ? `Target request timed out after ${timeoutMs} ms`
-        : cause instanceof Error
-          ? cause.message
-          : "Target connection failed";
+      let message = "Target connection failed";
+      if (controller.signal.aborted) message = `Target request timed out after ${timeoutMs} ms`;
+      else if (cause instanceof Error) message = cause.message;
       await dependencies.finishRun(runId, { status: "failed", error: message });
       await logFailure(message, null);
       return {

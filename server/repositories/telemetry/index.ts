@@ -53,7 +53,7 @@ export async function queryLogs(
   return { records, registeredServices };
 }
 
-export async function listTelemetryServiceNames(projectId: string) {
+export function listTelemetryServiceNames(projectId: string) {
   return getDb()
     .select({ name: services.name })
     .from(services)

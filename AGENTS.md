@@ -34,6 +34,13 @@ release. Add a tool name to select part of the graph. For example, run
 
 Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. The app uses Tailwind utilities and native CSS nesting in `app/app.vue`. Keep app-specific selectors in BEM form (`app__element`, `app__element--modifier`); leave Tailwind utility and third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
 
+### UI components
+
+- Prefer Nuxt UI components for generic buttons, inputs, selects, dropdowns, accordions, and alerts. Use their `class` and `ui` props to apply Cairn's existing BEM selectors and theme tokens rather than rebuilding generic interactions.
+- Keep thin Cairn wrappers when they connect a Nuxt UI component to app-specific state or events. Do not wrap Nuxt UI only to rename its API.
+- Keep Vue Flow canvas/nodes and the CodeMirror request editor as Cairn-specific components; their behavior is domain-specific and should not be replaced with generic UI controls.
+- Nuxt UI is registered through `@nuxt/ui` in `nuxt.config.ts`, with its Tailwind styles imported in `app/app.vue`. Component tests that mount panels outside Nuxt should stub the Nuxt UI controls and verify the panel's emitted intents and model updates.
+
 ### Mock APIs and shared variables
 
 - Mock API entries target registered service endpoints. Endpoint route templates may contain `{name}`, `{name:constraint}`, or `:name` parameters; mock API path values are URL-encoded before outbound calls.

@@ -39,7 +39,7 @@ const emit = defineEmits<{
       </div>
       <div class="app__node-heading">
         <div class="app__node-name-line">
-          <span
+          <output
             class="app__service-status-dot"
             :class="
               data.online === true
@@ -58,8 +58,7 @@ const emit = defineEmits<{
             :title="
               data.online === true ? 'Online' : data.online === false ? 'Offline' : 'Checking'
             "
-            role="img"
-          ></span>
+          ></output>
           <strong>{{ data.name }}</strong>
         </div>
         <span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>

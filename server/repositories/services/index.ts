@@ -108,7 +108,7 @@ export async function deleteService(projectId: string, id: string): Promise<bool
   return Boolean(result[0]?.affectedRows);
 }
 
-export async function listHealthTargets(projectId: string) {
+export function listHealthTargets(projectId: string) {
   return getDb()
     .select({ id: services.id, framework: services.framework, baseUrl: services.baseUrl })
     .from(services)

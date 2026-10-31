@@ -46,7 +46,7 @@ export function mockApiInput(value: unknown) {
   let requestJson: unknown;
   try {
     const encoded = JSON.stringify(input.requestJson ?? {});
-    if (encoded === undefined) throw new Error();
+    if (encoded === undefined) throw new Error("Mock API request cannot be serialized");
     requestJson = JSON.parse(encoded);
   } catch {
     throw createError({ statusCode: 400, statusMessage: "Mock API request must be valid JSON" });

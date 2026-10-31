@@ -12,7 +12,7 @@ export async function listEnvironmentVariables(projectId: string) {
   return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
 }
 
-export async function getEnvironmentVariableValues(projectId: string) {
+export function getEnvironmentVariableValues(projectId: string) {
   return getDb()
     .select({ name: environmentVariables.name, value: environmentVariables.value })
     .from(environmentVariables)

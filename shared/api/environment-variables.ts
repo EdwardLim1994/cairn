@@ -6,7 +6,7 @@ export const environmentVariableInputSchema = z.object({
     .string()
     .min(1)
     .max(255)
-    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+    .regex(/^[A-Za-z_]\w*$/),
   value: z.string(),
 });
 export const environmentVariableListRequestSchema = z.void();

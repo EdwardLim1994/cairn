@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { ref } from "vue";
+import { defineComponent, h, ref } from "vue";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { createApiClient, type ApiTransportOptions } from "../models/api-client";
 import { useServiceViewModel, type ServiceDraft } from "./useServiceViewModel";
@@ -7,6 +7,63 @@ import { createPinia, setActivePinia } from "pinia";
 import { useGraphStore } from "../stores/graph";
 import { mount } from "@vue/test-utils";
 import ServiceSettingsPanel from "../components/ServiceSettingsPanel.vue";
+
+const nuxtUiStubs = {
+  UButton: defineComponent({
+    inheritAttrs: false,
+    props: { type: String },
+    setup(props, { attrs, slots }) {
+      return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
+    },
+  }),
+  UInput: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String, placeholder: String, required: Boolean, ui: Object },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h("input", {
+          ...attrs,
+          class: props.ui?.base,
+          value: props.modelValue,
+          placeholder: props.placeholder,
+          required: props.required,
+          onInput: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).value),
+        });
+    },
+  }),
+  USelect: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String, items: Array, ui: Object, open: Boolean, placeholder: String },
+    emits: ["update:modelValue", "update:open"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h(
+          "select",
+          {
+            ...attrs,
+            class: props.ui?.base,
+            value: props.modelValue,
+            onChange: (event: Event) =>
+              emit("update:modelValue", (event.target as HTMLSelectElement).value),
+          },
+          props.items?.map((item) => {
+            const option = item as { value?: string; label?: string };
+            return h("option", { value: option.value }, option.label);
+          }),
+        );
+    },
+  }),
+  UAccordion: defineComponent({
+    inheritAttrs: false,
+    props: { items: Array, modelValue: [String, Array], ui: Object },
+    emits: ["update:modelValue"],
+    setup(_props, { attrs, slots }) {
+      return () => h("div", attrs, [slots.default?.(), slots.body?.()]);
+    },
+  }),
+};
 
 const service = {
   id: "service-1",
@@ -154,6 +211,7 @@ describe("service view model", () => {
         frameworkMenuOpen: false,
         editingServiceId: "service-1",
       },
+      global: { components: nuxtUiStubs },
     });
     await wrapper.get("footer button.app__button--primary").trigger("click");
     context.draft.value.name = "Updated Orders";
@@ -175,6 +233,7 @@ describe("service view model", () => {
         editingServiceId: "service-1",
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
+      global: { components: nuxtUiStubs },
     });
     const file = new File(
       [
@@ -222,6 +281,7 @@ describe("service view model", () => {
         editingServiceId: "service-1",
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
+      global: { components: nuxtUiStubs },
     });
     const file = new File(["not valid OpenAPI"], "invalid.yaml", { type: "text/yaml" });
     const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
@@ -310,6 +370,7 @@ describe("service view model", () => {
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
         onDiscard: () => context.closeSettings(),
       },
+      global: { components: nuxtUiStubs },
     });
     const file = new File(
       [

@@ -9,7 +9,10 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
     <div class="app__brand"><strong>Cairn</strong><span>DATA FLOW OBSERVABILITY</span></div>
     <div class="app__top-actions">
       <span class="app__project-label"><i></i> {{ serviceCount }} services</span>
-      <button
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
         class="app__icon-button"
         :aria-label="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
         :title="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
@@ -19,8 +22,11 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
           <path v-if="allNodesCollapsed" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
           <path v-else d="M8 8H3V3m13 5h5V3M3 16h5v5m13-5h-5v5" />
         </svg>
-      </button>
-      <button
+      </UButton>
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
         class="app__icon-button"
         :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
         @click.stop="emit('toggleTheme')"
@@ -33,7 +39,7 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
           />
           <path v-else d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z" />
         </svg>
-      </button>
+      </UButton>
     </div>
   </header>
 </template>

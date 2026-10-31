@@ -180,7 +180,7 @@ describe("mock API view model", () => {
         { name: "Unknown", request: { method: "POST", url: "http://localhost:8080/unknown" } },
       ],
     });
-    const warnings = await viewModel.importCollection(collection);
+    const warnings = viewModel.importCollection(collection);
     expect(store.mockDraft).toHaveLength(1);
     expect(store.mockDraft[0]?.pathParameters).toEqual({ orderId: "42" });
     expect(warnings).toHaveLength(1);
@@ -205,7 +205,7 @@ describe("mock API view model", () => {
       value: "new",
     });
     expect(variable.value).toBe("new");
-    viewModel.handleEnvironmentVariableToggle(variable, true);
+    viewModel.openEnvironmentVariable(variable);
     viewModel.deleteEnvironmentVariable(variable);
     expect(store.environmentVariables).toEqual([]);
     expect(errors).toEqual([]);
@@ -254,14 +254,12 @@ describe("mock API view model", () => {
 
     await context.viewModel.saveMockDraft();
 
-    expect(context.calls).toEqual(
-      expect.arrayContaining([
-        { url: "/api/environment-variables/variable-delete", method: "DELETE" },
-        { url: "/api/environment-variables/variable-1", method: "PUT" },
-        { url: "/api/mock-apis/mock-delete", method: "DELETE" },
-        { url: "/api/mock-apis/mock-keep", method: "PUT" },
-      ]),
-    );
+    expect(context.calls).toEqual([
+      { url: "/api/environment-variables/variable-delete", method: "DELETE" },
+      { url: "/api/environment-variables/variable-1", method: "PUT" },
+      { url: "/api/mock-apis/mock-delete", method: "DELETE" },
+      { url: "/api/mock-apis/mock-keep", method: "PUT" },
+    ]);
     expect(context.errors).toEqual([]);
   });
 });

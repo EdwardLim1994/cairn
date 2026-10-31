@@ -1,8 +1,8 @@
 import { createError } from "h3";
 import { record } from "./graph-validation";
 
-const variableName = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const variableReference = /\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const variableName = /^[A-Za-z_]\w*$/;
+const variableReference = /\{\{([A-Za-z_]\w*)\}\}/g;
 
 export function environmentVariableInput(value: unknown) {
   const input = record(value, "Environment variable");
@@ -21,7 +21,7 @@ export function environmentVariableInput(value: unknown) {
 
 export function resolveJsonVariables(value: unknown, variables: Map<string, string>): unknown {
   if (typeof value === "string") {
-    const wholeReference = /^\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}$/.exec(value);
+    const wholeReference = /^\{\{([A-Za-z_]\w*)\}\}$/.exec(value);
     if (wholeReference) return getVariable(wholeReference[1]!, variables);
 
     return value.replace(variableReference, (_, name: string) => {

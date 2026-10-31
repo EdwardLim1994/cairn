@@ -65,10 +65,10 @@ export function createApiClient(transport: ApiTransport) {
     responseSchema: ResponseSchema,
   ): Promise<z.output<ResponseSchema>> {
     const request = requestSchema.parse(input);
-    const response = await transport(url, {
-      method,
-      ...(method === "GET" ? { query: request } : method === "DELETE" ? {} : { body: request }),
-    });
+    const transportOptions: ApiTransportOptions = { method };
+    if (method === "GET") transportOptions.query = request;
+    else if (method !== "DELETE") transportOptions.body = request;
+    const response = await transport(url, transportOptions);
     return responseSchema.parse(response);
   }
 

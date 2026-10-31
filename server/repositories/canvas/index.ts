@@ -1,7 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import type { CanvasGetResponse } from "#shared/api/canvas";
-import type { CanvasPutRequest } from "#shared/api/canvas";
+import type { CanvasGetResponse, CanvasPutRequest } from "#shared/api/canvas";
 import { getDb } from "../../db";
 import { mockApis, projects, serviceEdges, serviceEndpoints, services } from "../../db/schema";
 import { CanvasConstraintError } from "./errors";

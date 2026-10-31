@@ -3,6 +3,14 @@ import type { useObservabilityStore } from "../stores/observability";
 
 type Store = ReturnType<typeof useObservabilityStore>;
 
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export function useObservabilityViewModel(options: {
   store: Store;
   apiClient: ReturnType<typeof createApiClient>;
@@ -35,13 +43,6 @@ export function useObservabilityViewModel(options: {
   }
   function setSearch(value: string) {
     options.store.setSearch(value);
-  }
-  function formatTime(value: string) {
-    return new Date(value).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
   }
   function setOpen(value: boolean) {
     options.store.setLogsOpen(value);

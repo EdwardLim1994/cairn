@@ -23,11 +23,18 @@ function prettyResponse(value: string | null) {
           {{ result.status }} | {{ result.responseStatus ?? "-" }}
         </span>
       </div>
-      <button class="app__icon-button" aria-label="Close run details" @click="emit('close')">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="app__icon-button"
+        aria-label="Close run details"
+        @click="emit('close')"
+      >
         <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="m6 6 12 12M18 18 6 6" />
         </svg>
-      </button>
+      </UButton>
     </header>
     <div class="app__run-details">
       <p v-if="result.error" class="app__status-text app__status-text--error">{{ result.error }}</p>

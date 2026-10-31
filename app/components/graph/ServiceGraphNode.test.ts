@@ -23,7 +23,7 @@ describe("ServiceGraphNode", () => {
     expect(wrapper.text()).toContain("Orders");
     expect(wrapper.text()).toContain("REGISTERED ENDPOINTS");
     expect(wrapper.text()).toContain("List orders");
-    expect(wrapper.get('[aria-label="Service online"]').attributes("role")).toBe("img");
+    expect(wrapper.get('[aria-label="Service online"]').element.tagName).toBe("OUTPUT");
   });
 
   it("emits endpoint and collapse actions", async () => {

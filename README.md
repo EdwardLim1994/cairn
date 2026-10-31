@@ -5,7 +5,7 @@
 
 A Nuxt single page app for editing a microservice graph, triggering registered REST calls, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
 
-GitHub Actions runs unit, component, and MySQL-backed integration tests in the CI workflow. SonarCloud analysis runs separately on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
+GitHub Actions runs formatting, lint, unit, component, and MySQL-backed integration checks in the CI workflow. The SonarCloud workflow runs unit and component tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
 ## Run with Docker Compose
 
@@ -71,6 +71,14 @@ vp run dev
 ```
 
 For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3306/<database>`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+
+Run the unit and component tests with LCOV coverage locally using:
+
+```sh
+vp run test:coverage
+```
+
+This excludes the MySQL integration tests, which run separately through `vp run test:integration` with `CAIRN_TEST_DATABASE_URL` set. The coverage report is written to the ignored `coverage/lcov.info` path. The SonarCloud workflow creates a fresh report before analysis, so no artifact upload between workflows is needed.
 
 ## API overview
 

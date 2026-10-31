@@ -1,7 +1,18 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
+import { defineComponent, h } from "vue";
 import LatestRunDrawer from "./LatestRunDrawer.vue";
+
+const components = {
+  UButton: defineComponent({
+    inheritAttrs: false,
+    props: { type: String },
+    setup(props, { attrs, slots }) {
+      return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
+    },
+  }),
+};
 
 describe("LatestRunDrawer", () => {
   it("shows response, failure details, trace flow, and close action", async () => {
@@ -18,6 +29,7 @@ describe("LatestRunDrawer", () => {
           flow: { status: "complete", incomplete: false },
         },
       },
+      global: { components },
     });
     expect(wrapper.text()).toContain('"error": "out of stock"');
     expect(wrapper.text()).toContain("Request failed");

@@ -1,7 +1,75 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
+import { defineComponent, h } from "vue";
 import MockApiSettingsPanel from "./MockApiSettingsPanel.vue";
+
+function formControlStub(tag: "input" | "textarea" | "select") {
+  return defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String, items: Array, ui: Object, rows: Number },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h(
+          tag,
+          {
+            ...attrs,
+            class: props.ui?.base,
+            rows: props.rows,
+            value: props.modelValue,
+            onInput: (event: Event) =>
+              emit("update:modelValue", (event.target as HTMLInputElement).value),
+            onChange: (event: Event) =>
+              emit("update:modelValue", (event.target as HTMLSelectElement).value),
+          },
+          tag === "select"
+            ? props.items?.map((item) => {
+                const option = item as { value: string; label: string };
+                return h("option", { value: option.value }, option.label);
+              })
+            : undefined,
+        );
+    },
+  });
+}
+
+const settingsUiStubs = {
+  UButton: defineComponent({
+    inheritAttrs: false,
+    props: { type: String },
+    setup(props, { attrs, slots }) {
+      return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
+    },
+  }),
+  UInput: formControlStub("input"),
+  UTextarea: formControlStub("textarea"),
+  USelect: formControlStub("select"),
+  UAccordion: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: [String, Array], ui: Object },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit, slots }) {
+      return () => {
+        const open = Boolean(props.modelValue);
+        const value = Array.isArray(props.modelValue) ? props.modelValue[0] : props.modelValue;
+        return h("div", attrs, [
+          h(
+            "button",
+            {
+              type: "button",
+              class: props.ui?.trigger,
+              "aria-expanded": String(open),
+              onClick: () => emit("update:modelValue", open ? undefined : value),
+            },
+            slots.default?.(),
+          ),
+          ...(open ? [h("div", slots.body?.())] : []),
+        ]);
+      };
+    },
+  }),
+};
 
 const mockDraft = [
   {
@@ -15,6 +83,28 @@ const mockDraft = [
 ];
 
 describe("MockApiSettingsPanel", () => {
+  it("discards when Escape is pressed in the settings dialog", async () => {
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: structuredClone(mockDraft),
+        environmentVariables: [],
+        variablesOpen: false,
+        apisOpen: false,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    await wrapper.get('[aria-label="Mock API settings"]').trigger("keydown.esc");
+
+    expect(wrapper.emitted("discard")).toEqual([[]]);
+  });
+
   it("renders shared variables, mock APIs, and import controls", () => {
     const wrapper = mount(MockApiSettingsPanel, {
       props: {
@@ -29,6 +119,7 @@ describe("MockApiSettingsPanel", () => {
         servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
         endpointPathParameterNames: () => [],
       },
+      global: { components: settingsUiStubs },
     });
 
     expect(wrapper.text()).toContain("Shared environment variables");
@@ -53,6 +144,7 @@ describe("MockApiSettingsPanel", () => {
         servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
         endpointPathParameterNames: () => [],
       },
+      global: { components: settingsUiStubs },
     });
     await wrapper
       .findAll("button")
@@ -80,5 +172,27 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.emitted("addVariable")).toEqual([[]]);
     expect(wrapper.emitted("addMockApi")).toEqual([[]]);
     expect(wrapper.emitted("importCollection")).toHaveLength(1);
+  });
+
+  it("uses accordion triggers to expand and collapse each settings section", async () => {
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: structuredClone(mockDraft),
+        environmentVariables: [],
+        variablesOpen: true,
+        apisOpen: true,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        servicesForSelect: [],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    await wrapper.get("#shared-environment-variables-toggle [aria-expanded]").trigger("click");
+    await wrapper.get("#registered-mock-apis-toggle [aria-expanded]").trigger("click");
+
+    expect(wrapper.emitted("update:variablesOpen")).toEqual([[false]]);
+    expect(wrapper.emitted("update:apisOpen")).toEqual([[false]]);
   });
 });

@@ -10,6 +10,16 @@ type ViewModelOptions = {
   runningMockId: () => string | null;
 };
 
+function frameworkLabel(framework: string) {
+  return framework.toLowerCase().includes(".net") ? ".NET" : framework;
+}
+
+function mockEdgeClass(entryId: string, runningId: string | null, observedId: string | null) {
+  if (entryId === runningId) return "app__flow-edge app__flow-edge--running";
+  if (entryId === observedId) return "app__flow-edge app__flow-edge--observed";
+  return "";
+}
+
 export function useGraphViewModel({
   store,
   mockApis,
@@ -36,10 +46,6 @@ export function useGraphViewModel({
     return service && store.collapsedServiceEndpoints[service.id]
       ? service.endpoints[0]?.id
       : endpointId;
-  }
-
-  function frameworkLabel(framework: string) {
-    return framework.toLowerCase().includes(".net") ? ".NET" : framework;
   }
 
   function serviceEndpointOptions() {
@@ -139,12 +145,7 @@ export function useGraphViewModel({
           target,
           targetHandle: endpointHandle(entry.targetEndpointId ?? ""),
           type: "default",
-          class:
-            entry.id === runningMockId()
-              ? "app__flow-edge app__flow-edge--running"
-              : entry.id === store.observedMockApiId
-                ? "app__flow-edge app__flow-edge--observed"
-                : "",
+          class: mockEdgeClass(entry.id, runningMockId(), store.observedMockApiId),
         },
       ];
     });
