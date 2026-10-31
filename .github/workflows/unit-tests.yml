@@ -1,0 +1,32 @@
+name: Unit tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - run: bun install --frozen-lockfile
+
+      - name: Check formatting, lint, and types
+        run: bun run vp check
+
+      - name: Lint
+        run: bun run vp lint
+
+      - name: Unit and component tests
+        run: bun run test:unit
+
+      - name: Check formatting
+        run: bun run vp fmt --check
