@@ -23,10 +23,10 @@
 - [x] 3.4 Refactor `server/use-cases/telemetry/ingest-otlp-logs.ts` and `server/use-cases/telemetry/ingest-otlp-traces.ts` complexity hotspots while preserving event ordering; add/update use-case tests and verify telemetry tests pass.
 - [x] 3.5 Review recurring sequential-await, nested-conditional, regex, and async-without-await findings in batches; fix safe cases, preserve observable ordering where writes or polling depend on it, add/update tests for ordering/error cases, and verify affected suites pass.
 - [x] 3.6 Address recurring accessibility and `!important` findings without changing intended interactions or theme styling; add/update component tests and verify keyboard interaction, focus, and dark-mode states.
-- [ ] 3.7 Re-query SonarCloud and document resolved, remaining, or obsolete findings with their disposition; verify no addressed finding remains open and remaining issues have a concrete follow-up rationale.
+- [x] 3.7 Re-query SonarCloud and document resolved, remaining, or obsolete findings with their disposition; verify no addressed finding remains open and remaining issues have a concrete follow-up rationale.
 
 ## 4. Integrated quality gate verification
 
 - [x] 4.1 Run `vp check` on changed paths and the complete unit, component, and MySQL integration suites; verify all checks pass.
 - [x] 4.2 Run the production build and CI-equivalent coverage generation; verify build succeeds and LCOV represents the current commit.
-- [ ] 4.3 Run SonarCloud analysis with the generated report, inspect new-code coverage and remaining issue groups, and document the resulting quality gate status; verify the scan used the intended commit and LCOV artifact.
+- [x] 4.3 Run SonarCloud analysis with the generated report, inspect new-code coverage and remaining issue groups, and document the resulting quality gate status; verify the scan used the intended commit and LCOV artifact.
