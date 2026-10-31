@@ -1,16 +1,10 @@
 import type { Ref } from "vue";
 import type { createApiClient } from "../models/api-client";
 import type { GraphService } from "../models/graph";
+import { parseOpenApiEndpoints, type ServiceEndpointDraft } from "../utils/openapi-import";
 
 type ApiClient = ReturnType<typeof createApiClient>;
-type EndpointDraft = {
-  id?: string;
-  name: string;
-  apiType: "REST";
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  url: string;
-  requestJson?: unknown;
-};
+type EndpointDraft = ServiceEndpointDraft & { requestJson?: unknown };
 export type ServiceDraft = {
   name: string;
   framework: string;
@@ -33,9 +27,12 @@ type ServiceViewModelOptions = {
   closeSettings: () => void;
   frameworkLabel: (framework: string) => string;
   onError: (message: string) => void;
+  onImportWarnings: (warnings: string[]) => void;
 };
 
 export function useServiceViewModel(options: ServiceViewModelOptions) {
+  let initialNewServiceEndpoint: EndpointDraft | null = null;
+
   function newServiceDraft(): ServiceDraft {
     return {
       name: "",
@@ -47,7 +44,9 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   function beginAddService(position: Position) {
-    options.draft.value = newServiceDraft();
+    const draft = newServiceDraft();
+    options.draft.value = draft;
+    initialNewServiceEndpoint = draft.endpoints[0] ?? null;
     options.frameworkMenuOpen.value = false;
     options.editingServiceId.value = null;
     options.addPosition.value = { ...position };
@@ -58,6 +57,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
     const service = options.services().find((item) => item.id === id);
     if (!service) return false;
     options.frameworkMenuOpen.value = false;
+    initialNewServiceEndpoint = null;
     options.editingServiceId.value = id;
     options.draft.value = {
       name: service.name,
@@ -88,7 +88,39 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
     options.draft.value.endpoints.splice(index, 1);
   }
 
+  async function importOpenApiFile(file: File) {
+    try {
+      const result = await parseOpenApiEndpoints(await file.text(), options.draft.value.endpoints);
+      const starter = initialNewServiceEndpoint;
+      if (
+        result.endpoints.length &&
+        starter &&
+        options.draft.value.endpoints.includes(starter) &&
+        !starter.id &&
+        !starter.name.trim() &&
+        starter.apiType === "REST" &&
+        starter.method === "GET" &&
+        starter.url === "/"
+      ) {
+        options.draft.value.endpoints.splice(options.draft.value.endpoints.indexOf(starter), 1);
+      }
+      if (result.endpoints.length) initialNewServiceEndpoint = null;
+      options.draft.value.endpoints.push(...result.endpoints);
+      options.onImportWarnings(result.warnings);
+      return result;
+    } catch (cause) {
+      options.onError(cause instanceof Error ? cause.message : "Could not import OpenAPI document");
+      return undefined;
+    }
+  }
+
   async function saveService() {
+    if (!options.draft.value.framework.trim()) {
+      options.onError("Select a framework before saving the service");
+      return;
+    }
+
+    options.onError("");
     try {
       await options.saveCanvas();
       const body = options.editingServiceId.value
@@ -128,6 +160,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
     openServiceEndpoint,
     addEndpoint,
     removeEndpoint,
+    importOpenApiFile,
     saveService,
     deleteService,
   };

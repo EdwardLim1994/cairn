@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from "vue";
+
 type EndpointDraft = {
   id?: string;
   name: string;
@@ -18,13 +20,22 @@ type ServiceDraft = {
 const draft = defineModel<ServiceDraft>("draft", { required: true });
 const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: true });
 const props = defineProps<{ editingServiceId: string | null }>();
+const openApiFileInput = ref<HTMLInputElement | null>(null);
 const emit = defineEmits<{
   addEndpoint: [];
   removeEndpoint: [index: number];
+  importOpenApi: [file: File];
   save: [];
   discard: [];
   removeService: [id: string];
 }>();
+
+function handleOpenApiFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) emit("importOpenApi", file);
+  input.value = "";
+}
 </script>
 
 <template>
@@ -65,13 +76,14 @@ const emit = defineEmits<{
           </label>
           <div class="app__field-row">
             <div class="app__field">
-              <span>Framework</span>
+              <span>Framework <span aria-hidden="true">*</span></span>
               <div class="app__framework-select">
                 <button
                   type="button"
                   class="app__control app__control--framework-select"
                   role="combobox"
                   aria-haspopup="listbox"
+                  aria-required="true"
                   :aria-expanded="frameworkMenuOpen"
                   :aria-label="`Framework: ${draft.framework || 'Select framework'}`"
                   @click.stop="frameworkMenuOpen = !frameworkMenuOpen"
@@ -133,12 +145,30 @@ const emit = defineEmits<{
         </div>
         <div class="app__section-title">
           <strong>Available endpoints</strong>
-          <button
-            class="app__button app__button--secondary app__button--small"
-            @click="emit('addEndpoint')"
-          >
-            + New endpoint
-          </button>
+          <div class="app__endpoint-actions">
+            <button
+              type="button"
+              class="app__button app__button--secondary app__button--small"
+              @click="openApiFileInput?.click()"
+            >
+              Import OpenAPI
+            </button>
+            <input
+              ref="openApiFileInput"
+              class="app__openapi-file-input"
+              type="file"
+              accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+              aria-label="Upload OpenAPI schema"
+              @change="handleOpenApiFileChange"
+            />
+            <button
+              type="button"
+              class="app__button app__button--secondary app__button--small"
+              @click="emit('addEndpoint')"
+            >
+              + New endpoint
+            </button>
+          </div>
         </div>
         <details
           v-for="(endpoint, index) in draft.endpoints"

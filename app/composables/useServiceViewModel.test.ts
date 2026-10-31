@@ -56,6 +56,7 @@ describe("service view model", () => {
     const addPosition = ref({ x: 12, y: 24 });
     const events: string[] = [];
     const errors: string[] = [];
+    const warningBatches: string[][] = [];
     const options = {
       apiClient,
       draft,
@@ -69,8 +70,9 @@ describe("service view model", () => {
       closeSettings: () => events.push("close"),
       frameworkLabel: (framework: string) => (framework.includes(".net") ? ".NET" : framework),
       onError: (message: string) => errors.push(message),
+      onImportWarnings: (warnings: string[]) => warningBatches.push(warnings),
     };
-    return { vm: useServiceViewModel(options), ...options, calls, events, errors };
+    return { vm: useServiceViewModel(options), ...options, calls, events, errors, warningBatches };
   }
 
   it("creates default drafts, starts add flow, edits services, and resolves endpoint owners", () => {
@@ -159,5 +161,174 @@ describe("service view model", () => {
     expect(context.calls[0]?.options.method).toBe("PUT");
     expect(graphStore.services[0]?.name).toBe("Updated Orders");
     expect(wrapper.emitted("save")).toEqual([[]]);
+  });
+
+  it("imports valid OpenAPI files through the service settings control with per-operation warnings", async () => {
+    const context = setup();
+    let importPromise: Promise<unknown> | undefined;
+    const wrapper = mount(ServiceSettingsPanel, {
+      props: {
+        draft: context.draft.value,
+        frameworkMenuOpen: false,
+        editingServiceId: "service-1",
+        onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
+      },
+    });
+    const file = new File(
+      [
+        JSON.stringify({
+          openapi: "3.1.0",
+          info: { title: "Orders", version: "1.0.0" },
+          paths: {
+            "/orders": { get: { summary: "Renamed existing route" } },
+            "/products": { get: { summary: "List products" }, head: {} },
+          },
+        }),
+      ],
+      "openapi.json",
+      { type: "application/json" },
+    );
+    const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
+    Object.defineProperty(input.element, "files", { configurable: true, value: [file] });
+    await input.trigger("change");
+    await importPromise;
+
+    expect(context.draft.value.endpoints).toHaveLength(2);
+    expect(context.draft.value.endpoints[0]?.name).toBe("List orders");
+    expect(context.draft.value.endpoints[1]).toEqual({
+      name: "List products",
+      apiType: "REST",
+      method: "GET",
+      url: "/products",
+    });
+    expect(context.warningBatches).toEqual([
+      [
+        "Skipped duplicate GET /orders: this endpoint is already registered.",
+        "Skipped HEAD /products: this HTTP method is not supported.",
+      ],
+    ]);
+    expect(context.errors).toEqual([]);
+  });
+
+  it("reports parser failures through the service settings flow without changing endpoint drafts", async () => {
+    const context = setup();
+    let importPromise: Promise<unknown> | undefined;
+    const wrapper = mount(ServiceSettingsPanel, {
+      props: {
+        draft: context.draft.value,
+        frameworkMenuOpen: false,
+        editingServiceId: "service-1",
+        onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
+      },
+    });
+    const file = new File(["not valid OpenAPI"], "invalid.yaml", { type: "text/yaml" });
+    const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
+    Object.defineProperty(input.element, "files", { configurable: true, value: [file] });
+    await input.trigger("change");
+    await importPromise;
+
+    expect(context.draft.value.endpoints).toEqual([
+      { id: "endpoint-1", name: "List orders", apiType: "REST", method: "GET", url: "/orders" },
+    ]);
+    expect(context.errors[0]).toContain("Could not import OpenAPI document");
+    expect(context.calls).toEqual([]);
+  });
+
+  it("keeps imported endpoints unsaved until service save and persists them on create and update", async () => {
+    const content = JSON.stringify({
+      openapi: "3.1.0",
+      info: { title: "Orders", version: "1.0.0" },
+      paths: { "/products": { get: { summary: "List products" } } },
+    });
+    const context = setup();
+    context.vm.editService("service-1");
+    await context.vm.importOpenApiFile(new File([content], "openapi.json"));
+
+    expect(context.calls).toEqual([]);
+    await context.vm.saveService();
+    expect(context.calls[0]?.options).toMatchObject({
+      method: "PUT",
+      body: {
+        endpoints: [
+          { id: "endpoint-1", name: "List orders", method: "GET", url: "/orders" },
+          { name: "List products", apiType: "REST", method: "GET", url: "/products" },
+        ],
+      },
+    });
+
+    const addContext = setup();
+    addContext.vm.beginAddService({ x: 20, y: 30 });
+    addContext.draft.value.name = "New Orders";
+    addContext.draft.value.framework = "Spring Boot";
+    await addContext.vm.importOpenApiFile(new File([content], "openapi.json"));
+    expect(addContext.draft.value.endpoints).toEqual([
+      { name: "List products", apiType: "REST", method: "GET", url: "/products" },
+    ]);
+    expect(addContext.calls).toEqual([]);
+    await addContext.vm.saveService();
+    expect(addContext.calls[0]?.options).toMatchObject({
+      method: "POST",
+      body: {
+        endpoints: [{ name: "List products", apiType: "REST", method: "GET", url: "/products" }],
+      },
+    });
+  });
+
+  it("preserves an edited starter endpoint when importing into a new service", async () => {
+    const context = setup();
+    context.vm.beginAddService({ x: 10, y: 20 });
+    context.draft.value.endpoints[0]!.name = "Root endpoint";
+    await context.vm.importOpenApiFile(
+      new File(
+        [
+          JSON.stringify({
+            openapi: "3.1.0",
+            info: { title: "Orders", version: "1.0.0" },
+            paths: { "/products": { get: { summary: "List products" } } },
+          }),
+        ],
+        "openapi.json",
+      ),
+    );
+
+    expect(context.draft.value.endpoints).toHaveLength(2);
+    expect(context.draft.value.endpoints[0]?.name).toBe("Root endpoint");
+    expect(context.draft.value.endpoints[1]?.url).toBe("/products");
+  });
+
+  it("discards imported endpoint drafts when service settings are closed without saving", async () => {
+    const context = setup();
+    context.vm.editService("service-1");
+    let importPromise: Promise<unknown> | undefined;
+    const wrapper = mount(ServiceSettingsPanel, {
+      props: {
+        draft: context.draft.value,
+        frameworkMenuOpen: false,
+        editingServiceId: "service-1",
+        onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
+        onDiscard: () => context.closeSettings(),
+      },
+    });
+    const file = new File(
+      [
+        JSON.stringify({
+          openapi: "3.1.0",
+          info: { title: "Orders", version: "1.0.0" },
+          paths: { "/products": { get: { summary: "List products" } } },
+        }),
+      ],
+      "openapi.json",
+    );
+    const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
+    Object.defineProperty(input.element, "files", { configurable: true, value: [file] });
+    await input.trigger("change");
+    await importPromise;
+    expect(context.draft.value.endpoints).toHaveLength(2);
+
+    await wrapper.get("footer button.app__button--secondary").trigger("click");
+    expect(context.events).toContain("close");
+    expect(context.calls).toEqual([]);
+    expect(context.vm.editService("service-1")).toBe(true);
+    expect(context.draft.value.endpoints).toHaveLength(1);
   });
 });

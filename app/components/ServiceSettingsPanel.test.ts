@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import ServiceSettingsPanel from "./ServiceSettingsPanel.vue";
 
 const draft = {
@@ -51,7 +51,7 @@ describe("ServiceSettingsPanel", () => {
     });
     await wrapper.get("button.app__button--primary").trigger("click");
     await wrapper.get("footer button.app__button--secondary").trigger("click");
-    await wrapper.get(".app__section-title button").trigger("click");
+    await wrapper.get(".app__endpoint-actions button:last-child").trigger("click");
     await wrapper.get('[aria-label="Remove List orders"]').trigger("click");
     await wrapper.get('[aria-label="Remove service"]').trigger("click");
 
@@ -60,5 +60,27 @@ describe("ServiceSettingsPanel", () => {
     expect(wrapper.emitted("addEndpoint")).toEqual([[]]);
     expect(wrapper.emitted("removeEndpoint")).toEqual([[0]]);
     expect(wrapper.emitted("removeService")).toEqual([["service-1"]]);
+  });
+
+  it("opens the JSON/YAML file picker and emits the selected OpenAPI file", async () => {
+    const wrapper = mount(ServiceSettingsPanel, {
+      props: {
+        draft: structuredClone(draft),
+        frameworkMenuOpen: false,
+        editingServiceId: "service-1",
+      },
+    });
+    const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
+    const click = vi.spyOn(input.element as HTMLInputElement, "click");
+    const file = new File(["openapi: 3.1.0"], "service.yaml", { type: "text/yaml" });
+
+    await wrapper.get("button.app__button--small").trigger("click");
+    expect(click).toHaveBeenCalledOnce();
+    expect((input.element as HTMLInputElement).accept).toContain(".json");
+    expect((input.element as HTMLInputElement).accept).toContain(".yaml");
+
+    Object.defineProperty(input.element, "files", { configurable: true, value: [file] });
+    await input.trigger("change");
+    expect(wrapper.emitted("importOpenApi")).toEqual([[file]]);
   });
 });

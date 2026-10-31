@@ -27,7 +27,7 @@ export function useGraphInteractionViewModel(options: {
       options.contextMenu.value = null;
       return;
     }
-    if (!(event.target instanceof Element) || !event.target.closest(".graph-flow")) return;
+    if (!(event.target instanceof Element) || !event.target.closest(".app__graph-flow")) return;
     event.preventDefault();
     const point = options.graphCanvas.value?.screenToFlowCoordinate({
       x: event.clientX,

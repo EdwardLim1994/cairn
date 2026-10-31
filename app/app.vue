@@ -182,6 +182,9 @@ const serviceViewModel = useServiceViewModel({
   closeSettings,
   frameworkLabel: graphViewModel.frameworkLabel,
   onError: (message) => (errorMessage.value = message),
+  onImportWarnings: (warnings) => {
+    importWarnings.value = warnings.map((message, id) => ({ id, message }));
+  },
 });
 const graphInteractionViewModel = useGraphInteractionViewModel({
   store: graphStore,
@@ -398,6 +401,7 @@ onUnmounted(() => {
       :editing-service-id="editingServiceId"
       @add-endpoint="addEndpoint"
       @remove-endpoint="removeEndpoint"
+      @import-open-api="serviceViewModel.importOpenApiFile"
       @save="saveService"
       @discard="closeSettings"
       @remove-service="handleServiceDelete"
@@ -1514,6 +1518,14 @@ body {
 
 .app__section-title {
   @apply mt-1 gap-2;
+}
+
+.app__endpoint-actions {
+  @apply flex items-center gap-2;
+}
+
+.app__openapi-file-input {
+  display: none;
 }
 
 .app__section-title strong {
