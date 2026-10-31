@@ -83,15 +83,18 @@ const severityFilterItems = computed(() => [
   </UButton>
   <section
     v-if="open"
+    id="logs-panel"
     class="app__logs-panel app__surface"
     :style="{ '--logs-panel-height': `${props.height}px` }"
   >
-    <hr
+    <div
       class="app__logs-resize-handle"
-      role="separator"
+      role="slider"
       aria-label="Resize logs panel"
-      aria-orientation="horizontal"
+      aria-orientation="vertical"
       tabindex="0"
+      aria-controls="logs-panel"
+      aria-valuetext="Panel height in pixels"
       :aria-valuenow="props.height"
       aria-valuemin="160"
       aria-valuemax="1200"

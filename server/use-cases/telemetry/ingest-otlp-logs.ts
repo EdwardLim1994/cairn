@@ -27,6 +27,39 @@ function normalizeServiceName(
   );
 }
 
+function normalizeResourceLogs(
+  resourceLog: Record<string, unknown>,
+  projectId: string,
+  serviceName: string,
+) {
+  const records = [];
+  for (const scopeValue of otlpArray(resourceLog.scopeLogs, "scopeLogs")) {
+    const scope = otlpObject(scopeValue, "Scope log");
+    for (const logValue of otlpArray(scope.logRecords, "logRecords")) {
+      const item = otlpObject(logValue, "Log record");
+      const bodyValue = otlpObject(item.body, "Log body");
+      const messageValue =
+        bodyValue.stringValue ??
+        bodyValue.intValue ??
+        bodyValue.doubleValue ??
+        bodyValue.boolValue ??
+        bodyValue.kvlistValue ??
+        bodyValue.arrayValue ??
+        "";
+      records.push({
+        projectId,
+        traceId: item.traceId ? validHex(item.traceId, 32, "Trace id") : null,
+        serviceName,
+        severity: normalizeSeverity(item.severityText),
+        timestamp: otlpTimestamp(item.timeUnixNano || item.observedTimeUnixNano, "Log timestamp"),
+        message: typeof messageValue === "string" ? messageValue : JSON.stringify(messageValue),
+        attributes: otlpAttributes(item.attributes),
+      });
+    }
+  }
+  return records;
+}
+
 function normalizeLogRecords(
   body: OtlpLogsRequest,
   projectId: string,
@@ -39,30 +72,7 @@ function normalizeLogRecords(
     const resource = resourceAttributes(resourceLog.resource);
     if (!matchesProject(resource, configuredProjectId)) continue;
     const serviceName = normalizeServiceName(resource, registeredServices);
-    for (const scopeValue of otlpArray(resourceLog.scopeLogs, "scopeLogs")) {
-      const scope = otlpObject(scopeValue, "Scope log");
-      for (const logValue of otlpArray(scope.logRecords, "logRecords")) {
-        const item = otlpObject(logValue, "Log record");
-        const bodyValue = otlpObject(item.body, "Log body");
-        const messageValue =
-          bodyValue.stringValue ??
-          bodyValue.intValue ??
-          bodyValue.doubleValue ??
-          bodyValue.boolValue ??
-          bodyValue.kvlistValue ??
-          bodyValue.arrayValue ??
-          "";
-        records.push({
-          projectId,
-          traceId: item.traceId ? validHex(item.traceId, 32, "Trace id") : null,
-          serviceName,
-          severity: normalizeSeverity(item.severityText),
-          timestamp: otlpTimestamp(item.timeUnixNano || item.observedTimeUnixNano, "Log timestamp"),
-          message: typeof messageValue === "string" ? messageValue : JSON.stringify(messageValue),
-          attributes: otlpAttributes(item.attributes),
-        });
-      }
-    }
+    records.push(...normalizeResourceLogs(resourceLog, projectId, serviceName));
   }
   return records;
 }

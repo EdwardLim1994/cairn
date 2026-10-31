@@ -203,12 +203,8 @@ function endpointOptions() {
                       :placeholder="`Value or {{${name}}}`"
                     />
                   </label>
-                  <div
-                    class="app__field"
-                    role="group"
-                    :aria-labelledby="`request-label-${entry.id || index}`"
-                  >
-                    <span :id="`request-label-${entry.id || index}`">Request (JSON)</span>
+                  <fieldset class="app__field app__request-fieldset">
+                    <legend>Request (JSON)</legend>
                     <div class="flex justify-end">
                       <UButton
                         type="button"
@@ -225,7 +221,7 @@ function endpointOptions() {
                       :variables="environmentVariables"
                       @update:model-value="entry.requestJson = $event"
                     />
-                  </div>
+                  </fieldset>
                   <label class="app__field">
                     <span>Description</span>
                     <UInput

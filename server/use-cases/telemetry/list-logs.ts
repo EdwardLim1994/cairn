@@ -37,7 +37,7 @@ export function createListLogsUseCase(dependencies: {
       ...new Set(requestedSeverities.flatMap((value) => severityAliases[value] ?? [value])),
     ];
     const rawSearch = query.search?.trim();
-    const search = rawSearch?.replace(new RegExp(String.raw`[\\%_]`, "g"), String.raw`\$&`);
+    const search = rawSearch?.replace(/[\\%_]/g, String.raw`\$&`);
     const { records, registeredServices } = await dependencies.queryLogs(
       await dependencies.ensureProject(),
       { ...(severities.length ? { severities } : {}), ...(search ? { search } : {}) },

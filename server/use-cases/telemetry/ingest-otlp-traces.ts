@@ -18,6 +18,34 @@ function spanStatus(code: unknown) {
   return "UNSET";
 }
 
+function normalizeResourceSpans(
+  resourceSpan: Record<string, unknown>,
+  projectId: string,
+  serviceName: string,
+) {
+  const records = [];
+  for (const scopeValue of otlpArray(resourceSpan.scopeSpans, "scopeSpans")) {
+    const scope = otlpObject(scopeValue, "Scope span");
+    for (const spanValue of otlpArray(scope.spans, "spans")) {
+      const item = otlpObject(spanValue, "Span");
+      const status = otlpObject(item.status, "Span status");
+      records.push({
+        projectId,
+        traceId: validHex(item.traceId, 32, "Trace id"),
+        spanId: validHex(item.spanId, 16, "Span id"),
+        parentSpanId: item.parentSpanId ? validHex(item.parentSpanId, 16, "Parent span id") : null,
+        serviceName,
+        operationName: typeof item.name === "string" ? item.name.slice(0, 255) : "unknown",
+        startTime: otlpTimestamp(item.startTimeUnixNano, "Span start time"),
+        endTime: otlpTimestamp(item.endTimeUnixNano, "Span end time"),
+        statusCode: spanStatus(status.code),
+        attributes: otlpAttributes(item.attributes),
+      });
+    }
+  }
+  return records;
+}
+
 function normalizeSpans(body: OtlpTracesRequest, projectId: string, configuredProjectId: string) {
   const records = [];
   for (const resourceSpanValue of otlpArray(body.resourceSpans, "resourceSpans")) {
@@ -26,27 +54,7 @@ function normalizeSpans(body: OtlpTracesRequest, projectId: string, configuredPr
     if (!matchesProject(attributes, configuredProjectId)) continue;
     const serviceName =
       typeof attributes["service.name"] === "string" ? attributes["service.name"] : "unknown";
-    for (const scopeValue of otlpArray(resourceSpan.scopeSpans, "scopeSpans")) {
-      const scope = otlpObject(scopeValue, "Scope span");
-      for (const spanValue of otlpArray(scope.spans, "spans")) {
-        const item = otlpObject(spanValue, "Span");
-        const status = otlpObject(item.status, "Span status");
-        records.push({
-          projectId,
-          traceId: validHex(item.traceId, 32, "Trace id"),
-          spanId: validHex(item.spanId, 16, "Span id"),
-          parentSpanId: item.parentSpanId
-            ? validHex(item.parentSpanId, 16, "Parent span id")
-            : null,
-          serviceName,
-          operationName: typeof item.name === "string" ? item.name.slice(0, 255) : "unknown",
-          startTime: otlpTimestamp(item.startTimeUnixNano, "Span start time"),
-          endTime: otlpTimestamp(item.endTimeUnixNano, "Span end time"),
-          statusCode: spanStatus(status.code),
-          attributes: otlpAttributes(item.attributes),
-        });
-      }
-    }
+    records.push(...normalizeResourceSpans(resourceSpan, projectId, serviceName));
   }
   return records;
 }

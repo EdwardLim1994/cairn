@@ -1452,7 +1452,14 @@ body {
   @apply min-w-0 flex-1 gap-1;
 }
 
-.app__field > span {
+.app__request-fieldset {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.app__field > span,
+.app__field > legend {
   color: var(--muted);
   font-size: 10px;
   font-weight: 500;
@@ -1564,6 +1571,7 @@ body {
 
 .app__settings-accordion-chevron {
   color: var(--muted);
+  transition: transform 0.15s ease;
 }
 
 .app__endpoint-accordion-content {
@@ -1736,10 +1744,6 @@ body {
 
 .app__settings-accordion-body {
   width: 100%;
-}
-
-.app__settings-accordion-chevron {
-  transition: transform 0.15s ease;
 }
 
 .app__environment-variable-list {
