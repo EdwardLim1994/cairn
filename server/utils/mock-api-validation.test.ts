@@ -23,18 +23,31 @@ describe("mock API input validation", () => {
     );
   });
 
-  it("normalizes request defaults and rejects missing targets or invalid JSON", () => {
+  it("normalizes linked API defaults and preserves incomplete drafts", () => {
     expect(mockApiInput({ name: " List orders ", targetEndpointId: "endpoint-1" })).toEqual({
       name: "List orders",
       targetEndpointId: "endpoint-1",
       description: "",
       pathParameters: {},
       requestJson: {},
+      headerTemplateId: null,
+      customHeaders: [],
+      active: true,
+      importMethod: null,
+      importUrl: null,
+      matchUrl: null,
     });
     expect(() => mockApiInput({ name: "", targetEndpointId: "endpoint-1" })).toThrow(
       /name is required/,
     );
-    expect(() => mockApiInput({ name: "x" })).toThrow(/service endpoint is required/);
+    expect(mockApiInput({ name: "Unmatched import" })).toMatchObject({
+      targetEndpointId: null,
+      active: false,
+    });
+    expect(() => mockApiInput({ name: "Unsafe draft", active: "yes" })).toThrow(/Active/);
+    expect(() => mockApiInput({ name: "Unsafe draft", customHeaders: [{ name: "x" }] })).toThrow(
+      /Custom headers/,
+    );
     expect(() =>
       mockApiInput({ name: "x", targetEndpointId: "id", requestJson: BigInt(1) }),
     ).toThrow(/valid JSON/);

@@ -73,7 +73,6 @@ function toggleEndpoint(endpoint: EndpointDraft, index: number, open: boolean) {
     class="app__dialog-backdrop"
     aria-modal="true"
     aria-label="Service settings"
-    @click.self="emit('discard')"
     @keydown.esc.prevent="emit('discard')"
   >
     <section class="app__side-dialog app__surface">

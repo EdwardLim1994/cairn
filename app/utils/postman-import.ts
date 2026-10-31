@@ -1,3 +1,6 @@
+import { validateHeaderRows } from "#shared/utils/headers";
+import { findVariableReferences } from "#shared/utils/environment-variables";
+
 type Endpoint = {
   id?: string;
   apiType: string;
@@ -16,15 +19,25 @@ type PostmanRequest = {
   url: string;
   requestJson: string;
   unsupportedBody: boolean;
+  originalUrl: string;
+  matchUrl: string;
+  headers: { name: string; value: string }[];
+  unsupportedFeatures: string[];
 };
 type RecordValue = Record<string, unknown>;
 
 export type ImportedMockApi = {
   name: string;
-  targetEndpointId: string;
+  targetEndpointId: string | null;
   description: string;
   requestJson: string;
   pathParameters: Record<string, string>;
+  customHeaders: { name: string; value: string }[];
+  headerTemplateId: null;
+  active: false;
+  importMethod: string;
+  importUrl: string;
+  matchUrl: string;
 };
 
 export type PostmanImportResult = {
@@ -196,15 +209,14 @@ function readVariables(collection: RecordValue) {
   if (!Array.isArray(collection.variable)) return variables;
 
   for (const variable of collection.variable) {
-    const value = isRecord(variable) ? postmanText(variable.value) : "";
+    const value = isRecord(variable) ? variable.value : undefined;
     if (
       isRecord(variable) &&
       typeof variable.key === "string" &&
-      "value" in variable &&
-      variable.value != null &&
-      value !== ""
+      (typeof value === "string" || typeof value === "number" || typeof value === "boolean") &&
+      variable.enabled !== false
     ) {
-      variables.set(variable.key, value);
+      variables.set(variable.key, String(value));
     }
   }
   return variables;
@@ -237,18 +249,45 @@ function readRequestBody(body: unknown) {
 function readRequest(
   item: RecordValue,
   variables: Map<string, string>,
+  inheritedUnsupported: string[],
 ): PostmanRequest | undefined {
   if (!isRecord(item.request)) return undefined;
   const request = item.request;
-  const url = rawRequestUrl(request.url).replace(
+  const originalUrl = rawRequestUrl(request.url);
+  const matchUrl = originalUrl.replace(
     /\{\{([^{}]+)\}\}/g,
     (token, key: string) => variables.get(key) ?? token,
   );
-  const name = typeof item.name === "string" && item.name.trim() ? item.name : url;
+  const name = typeof item.name === "string" && item.name.trim() ? item.name : originalUrl;
+  const headers: { name: string; value: string }[] = [];
+  const unsupportedFeatures = [...inheritedUnsupported];
+  if (isRecord(request.auth) && request.auth.type !== "noauth")
+    unsupportedFeatures.push("request authorization");
+  if (Array.isArray(request.header)) {
+    for (const rawHeader of request.header) {
+      if (!isRecord(rawHeader) || rawHeader.disabled === true) continue;
+      if (typeof rawHeader.key !== "string" || typeof rawHeader.value !== "string") {
+        unsupportedFeatures.push("invalid or protected header (unsupported value)");
+        continue;
+      }
+      const header = { name: rawHeader.key, value: rawHeader.value };
+      try {
+        // Validate each row so one invalid import does not discard its valid siblings.
+        validateHeaderRows([...headers, header], "Imported header");
+        headers.push(header);
+      } catch {
+        unsupportedFeatures.push(`invalid or protected header ${header.name || "(blank)"}`);
+      }
+    }
+  }
   return {
     name,
     method: postmanText(request.method || "GET").toUpperCase(),
-    url,
+    url: matchUrl,
+    originalUrl,
+    matchUrl,
+    headers,
+    unsupportedFeatures,
     ...readRequestBody(request.body),
   };
 }
@@ -257,11 +296,15 @@ function collectRequests(
   items: unknown[],
   variables: Map<string, string>,
   requests: PostmanRequest[],
+  inheritedUnsupported: string[] = [],
 ) {
   for (const item of items) {
     if (!isRecord(item)) continue;
-    if (Array.isArray(item.item)) collectRequests(item.item, variables, requests);
-    const request = readRequest(item, variables);
+    const unsupported = [...inheritedUnsupported];
+    if (item.auth) unsupported.push("inherited authorization");
+    if (Array.isArray(item.event) && item.event.length) unsupported.push("scripts");
+    if (Array.isArray(item.item)) collectRequests(item.item, variables, requests, unsupported);
+    const request = readRequest(item, variables, unsupported);
     if (request) requests.push(request);
   }
 }
@@ -269,44 +312,76 @@ function collectRequests(
 function matchRequest(
   request: PostmanRequest,
   endpoints: { service: Service; endpoint: Endpoint }[],
+  environmentVariables: Map<string, string>,
 ) {
+  const url = request.matchUrl.replace(
+    /\{\{([^{}]+)\}\}/g,
+    (token, key: string) => environmentVariables.get(key) ?? token,
+  );
   const urlMatches = endpoints.filter(({ service, endpoint }) =>
-    matchesEndpointUrl(request.url, service, endpoint),
+    matchesEndpointUrl(url, service, endpoint),
   );
-  const matched = urlMatches.find(
-    ({ endpoint }) =>
-      endpoint.apiType === "REST" && endpoint.method.toUpperCase() === request.method,
+  if (request.unsupportedBody)
+    return { warning: `Skipped "${request.name}": request body is not JSON.` };
+  const restMatches = urlMatches.filter(({ endpoint }) => endpoint.apiType === "REST");
+  const matched = restMatches.find(
+    ({ endpoint }) => endpoint.method.toUpperCase() === request.method,
   );
-  if (matched?.endpoint.id && !request.unsupportedBody) {
-    return {
-      draft: {
-        name: request.name,
-        targetEndpointId: matched.endpoint.id,
-        description: "",
-        requestJson: request.requestJson,
-        pathParameters: routeParameters(request.url, matched.service, matched.endpoint),
-      } satisfies ImportedMockApi,
-    };
+  const selected = matched ?? restMatches[0];
+  const pathParameters = selected ? routeParameters(url, selected.service, selected.endpoint) : {};
+  const draft: ImportedMockApi = {
+    name: request.name,
+    targetEndpointId: matched?.endpoint.id ?? null,
+    description: "",
+    requestJson: request.requestJson,
+    pathParameters,
+    customHeaders: request.headers,
+    headerTemplateId: null,
+    active: false,
+    importMethod: request.method,
+    importUrl: request.originalUrl,
+    matchUrl: request.matchUrl,
+  };
+  const warnings = request.unsupportedFeatures.map((feature) => `${feature} is not imported.`);
+  const missingVariables = new Set(
+    findVariableReferences([
+      request.matchUrl,
+      request.requestJson,
+      request.headers.map(({ value }) => value),
+    ]).filter((name) => !environmentVariables.has(name)),
+  );
+  for (const name of missingVariables) warnings.push(`Uses missing variable {{${name}}}.`);
+  if (!matched) {
+    const reason = !urlMatches.length
+      ? "URL did not match a registered REST endpoint"
+      : !restMatches.length
+        ? "matching endpoint is not REST"
+        : `HTTP method ${request.method} did not match the endpoint`;
+    warnings.push(`${reason}.`);
   }
-  if (!urlMatches.length) {
-    return { warning: `Skipped "${request.name}": URL did not match a registered REST endpoint.` };
-  }
-  if (!urlMatches.some(({ endpoint }) => endpoint.apiType === "REST")) {
-    return { warning: `Skipped "${request.name}": matching endpoint is not REST.` };
-  }
-  if (!urlMatches.some(({ endpoint }) => endpoint.method.toUpperCase() === request.method)) {
-    return {
-      warning: `Skipped "${request.name}": HTTP method ${request.method} did not match the endpoint.`,
-    };
-  }
-  return { warning: `Skipped "${request.name}": request body is not JSON.` };
+  return {
+    draft,
+    warnings: warnings.map((warning) => `"${request.name}": ${warning}`),
+  };
 }
 
-export function parsePostmanCollection(text: string, services: Service[]): PostmanImportResult {
+export function parsePostmanCollection(
+  text: string,
+  services: Service[],
+  environmentEntries: { name: string; value: string }[] = [],
+): PostmanImportResult {
   const collection = readCollection(text);
   const variables = readVariables(collection);
+  const currentVariableNames = new Set(environmentEntries.map(({ name }) => name));
+  const collectionFallback = new Map(
+    [...variables].filter(([name]) => !currentVariableNames.has(name)),
+  );
   const requests: PostmanRequest[] = [];
-  collectRequests(collection.item as unknown[], variables, requests);
+  const inheritedUnsupported = [
+    ...(collection.auth ? ["inherited authorization"] : []),
+    ...(Array.isArray(collection.event) && collection.event.length ? ["scripts"] : []),
+  ];
+  collectRequests(collection.item as unknown[], collectionFallback, requests, inheritedUnsupported);
   if (!requests.length) throw new Error("No requests found in this Postman collection");
 
   const endpoints = services.flatMap((service) =>
@@ -314,11 +389,53 @@ export function parsePostmanCollection(text: string, services: Service[]): Postm
   );
   const drafts: ImportedMockApi[] = [];
   const warnings: string[] = [];
+  const environmentVariables = new Map(environmentEntries.map(({ name, value }) => [name, value]));
   for (const request of requests) {
-    const result = matchRequest(request, endpoints);
+    const result = matchRequest(request, endpoints, environmentVariables);
     if (result.draft) drafts.push(result.draft);
-    if (result.warning) warnings.push(result.warning);
+    if ("warning" in result && result.warning) warnings.push(result.warning);
+    warnings.push(...(result.warnings ?? []));
   }
 
   return { drafts, warnings };
+}
+
+export function retryUnmatchedPostmanDrafts<
+  T extends {
+    name: string;
+    targetEndpointId: string | null;
+    importMethod?: string | null;
+    importUrl?: string | null;
+    matchUrl?: string | null;
+    requestJson: unknown;
+    customHeaders?: { name: string; value: string }[];
+    pathParameters: Record<string, string>;
+  },
+>(drafts: T[], services: Service[], environmentEntries: { name: string; value: string }[]) {
+  const endpoints = services.flatMap((service) =>
+    service.endpoints.map((endpoint) => ({ service, endpoint })),
+  );
+  const variables = new Map(environmentEntries.map(({ name, value }) => [name, value]));
+  return drafts.map((draft) => {
+    if (draft.targetEndpointId || !draft.importUrl) return draft;
+    const result = matchRequest(
+      {
+        name: draft.name,
+        method: draft.importMethod ?? "GET",
+        url: draft.matchUrl ?? draft.importUrl,
+        requestJson:
+          typeof draft.requestJson === "string"
+            ? draft.requestJson
+            : JSON.stringify(draft.requestJson),
+        unsupportedBody: false,
+        originalUrl: draft.importUrl,
+        matchUrl: draft.matchUrl ?? draft.importUrl,
+        headers: draft.customHeaders ?? [],
+        unsupportedFeatures: [],
+      },
+      endpoints,
+      variables,
+    );
+    return result.draft ? { ...draft, ...result.draft, active: false } : draft;
+  });
 }

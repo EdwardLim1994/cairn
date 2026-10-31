@@ -36,8 +36,9 @@ export function validateEndpointPathParameters(
 
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
-  if (typeof input.targetEndpointId !== "string" || !input.targetEndpointId)
-    throw createError({ statusCode: 400, statusMessage: "A service endpoint is required" });
+  const targetEndpointId = input.targetEndpointId ?? null;
+  if (targetEndpointId !== null && (typeof targetEndpointId !== "string" || !targetEndpointId))
+    throw createError({ statusCode: 400, statusMessage: "Service endpoint is invalid" });
   if (typeof input.name !== "string" || !input.name.trim() || input.name.trim().length > 255)
     throw createError({ statusCode: 400, statusMessage: "Mock API name is required" });
   const description = input.description === undefined ? "" : input.description;
@@ -51,11 +52,39 @@ export function mockApiInput(value: unknown) {
   } catch {
     throw createError({ statusCode: 400, statusMessage: "Mock API request must be valid JSON" });
   }
+  const customHeaders = input.customHeaders ?? [];
+  if (
+    !Array.isArray(customHeaders) ||
+    customHeaders.some(
+      (header) =>
+        !header ||
+        typeof header !== "object" ||
+        typeof header.name !== "string" ||
+        typeof header.value !== "string",
+    )
+  )
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Custom headers must contain text names and values",
+    });
+  if (input.active !== undefined && typeof input.active !== "boolean")
+    throw createError({ statusCode: 400, statusMessage: "Active must be a boolean" });
+  if (input.headerTemplateId != null && typeof input.headerTemplateId !== "string")
+    throw createError({ statusCode: 400, statusMessage: "Header template ID must be text" });
+  for (const key of ["importMethod", "importUrl", "matchUrl"] as const)
+    if (input[key] != null && typeof input[key] !== "string")
+      throw createError({ statusCode: 400, statusMessage: `${key} must be text` });
   return {
     name: input.name.trim(),
-    targetEndpointId: input.targetEndpointId,
+    targetEndpointId,
     description,
     pathParameters: mockApiPathParameters(input.pathParameters),
     requestJson,
+    headerTemplateId: input.headerTemplateId ?? null,
+    customHeaders: input.customHeaders ?? [],
+    active: input.active ?? targetEndpointId !== null,
+    importMethod: input.importMethod ?? null,
+    importUrl: input.importUrl ?? null,
+    matchUrl: input.matchUrl ?? null,
   };
 }

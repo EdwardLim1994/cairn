@@ -128,6 +128,16 @@ describe("ServiceSettingsPanel", () => {
     expect(wrapper.emitted("discard")).toEqual([[]]);
   });
 
+  it("keeps the panel open when its backdrop is clicked", async () => {
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+    });
+    await wrapper.get('[aria-label="Service settings"]').trigger("click");
+    expect(wrapper.emitted("discard")).toBeUndefined();
+  });
+
   it("renders service fields and endpoint details and supports framework editing", async () => {
     const panelDraft = structuredClone(draft);
     const wrapper = mountPanel({

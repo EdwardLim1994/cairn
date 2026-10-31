@@ -44,6 +44,14 @@ const validMockApi = {
   projectId: "project-1",
   name: "List orders",
   targetEndpointId: "endpoint-1",
+  headerTemplateId: null,
+  customHeaders: [],
+  active: true,
+  status: "ready",
+  readinessReasons: [],
+  importMethod: null,
+  importUrl: null,
+  matchUrl: null,
   pathParameters: {},
   requestJson: {},
   description: "",
@@ -97,6 +105,7 @@ const validCanvas = {
   services: [validService],
   edges: [],
   mockApis: [validMockApi],
+  headerTemplates: [],
 };
 const validServiceInput = {
   name: "Orders",
@@ -312,6 +321,7 @@ describe("shared API contracts", () => {
         ],
         edges: [],
         mockApis: [],
+        headerTemplates: [],
       }).success,
     ).toBe(true);
   });

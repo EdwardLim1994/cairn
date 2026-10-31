@@ -35,6 +35,14 @@ const mockApi = {
   projectId: "project-1",
   name: "Fetch orders",
   targetEndpointId: "endpoint-1",
+  headerTemplateId: null,
+  customHeaders: [],
+  active: true,
+  status: "ready" as const,
+  readinessReasons: [],
+  importMethod: null,
+  importUrl: null,
+  matchUrl: null,
   pathParameters: {},
   requestJson: {},
   description: "",
@@ -46,6 +54,7 @@ const canvas = {
   services: [service],
   edges: [],
   mockApis: [mockApi],
+  headerTemplates: [],
 };
 
 describe("canvas view model", () => {

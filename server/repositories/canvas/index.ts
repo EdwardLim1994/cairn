@@ -2,7 +2,14 @@ import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { CanvasGetResponse, CanvasPutRequest } from "#shared/api/canvas";
 import { getDb } from "../../db";
-import { mockApis, projects, serviceEdges, serviceEndpoints, services } from "../../db/schema";
+import { listMockApis } from "../mock-apis";
+import {
+  headerTemplates,
+  projects,
+  serviceEdges,
+  serviceEndpoints,
+  services,
+} from "../../db/schema";
 import { CanvasConstraintError } from "./errors";
 
 /** Canvas-specific persistence; multi-table writes stay within this domain module. */
@@ -12,12 +19,13 @@ export async function getCanvas(
   projectId: string,
   db: Database = getDb(),
 ): Promise<CanvasGetResponse> {
-  const [[project], serviceRows, endpoints, edges, mockApiRows] = await Promise.all([
+  const [[project], serviceRows, endpoints, edges, mockApiRows, templateRows] = await Promise.all([
     db.select().from(projects).where(eq(projects.id, projectId)),
     db.select().from(services).where(eq(services.projectId, projectId)),
     db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
     db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
-    db.select().from(mockApis).where(eq(mockApis.projectId, projectId)),
+    listMockApis(projectId, db),
+    db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
   ]);
   if (!project) throw new Error("Project canvas could not be initialized");
   return {
@@ -35,9 +43,11 @@ export async function getCanvas(
       sourceServiceId,
       targetEndpointId,
     })),
-    mockApis: mockApiRows.map((mockApi) => ({
-      ...mockApi,
-      createdAt: mockApi.createdAt.toISOString(),
+    mockApis: mockApiRows,
+    headerTemplates: templateRows.map((template) => ({
+      ...template,
+      createdAt: template.createdAt.toISOString(),
+      updatedAt: template.updatedAt.toISOString(),
     })),
   };
 }

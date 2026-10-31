@@ -14,9 +14,14 @@ export function createCreateMockApiUseCase(dependencies: {
 }) {
   return async (input: MockApiInput) => {
     const projectId = await dependencies.ensureProject();
-    const endpoint = await dependencies.findMockApiEndpoint(projectId, input.targetEndpointId);
-    if (!endpoint) throw new MockApiEndpointError("Selected endpoint is not in this project");
-    validateEndpointPathParameters(input.pathParameters, endpoint.url);
+    const endpoint = input.targetEndpointId
+      ? await dependencies.findMockApiEndpoint(projectId, input.targetEndpointId)
+      : undefined;
+    if (input.targetEndpointId && !endpoint)
+      throw new MockApiEndpointError("Selected endpoint is not in this project");
+    if (!endpoint && input.active)
+      throw new MockApiEndpointError("An API without an endpoint must be inactive");
+    if (endpoint) validateEndpointPathParameters(input.pathParameters, endpoint.url);
     const id = (dependencies.newId ?? randomUUID)();
     await dependencies.createMockApi(id, projectId, input);
     return { id };

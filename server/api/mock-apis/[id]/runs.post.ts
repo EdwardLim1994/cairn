@@ -1,6 +1,6 @@
 import { mockApiRunResponseSchema } from "#shared/api/mock-apis";
 import { getEnvironmentVariableValues } from "../../../repositories/environment-variables";
-import { MockApiNotFoundError } from "../../../repositories/mock-apis/errors";
+import { MockApiNotFoundError, MockApiNotReadyError } from "../../../repositories/mock-apis/errors";
 import { getMockApiExecutionTarget, createRun, finishRun } from "../../../repositories/runs";
 import { addMockRunFailureLog } from "../../../repositories/telemetry";
 import { getAppConfig } from "../../../utils/config";
@@ -25,6 +25,8 @@ export default defineEventHandler(async (event) => {
   } catch (cause) {
     if (cause instanceof MockApiNotFoundError)
       throw createError({ statusCode: 404, statusMessage: cause.message, cause });
+    if (cause instanceof MockApiNotReadyError)
+      throw createError({ statusCode: 409, statusMessage: cause.message, cause });
     throw cause;
   }
 });

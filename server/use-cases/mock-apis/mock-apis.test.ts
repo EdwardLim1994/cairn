@@ -11,6 +11,12 @@ const mockInput = {
   pathParameters: { orderId: "123" },
   requestJson: {},
   description: "",
+  headerTemplateId: null,
+  customHeaders: [],
+  active: true,
+  importMethod: null,
+  importUrl: null,
+  matchUrl: null,
 };
 
 describe("mock API endpoint use cases", () => {

@@ -8,6 +8,7 @@ const canvas = {
   services: [],
   edges: [],
   mockApis: [],
+  headerTemplates: [],
 };
 const requestBody = {
   name: "Orders",

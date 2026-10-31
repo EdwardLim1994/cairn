@@ -1,14 +1,21 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { MockApiNotFoundError } from "../../repositories/mock-apis/errors";
+import { MockApiNotFoundError, MockApiNotReadyError } from "../../repositories/mock-apis/errors";
 import { createRunMockApiUseCase } from "./run-mock-api";
 
 const target = {
   mockApiId: "mock-1",
   endpointId: "endpoint-1",
+  targetEndpointId: "endpoint-1",
+  endpointUrl: "/orders/{orderId}",
   method: "POST",
   url: "/orders/{orderId}",
   requestJson: { token: "{{TOKEN}}", enabled: true },
   pathParameters: { orderId: "42" },
+  active: true,
+  headerTemplateId: null,
+  headerTemplateExists: true,
+  headerTemplateHeaders: [],
+  customHeaders: [],
   mockApiName: "Create order",
   baseUrl: "http://localhost:8081",
   serviceName: "order-service",
@@ -52,12 +59,14 @@ describe("mock API run use case", () => {
       "http://localhost:8081/orders/42",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({
-          traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
-        }),
         body: JSON.stringify({ token: "abc", enabled: true }),
       }),
     );
+    const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
+    expect(new Headers(request.headers).get("traceparent")).toBe(
+      `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+    );
+    expect(new Headers(request.headers).get("content-type")).toBe("application/json");
     expect(deps.finishRun).toHaveBeenCalledWith(
       "run-1",
       expect.objectContaining({ status: "completed" }),
@@ -130,5 +139,36 @@ describe("mock API run use case", () => {
     const { deps, run } = setup({ getTarget: vi.fn().mockResolvedValue(undefined) });
     await expect(run("missing")).rejects.toBeInstanceOf(MockApiNotFoundError);
     expect(deps.createRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects inactive or incomplete APIs before creating a run or sending a request", async () => {
+    const inactive = setup({ getTarget: vi.fn().mockResolvedValue({ ...target, active: false }) });
+    await expect(inactive.run("mock-1")).rejects.toBeInstanceOf(MockApiNotReadyError);
+    expect(inactive.deps.createRun).not.toHaveBeenCalled();
+    expect(inactive.deps.fetch).not.toHaveBeenCalled();
+
+    const missing = setup({ getVariables: vi.fn().mockResolvedValue([]) });
+    await expect(missing.run("mock-1")).rejects.toThrow(/missing variable/);
+    expect(missing.deps.createRun).not.toHaveBeenCalled();
+    expect(missing.deps.fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses template and custom headers, with custom values overriding case-insensitively", async () => {
+    const { deps, run } = setup({
+      getVariables: vi.fn().mockResolvedValue([{ name: "TOKEN", value: "abc" }]),
+      getTarget: vi.fn().mockResolvedValue({
+        ...target,
+        headerTemplateHeaders: [
+          { name: "X-Tenant", value: "default" },
+          { name: "Content-Type", value: "application/custom" },
+        ],
+        customHeaders: [{ name: "x-tenant", value: "{{TOKEN}}" }],
+      }),
+    });
+    await run("mock-1");
+    const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
+    const headers = new Headers(request.headers);
+    expect(headers.get("x-tenant")).toBe("abc");
+    expect(headers.get("content-type")).toBe("application/custom");
   });
 });

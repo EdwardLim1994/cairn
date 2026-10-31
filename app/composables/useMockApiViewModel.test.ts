@@ -32,7 +32,7 @@ const service = {
 describe("mock API view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function setup(failVariables = false) {
+  function setup(failVariables = false, failSave = false) {
     const store = useMockApiStore();
     const errors: string[] = [];
     const operations: string[] = [];
@@ -50,6 +50,26 @@ describe("mock API view model", () => {
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ];
+      }
+      if (url === "/api/mock-api-settings") {
+        if (failSave) throw new Error("save failed");
+        const body = options.body as {
+          environmentVariables: { id?: string }[];
+          headerTemplates: { id?: string }[];
+          mockApis: { id?: string }[];
+        };
+        const mapped = (rows: { id?: string }[]) =>
+          Object.fromEntries(
+            rows.flatMap(({ id }, index) => (id ? [[id, index ? id : "created-id"]] : [])),
+          );
+        return {
+          saved: true,
+          idMap: {
+            environmentVariables: mapped(body.environmentVariables),
+            headerTemplates: mapped(body.headerTemplates),
+            mockApis: mapped(body.mockApis),
+          },
+        };
       }
       return { id: "created-id" };
     });
@@ -119,6 +139,14 @@ describe("mock API view model", () => {
         projectId: "project-1",
         name: "Get order",
         targetEndpointId: "endpoint-1",
+        headerTemplateId: null,
+        customHeaders: [],
+        active: true,
+        status: "ready" as const,
+        readinessReasons: [],
+        importMethod: null,
+        importUrl: null,
+        matchUrl: null,
         description: "",
         pathParameters: { orderId: "7" },
         requestJson: { includeItems: true },
@@ -181,14 +209,154 @@ describe("mock API view model", () => {
       ],
     });
     const warnings = viewModel.importCollection(collection);
-    expect(store.mockDraft).toHaveLength(1);
+    expect(store.mockDraft).toHaveLength(2);
     expect(store.mockDraft[0]?.pathParameters).toEqual({ orderId: "42" });
+    expect(store.mockDraft[1]).toMatchObject({ targetEndpointId: null, active: false });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("Unknown");
     expect(importWarnings.value).toEqual([{ id: 0, message: warnings[0] }]);
     expect(registeredApisOpen.value).toBe(true);
     viewModel.dismissImportWarning(0);
     expect(importWarnings.value).toEqual([]);
+  });
+
+  it("retries unmatched collection requests after environment import", () => {
+    const { store, viewModel, importWarnings } = setup();
+    const collection = JSON.stringify({
+      info: { name: "Orders" },
+      item: [{ name: "Get order", request: { method: "GET", url: "{{base}}/orders/42" } }],
+    });
+    viewModel.importCollection(collection);
+    expect(store.mockDraft[0]?.targetEndpointId).toBeNull();
+    expect(importWarnings.value).toHaveLength(2);
+    viewModel.importEnvironment(
+      JSON.stringify({ values: [{ key: "base", value: "http://localhost:8080" }] }),
+    );
+    expect(store.environmentVariables).toMatchObject([
+      { name: "base", value: "http://localhost:8080" },
+    ]);
+    expect(store.mockDraft[0]).toMatchObject({
+      targetEndpointId: "endpoint-1",
+      pathParameters: { orderId: "42" },
+      active: false,
+    });
+    expect(importWarnings.value).toEqual([]);
+  });
+
+  it("supports environment-first imports and discards both imported drafts", () => {
+    const context = setup();
+    context.store.savedEnvironmentVariableIds = [];
+    context.store.savedEnvironmentVariableValues = {};
+    context.viewModel.importEnvironment(
+      JSON.stringify({ values: [{ key: "base", value: "http://localhost:8080" }] }),
+    );
+    context.viewModel.importCollection(
+      JSON.stringify({
+        info: { name: "Orders" },
+        item: [{ name: "Get order", request: { method: "GET", url: "{{base}}/orders/42" } }],
+      }),
+    );
+    expect(context.store.mockDraft[0]).toMatchObject({
+      targetEndpointId: "endpoint-1",
+      active: false,
+    });
+    context.viewModel.discardMockSettings();
+    expect(context.store.environmentVariables).toEqual([]);
+    expect(context.store.mockDraft).toEqual([]);
+  });
+
+  it("confirms template deletion and detaches staged APIs while retaining custom headers", () => {
+    const { store, viewModel } = setup();
+    const template = { id: "template-1", name: "Tenant", headers: [] };
+    store.headerTemplates = [template];
+    store.setMockDraft([
+      {
+        name: "Get order",
+        targetEndpointId: "endpoint-1",
+        headerTemplateId: template.id,
+        customHeaders: [{ name: "X-Local", value: "kept" }],
+        description: "",
+        requestJson: "{}",
+        pathParameters: {},
+      },
+    ]);
+    let confirmation = "";
+    expect(
+      viewModel.removeHeaderTemplate(template, (message) => {
+        confirmation = message;
+        return false;
+      }),
+    ).toBe(false);
+    expect(confirmation).toContain("Get order");
+    expect(store.headerTemplates).toEqual([template]);
+    expect(viewModel.removeHeaderTemplate(template, () => true)).toBe(true);
+    expect(store.headerTemplates).toEqual([]);
+    expect(store.mockDraft[0]).toMatchObject({
+      headerTemplateId: null,
+      customHeaders: [{ name: "X-Local", value: "kept" }],
+    });
+  });
+
+  it("restores staged API, variable, and template changes on Discard", () => {
+    const context = setup();
+    context.store.setMockApis([
+      {
+        id: "saved-api",
+        projectId: "project-1",
+        name: "Saved",
+        targetEndpointId: "endpoint-1",
+        headerTemplateId: null,
+        customHeaders: [],
+        active: false,
+        status: "inactive",
+        readinessReasons: [],
+        importMethod: null,
+        importUrl: null,
+        matchUrl: null,
+        description: "",
+        pathParameters: {},
+        requestJson: {},
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    context.store.savedEnvironmentVariableIds = ["saved-variable"];
+    context.store.savedEnvironmentVariableValues = {
+      "saved-variable": { name: "TOKEN", value: "saved" },
+    };
+    context.store.setEnvironmentVariables([
+      { id: "saved-variable", name: "TOKEN", value: "edited" },
+      { id: "draft-variable", name: "NEW", value: "value", pendingCreate: true },
+    ]);
+    context.store.headerTemplates = [{ id: "draft-template", name: "New", headers: [] }];
+    context.store.setMockDraft([
+      {
+        name: "Unsaved",
+        targetEndpointId: null,
+        description: "",
+        requestJson: "{}",
+        pathParameters: {},
+      },
+    ]);
+
+    context.viewModel.discardMockSettings();
+    expect(context.store.environmentVariables).toEqual([
+      { id: "saved-variable", name: "TOKEN", value: "saved" },
+    ]);
+    expect(context.store.headerTemplates).toEqual([]);
+    expect(context.store.mockDraft).toMatchObject([{ name: "Saved", active: false }]);
+    expect(context.operations).toEqual(["close"]);
+  });
+
+  it("keeps staged changes open when the transaction save fails", async () => {
+    const context = setup(false, true);
+    context.panelOpen.value = true;
+    const draft = context.viewModel.addMockDraft();
+    draft.name = "Unsaved";
+    await context.viewModel.saveMockDraft();
+    expect(context.panelOpen.value).toBe(true);
+    expect(context.store.mockDraft[0]?.name).toBe("Unsaved");
+    expect(context.operations).toEqual([]);
+    expect(context.errors).toEqual(["save failed"]);
   });
 
   it("edits, validates, saves, creates, and deletes shared variables", async () => {
@@ -227,7 +395,7 @@ describe("mock API view model", () => {
     expect(context.store.environmentVariables[0]?.id).toBe("created-id");
     expect(context.store.environmentVariables[0]?.pendingCreate).toBeUndefined();
     expect(context.store.savedEnvironmentVariableIds).toEqual(["created-id"]);
-    expect(context.operations).toEqual(["save", "close", "load", "save"]);
+    expect(context.operations).toEqual(["close", "load"]);
     expect(context.errors).toEqual([]);
   });
 
@@ -238,6 +406,14 @@ describe("mock API view model", () => {
       projectId: "project-1",
       name: "Get order",
       targetEndpointId: "endpoint-1",
+      headerTemplateId: null,
+      customHeaders: [],
+      active: true,
+      status: "ready" as const,
+      readinessReasons: [],
+      importMethod: null,
+      importUrl: null,
+      matchUrl: null,
       pathParameters: {},
       requestJson: {},
       description: "",
@@ -254,12 +430,7 @@ describe("mock API view model", () => {
 
     await context.viewModel.saveMockDraft();
 
-    expect(context.calls).toEqual([
-      { url: "/api/environment-variables/variable-delete", method: "DELETE" },
-      { url: "/api/environment-variables/variable-1", method: "PUT" },
-      { url: "/api/mock-apis/mock-delete", method: "DELETE" },
-      { url: "/api/mock-apis/mock-keep", method: "PUT" },
-    ]);
+    expect(context.calls).toEqual([{ url: "/api/mock-api-settings", method: "PUT" }]);
     expect(context.errors).toEqual([]);
   });
 });

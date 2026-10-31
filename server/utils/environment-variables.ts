@@ -1,8 +1,13 @@
 import { createError } from "h3";
 import { record } from "./graph-validation";
+import { findVariableReferences } from "#shared/utils/environment-variables";
+export {
+  findVariableReferences,
+  resolveJsonVariables,
+  resolveStringVariables,
+} from "#shared/utils/environment-variables";
 
 const variableName = /^[A-Za-z_]\w*$/;
-const variableReference = /\{\{([A-Za-z_]\w*)\}\}/g;
 
 export function environmentVariableInput(value: unknown) {
   const input = record(value, "Environment variable");
@@ -19,25 +24,6 @@ export function environmentVariableInput(value: unknown) {
   return { name: input.name, value: input.value };
 }
 
-export function resolveJsonVariables(value: unknown, variables: Map<string, string>): unknown {
-  if (typeof value === "string") {
-    const wholeReference = /^\{\{([A-Za-z_]\w*)\}\}$/.exec(value);
-    if (wholeReference) return getVariable(wholeReference[1]!, variables);
-
-    return value.replace(variableReference, (_, name: string) => {
-      const replacement = getVariable(name, variables);
-      return replacement;
-    });
-  }
-  if (Array.isArray(value)) return value.map((item) => resolveJsonVariables(item, variables));
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, resolveJsonVariables(item, variables)]),
-    );
-  return value;
-}
-
-function getVariable(name: string, variables: Map<string, string>) {
-  if (!variables.has(name)) throw new Error(`Undefined environment variable: ${name}`);
-  return variables.get(name)!;
+export function missingVariableNames(value: unknown, variables: Map<string, string>) {
+  return [...new Set(findVariableReferences(value).filter((name) => !variables.has(name)))];
 }

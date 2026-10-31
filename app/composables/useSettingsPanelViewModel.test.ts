@@ -65,11 +65,11 @@ describe("settings panel view model", () => {
     document.body.removeChild(options);
   });
 
-  it("closes panels when clicking outside", () => {
+  it("keeps settings panels open when clicking outside", () => {
     const context = setup();
     context.model.closeSettingsOutside(new PointerEvent("pointerdown"));
-    expect(context.serviceDialog.value).toBe(false);
-    expect(context.mockPanel.value).toBe(false);
-    expect(context.store.selectedNodeId).toBeNull();
+    expect(context.serviceDialog.value).toBe(true);
+    expect(context.mockPanel.value).toBe(true);
+    expect(context.store.selectedNodeId).toBe("service-1");
   });
 });

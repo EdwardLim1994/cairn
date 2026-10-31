@@ -201,6 +201,7 @@ describe("service view model", () => {
       services: [service],
       edges: [],
       mockApis: [],
+      headerTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 560, y: 160 },
     });

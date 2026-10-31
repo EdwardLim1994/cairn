@@ -27,7 +27,7 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
 const mockApiStore = useMockApiStore();
-const { mockApis, mockDraft, environmentVariables, runningMockId, runResults } =
+const { mockApis, mockDraft, environmentVariables, headerTemplates, runningMockId, runResults } =
   storeToRefs(mockApiStore);
 const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
@@ -280,12 +280,38 @@ async function importPostmanCollection(event: Event) {
       cause instanceof Error ? cause.message : "Could not import Postman collection";
   }
 }
+async function importPostmanEnvironment(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  errorMessage.value = "";
+  try {
+    mockApiViewModel.importEnvironment(await file.text());
+  } catch (cause) {
+    errorMessage.value =
+      cause instanceof Error ? cause.message : "Could not import Postman environment";
+  }
+}
 function removeMockDraft(index: number) {
   mockApiViewModel.removeMockDraft(index);
 }
 
+function deleteHeaderTemplate(template: (typeof headerTemplates.value)[number]) {
+  mockApiViewModel.removeHeaderTemplate(template, (message) => window.confirm(message));
+}
+
 function saveMockDraft() {
   return mockApiViewModel.saveMockDraft();
+}
+
+function discardMockSettings() {
+  mockApiViewModel.discardMockSettings();
+}
+
+function addHeaderTemplate() {
+  mockApiViewModel.addHeaderTemplate();
 }
 
 function runMock(entry: MockApi) {
@@ -322,6 +348,9 @@ function adjustLogsPanelHeight(delta: number) {
 }
 
 const servicesForSelect = computed(() => graphViewModel.serviceEndpointOptions());
+const endpointDetails = computed(() =>
+  services.value.flatMap((service) => service.endpoints.map(({ id, url }) => ({ id, url }))),
+);
 
 onMounted(async () => {
   document.addEventListener("pointerdown", closeSettingsOutside);
@@ -415,6 +444,7 @@ onUnmounted(() => {
       v-if="mockPanel"
       v-model:mock-draft="mockDraft"
       v-model:environment-variables="environmentVariables"
+      v-model:header-templates="headerTemplates"
       v-model:variables-open="sharedEnvironmentVariablesOpen"
       v-model:apis-open="registeredMockApisOpen"
       v-model:variable-draft="environmentCardDraft"
@@ -422,8 +452,9 @@ onUnmounted(() => {
       :editing-environment-variable-id="editingEnvironmentVariableId"
       :expanded-environment-variable-id="expandedEnvironmentVariableId"
       :services-for-select="servicesForSelect"
+      :endpoint-details="endpointDetails"
       :endpoint-path-parameter-names="endpointPathParameterNames"
-      @discard="closeSettings"
+      @discard="discardMockSettings"
       @save="saveMockDraft"
       @add-variable="addEnvironmentVariable"
       @open-variable="openEnvironmentVariable"
@@ -431,10 +462,13 @@ onUnmounted(() => {
       @update-variable="updateEnvironmentVariable"
       @delete-variable="deleteEnvironmentVariable"
       @import-collection="importPostmanCollection"
+      @import-environment="importPostmanEnvironment"
       @add-mock-api="addMockDraft"
       @remove-mock-api="removeMockDraft"
       @set-mock-endpoint="setMockEndpoint"
       @format-request="formatRequestJson"
+      @add-header-template="addHeaderTemplate"
+      @delete-header-template="deleteHeaderTemplate"
     />
 
     <LatestRunDrawer
@@ -1479,6 +1513,22 @@ body {
 
 .app__field-row {
   @apply flex gap-2.5;
+}
+
+.app__header-row {
+  @apply grid grid-cols-[1fr_1fr_auto] items-center gap-2;
+}
+
+.app__readiness-reasons {
+  @apply list-disc pl-4;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.app__readiness-badge {
+  @apply rounded-full border px-2 py-0.5;
+  color: var(--muted);
+  font-size: 9px;
 }
 
 .app__switch-row {

@@ -19,11 +19,7 @@ export function useSettingsPanelViewModel(options: {
   function closeSettingsOutside(event: PointerEvent) {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(".app__framework-select-menu")) return;
-    if (target?.closest(".app__side-dialog")) {
-      if (!target.closest(".app__framework-select")) options.frameworkMenuOpen.value = false;
-      return;
-    }
-    closeSettings();
+    if (!target?.closest(".app__framework-select")) options.frameworkMenuOpen.value = false;
   }
 
   return { closeSettings, closeSettingsOutside };

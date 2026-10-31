@@ -2,6 +2,13 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
+import { saveMockApiSettings } from "../repositories/mock-api-settings";
+import { deleteEnvironmentVariable } from "../repositories/environment-variables";
+import {
+  parsePostmanCollection,
+  retryUnmatchedPostmanDrafts,
+} from "../../app/utils/postman-import";
+import { parsePostmanEnvironment } from "../../app/utils/postman-environment-import";
 import {
   environmentVariables,
   logs,
@@ -137,9 +144,9 @@ integration("mock API run controller with MySQL and deterministic service stubs"
     fetchStub.mockImplementation(
       (_url, init) =>
         new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new DOMException("Aborted", "AbortError")),
-          );
+          const rejectAbort = () => reject(new DOMException("Aborted", "AbortError"));
+          if (init?.signal?.aborted) rejectAbort();
+          else init?.signal?.addEventListener("abort", rejectAbort, { once: true });
         }),
     );
     const result = (await runRoute({ context: { params: { id: "mock-run-api" } } } as never)) as {
@@ -159,5 +166,108 @@ integration("mock API run controller with MySQL and deterministic service stubs"
     ).resolves.toMatchObject([
       { severity: "ERROR", message: expect.stringContaining("Target request timed out") },
     ]);
+  });
+
+  it("imports APIs before environment, matches, activates, and sends resolved template and request headers", async () => {
+    fetchStub.mockResolvedValue(new Response("ok", { status: 200 }));
+    const services = [
+      {
+        baseUrl: "http://localhost:8081",
+        endpoints: [
+          {
+            id: "mock-run-endpoint",
+            apiType: "REST",
+            method: "GET",
+            url: "/orders",
+          },
+        ],
+      },
+    ];
+    const imported = parsePostmanCollection(
+      JSON.stringify({
+        info: { name: "orders" },
+        item: [
+          {
+            name: "List orders",
+            request: {
+              method: "GET",
+              url: "{{base}}/orders",
+              header: [{ key: "X-Source", value: "{{SOURCE}}" }],
+            },
+          },
+        ],
+      }),
+      services,
+    );
+    expect(imported.drafts[0]?.targetEndpointId).toBeNull();
+    const firstSave = await saveMockApiSettings(projectId, {
+      environmentVariables: [],
+      headerTemplates: [],
+      mockApis: [
+        {
+          ...imported.drafts[0]!,
+          id: "draft-imported-api",
+          requestJson: JSON.parse(imported.drafts[0]!.requestJson),
+        },
+      ],
+    });
+    const environment = parsePostmanEnvironment(
+      JSON.stringify({
+        values: [
+          { key: "base", value: "http://localhost:8081" },
+          { key: "SOURCE", value: "collection" },
+          { key: "TENANT", value: "tenant-7" },
+        ],
+      }),
+    );
+    const retried = retryUnmatchedPostmanDrafts(imported.drafts, services, environment.variables);
+    expect(retried[0]?.targetEndpointId).toBe("mock-run-endpoint");
+    const apiId = firstSave.idMap.mockApis["draft-imported-api"]!;
+    const saved = await saveMockApiSettings(projectId, {
+      environmentVariables: environment.variables.map((entry, index) => ({
+        id: `draft-env-${index}`,
+        ...entry,
+      })),
+      headerTemplates: [
+        {
+          id: "draft-tenant-template",
+          name: "Tenant",
+          headers: [{ name: "X-Tenant", value: "{{TENANT}}" }],
+        },
+      ],
+      mockApis: [
+        {
+          ...retried[0]!,
+          id: apiId,
+          requestJson: JSON.parse(retried[0]!.requestJson),
+          headerTemplateId: "draft-tenant-template",
+          active: true,
+        },
+      ],
+    });
+    const persistedId = saved.idMap.mockApis[apiId]!;
+    const result = (await runRoute({ context: { params: { id: persistedId } } } as never)) as {
+      id: string;
+      traceId: string;
+      status: string;
+    };
+    expect(result.status).toBe("completed");
+    const request = fetchStub.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(request.headers);
+    expect(headers.get("x-source")).toBe("collection");
+    expect(headers.get("x-tenant")).toBe("tenant-7");
+    expect(headers.get("traceparent")).toMatch(
+      new RegExp(`^00-${result.traceId}-[a-f0-9]{16}-01$`),
+    );
+  });
+
+  it("deactivates after a dependency deletion and rejects the run without exposing values", async () => {
+    await deleteEnvironmentVariable(projectId, "mock-run-variable");
+    await expect(
+      runRoute({ context: { params: { id: "mock-run-api" } } } as never),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(fetchStub).not.toHaveBeenCalled();
+    const db = getDb();
+    expect(await db.select().from(runs).where(eq(runs.projectId, projectId))).toEqual([]);
   });
 });

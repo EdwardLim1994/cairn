@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { useGraphViewModel } from "./useGraphViewModel";
 import { useGraphStore } from "../stores/graph";
+import type { CanvasGetResponse } from "#shared/api/canvas";
 
 const service = {
   id: "service-1",
@@ -26,11 +27,19 @@ const service = {
     },
   ],
 };
-const mockApi = {
+const mockApi: CanvasGetResponse["mockApis"][number] = {
   id: "mock-1",
   projectId: "project-1",
   name: "Fetch orders",
   targetEndpointId: "endpoint-1",
+  headerTemplateId: null,
+  customHeaders: [],
+  active: true,
+  status: "ready" as const,
+  readinessReasons: [],
+  importMethod: null,
+  importUrl: null,
+  matchUrl: null,
   pathParameters: {},
   requestJson: {},
   description: "",
@@ -40,18 +49,19 @@ const mockApi = {
 describe("graph view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function createModel() {
+  function createModel(apis = [mockApi]) {
     const store = useGraphStore();
     store.applyCanvas({
       services: [service],
       edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
-      mockApis: [mockApi],
+      mockApis: apis,
+      headerTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 560, y: 160 },
     });
     const model = useGraphViewModel({
       store,
-      mockApis: () => [mockApi],
+      mockApis: () => apis,
       runResults: () => ({ "mock-1": { status: "failed" } }),
       runningMockId: () => null,
     });
@@ -108,6 +118,28 @@ describe("graph view model", () => {
     store.toggleMockConnections();
     expect(model.buildEdges()[1]?.sourceHandle).toBe("mock-1");
     expect(store.edges).toHaveLength(3);
+  });
+
+  it("keeps unmatched drafts visible without creating invalid edges", () => {
+    const unmatched = {
+      ...mockApi,
+      id: "mock-unmatched",
+      name: "Imported draft",
+      targetEndpointId: null,
+      active: false,
+      status: "draft" as const,
+      readinessReasons: [{ code: "endpoint-missing", message: "Select a service endpoint" }],
+    };
+    const { model } = createModel([mockApi, unmatched]);
+    const entries = (model.mockNode().data as { entries: Record<string, unknown>[] }).entries;
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toMatchObject({
+      name: "Imported draft",
+      endpoint: undefined,
+      readinessStatus: "draft",
+    });
+    expect(model.buildEdges().map(({ id }) => id)).toContain("mock-mock-1");
+    expect(model.buildEdges().map(({ id }) => id)).not.toContain("mock-mock-unmatched");
   });
 
   it("syncs graph nodes and creates a canvas payload from current positions", () => {

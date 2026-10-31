@@ -2,8 +2,13 @@ import { asc, and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { ServiceCreateRequest, ServiceUpdateRequest } from "#shared/api/services";
 import { getDb } from "../../db";
+import type { MySql2Database } from "drizzle-orm/mysql2";
+import * as schema from "../../db/schema";
 import { serviceEndpoints, services } from "../../db/schema";
 import { ServiceEndpointOwnershipError } from "./errors";
+import { deactivateInvalidMockApis } from "../mock-apis/reconcile-readiness";
+
+type Database = MySql2Database<typeof schema>;
 
 export async function listServices(projectId: string) {
   const db = getDb();
@@ -50,8 +55,12 @@ export async function createService(projectId: string, id: string, input: Servic
   });
 }
 
-export async function updateService(projectId: string, id: string, input: ServiceUpdateRequest) {
-  const db = getDb();
+export async function updateService(
+  projectId: string,
+  id: string,
+  input: ServiceUpdateRequest,
+  db: Database = getDb(),
+) {
   const [existing] = await db
     .select({ id: services.id })
     .from(services)
@@ -97,15 +106,23 @@ export async function updateService(projectId: string, id: string, input: Servic
           .where(and(eq(serviceEndpoints.id, endpoint.id), eq(serviceEndpoints.serviceId, id)));
       else await tx.insert(serviceEndpoints).values({ id: randomUUID(), ...values });
     }
+    await deactivateInvalidMockApis(tx, projectId);
   });
   return "updated" as const;
 }
 
-export async function deleteService(projectId: string, id: string): Promise<boolean> {
-  const result = await getDb()
-    .delete(services)
-    .where(and(eq(services.id, id), eq(services.projectId, projectId)));
-  return Boolean(result[0]?.affectedRows);
+export async function deleteService(
+  projectId: string,
+  id: string,
+  db: Database = getDb(),
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const result = await tx
+      .delete(services)
+      .where(and(eq(services.id, id), eq(services.projectId, projectId)));
+    if (result[0]?.affectedRows) await deactivateInvalidMockApis(tx, projectId);
+    return Boolean(result[0]?.affectedRows);
+  });
 }
 
 export function listHealthTargets(projectId: string) {

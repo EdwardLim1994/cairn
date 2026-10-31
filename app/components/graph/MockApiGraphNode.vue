@@ -10,6 +10,8 @@ export type MockApiGraphEntry = {
   pathParameters: Record<string, string>;
   endpoint?: { method: string; url: string };
   status?: string;
+  readinessStatus?: "draft" | "inactive" | "ready";
+  active?: boolean;
   running: boolean;
 };
 
@@ -83,9 +85,12 @@ const emit = defineEmits<{
       <span v-if="entry.status" class="app__run-state" :class="`app__run-state--${entry.status}`">
         {{ entry.status }}
       </span>
+      <span v-if="entry.readinessStatus" class="app__readiness-badge">
+        {{ entry.readinessStatus }}
+      </span>
       <button
         class="app__run-button nodrag"
-        :disabled="!!runningMockId"
+        :disabled="!!runningMockId || !entry.active || entry.readinessStatus !== 'ready'"
         :aria-label="entry.running ? `Running ${entry.name}` : `Run ${entry.name}`"
         :title="entry.running ? `Running ${entry.name}` : `Run ${entry.name}`"
         @click.stop="emit('run', entry)"

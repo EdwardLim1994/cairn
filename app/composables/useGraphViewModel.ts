@@ -93,6 +93,7 @@ export function useGraphViewModel({
           ...entry,
           endpoint: mockEndpoint(entry),
           status: runResults()[entry.id]?.status,
+          readinessStatus: entry.status,
           running: runningMockId() === entry.id,
         })),
         collapsed: store.mockConnectionsCollapsed,

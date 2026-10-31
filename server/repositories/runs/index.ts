@@ -1,13 +1,29 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import { mockApis, runs, serviceEndpoints, services, spans } from "../../db/schema";
+import {
+  headerTemplates,
+  mockApis,
+  runs,
+  serviceEndpoints,
+  services,
+  spans,
+} from "../../db/schema";
+import { listMockApis } from "../mock-apis";
 
 export async function getMockApiExecutionTarget(projectId: string, id: string) {
+  await listMockApis(projectId);
   const [target] = await getDb()
     .select({
       mockApiId: mockApis.id,
+      active: mockApis.active,
+      targetEndpointId: mockApis.targetEndpointId,
+      headerTemplateId: mockApis.headerTemplateId,
+      headerTemplateHeaders: headerTemplates.headers,
+      headerTemplateExists: headerTemplates.id,
+      customHeaders: mockApis.customHeaders,
       endpointId: serviceEndpoints.id,
       method: serviceEndpoints.method,
+      endpointUrl: serviceEndpoints.url,
       url: serviceEndpoints.url,
       requestJson: mockApis.requestJson,
       pathParameters: mockApis.pathParameters,
@@ -16,17 +32,26 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
       serviceName: services.name,
     })
     .from(mockApis)
-    .innerJoin(serviceEndpoints, eq(mockApis.targetEndpointId, serviceEndpoints.id))
-    .innerJoin(services, eq(serviceEndpoints.serviceId, services.id))
-    .where(
+    .leftJoin(
+      serviceEndpoints,
       and(
-        eq(mockApis.id, id),
-        eq(mockApis.projectId, projectId),
+        eq(mockApis.targetEndpointId, serviceEndpoints.id),
         eq(serviceEndpoints.projectId, projectId),
-        eq(services.projectId, projectId),
       ),
-    );
-  return target;
+    )
+    .leftJoin(
+      services,
+      and(eq(serviceEndpoints.serviceId, services.id), eq(services.projectId, projectId)),
+    )
+    .leftJoin(
+      headerTemplates,
+      and(
+        eq(mockApis.headerTemplateId, headerTemplates.id),
+        eq(headerTemplates.projectId, projectId),
+      ),
+    )
+    .where(and(eq(mockApis.id, id), eq(mockApis.projectId, projectId)));
+  return target && { ...target, headerTemplateExists: target.headerTemplateExists !== null };
 }
 
 export async function createRun(projectId: string, mockApiId: string, id: string, traceId: string) {

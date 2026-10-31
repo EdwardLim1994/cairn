@@ -26,6 +26,8 @@ import {
   mockApiRunResponseSchema,
   mockApiUpdateRequestSchema,
   mockApiUpdateResponseSchema,
+  mockApiSettingsSaveRequestSchema,
+  mockApiSettingsSaveResponseSchema,
 } from "#shared/api/mock-apis";
 import {
   logListRequestSchema,
@@ -111,6 +113,14 @@ export function createApiClient(transport: ApiTransport) {
       ),
     listMockApis: () =>
       send("/api/mock-apis", "GET", undefined, mockApiListRequestSchema, mockApiListResponseSchema),
+    saveMockApiSettings: (input: z.input<typeof mockApiSettingsSaveRequestSchema>) =>
+      send(
+        "/api/mock-api-settings",
+        "PUT",
+        input,
+        mockApiSettingsSaveRequestSchema,
+        mockApiSettingsSaveResponseSchema,
+      ),
     createMockApi: (input: z.input<typeof mockApiCreateRequestSchema>) =>
       send(
         "/api/mock-apis",

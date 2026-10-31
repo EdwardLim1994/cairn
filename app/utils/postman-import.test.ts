@@ -22,7 +22,7 @@ describe("Postman path parameter import", () => {
     expect(result.drafts).toHaveLength(2);
     expect(result.drafts[0]?.pathParameters).toEqual({ itemId: "a/b" });
     expect(result.drafts[1]?.pathParameters).toEqual({ itemId: "{{itemId}}" });
-    expect(result.warnings).toEqual([]);
+    expect(result.warnings).toEqual(['"Variable": Uses missing variable {{itemId}}.']);
   });
 
   it("normalizes trailing slashes from the service URL and route paths", () => {
@@ -125,7 +125,10 @@ describe("Postman path parameter import", () => {
         },
       ],
     );
-    expect(result.drafts).toEqual([]);
+    expect(result.drafts).toHaveLength(3);
+    expect(
+      result.drafts.every(({ targetEndpointId, active }) => !targetEndpointId && !active),
+    ).toBe(true);
     expect(result.warnings).toHaveLength(4);
     expect(result.warnings.join("\n")).toContain("URL did not match");
     expect(result.warnings.join("\n")).toContain("matching endpoint is not REST");
@@ -141,5 +144,89 @@ describe("Postman path parameter import", () => {
     expect(() => parsePostmanCollection(JSON.stringify({ info: {}, item: {} }), [])).toThrow(
       "This is not a Postman collection",
     );
+  });
+
+  it("retains enabled explicit headers and warns about disabled, protected, and inherited behavior", () => {
+    const result = parsePostmanCollection(
+      JSON.stringify({
+        info: { name: "headers" },
+        auth: { type: "bearer" },
+        event: [{ listen: "prerequest", script: { exec: ["do work"] } }],
+        item: [
+          {
+            name: "Get order",
+            request: {
+              method: "GET",
+              url: "http://localhost:8080/orders",
+              header: [
+                { key: "X-Tenant", value: "{{tenant}}" },
+                { key: "X-Disabled", value: "ignored", disabled: true },
+                { key: "traceparent", value: "forbidden" },
+              ],
+            },
+          },
+        ],
+      }),
+      [
+        {
+          baseUrl: "http://localhost:8080",
+          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+        },
+      ],
+    );
+    expect(result.drafts[0]).toMatchObject({
+      targetEndpointId: "endpoint-1",
+      active: false,
+      headerTemplateId: null,
+      customHeaders: [{ name: "X-Tenant", value: "{{tenant}}" }],
+    });
+    expect(result.warnings.join("\n")).toContain("inherited authorization");
+    expect(result.warnings.join("\n")).toContain("scripts");
+    expect(result.warnings.join("\n")).toContain("traceparent");
+  });
+
+  it("matches with current variables while preserving original URL metadata and retries unresolved drafts", async () => {
+    const services = [
+      {
+        baseUrl: "http://localhost:8080",
+        endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+      },
+    ];
+    const imported = parsePostmanCollection(
+      JSON.stringify({
+        info: { name: "variables" },
+        item: [{ name: "Get order", request: { method: "GET", url: "{{base}}/orders" } }],
+      }),
+      services,
+    );
+    expect(imported.drafts[0]?.targetEndpointId).toBeNull();
+    const { retryUnmatchedPostmanDrafts } = await import("./postman-import");
+    const retried = retryUnmatchedPostmanDrafts(imported.drafts, services, [
+      { name: "base", value: "http://localhost:8080" },
+    ]);
+    expect(retried[0]).toMatchObject({
+      targetEndpointId: "endpoint-1",
+      importUrl: "{{base}}/orders",
+    });
+    expect(retried[0]?.importUrl).not.toContain("localhost");
+  });
+
+  it("uses current Cairn values before collection fallback for URL matching", () => {
+    const result = parsePostmanCollection(
+      JSON.stringify({
+        info: { name: "variables" },
+        variable: [{ key: "base", value: "http://wrong.example" }],
+        item: [{ name: "Get order", request: { method: "GET", url: "{{base}}/orders" } }],
+      }),
+      [
+        {
+          baseUrl: "http://localhost:8080",
+          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+        },
+      ],
+      [{ name: "base", value: "http://localhost:8080" }],
+    );
+    expect(result.drafts[0]?.targetEndpointId).toBe("endpoint-1");
+    expect(result.drafts[0]?.importUrl).toBe("{{base}}/orders");
   });
 });

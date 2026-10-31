@@ -6,12 +6,15 @@ import type {
   EnvironmentVariableValues,
   MockApiDraft,
   MockApiRunResult,
+  HeaderTemplateDraft,
 } from "../models/mock-api";
 
 export const useMockApiStore = defineStore("mockApis", () => {
   const mockApis = ref<CanvasGetResponse["mockApis"]>([]);
   const mockDraft = ref<MockApiDraft[]>([]);
   const environmentVariables = ref<EnvironmentVariable[]>([]);
+  const headerTemplates = ref<HeaderTemplateDraft[]>([]);
+  const savedHeaderTemplates = ref<HeaderTemplateDraft[]>([]);
   const savedEnvironmentVariableIds = ref<string[]>([]);
   const savedEnvironmentVariableValues = ref<EnvironmentVariableValues>({});
   const runningMockId = ref<string | null>(null);
@@ -25,6 +28,18 @@ export const useMockApiStore = defineStore("mockApis", () => {
   }
   function setEnvironmentVariables(value: EnvironmentVariable[]) {
     environmentVariables.value = value;
+  }
+  function setHeaderTemplates(value: HeaderTemplateDraft[]) {
+    const clone = () =>
+      value.map((item) => ({ ...item, headers: item.headers.map((row) => ({ ...row })) }));
+    headerTemplates.value = clone();
+    savedHeaderTemplates.value = clone();
+  }
+  function restoreHeaderTemplates() {
+    headerTemplates.value = savedHeaderTemplates.value.map((item) => ({
+      ...item,
+      headers: item.headers.map((row) => ({ ...row })),
+    }));
   }
   function setSavedEnvironmentVariableIds(value: string[]) {
     savedEnvironmentVariableIds.value = value;
@@ -56,6 +71,8 @@ export const useMockApiStore = defineStore("mockApis", () => {
     mockApis,
     mockDraft,
     environmentVariables,
+    headerTemplates,
+    savedHeaderTemplates,
     savedEnvironmentVariableIds,
     savedEnvironmentVariableValues,
     runningMockId,
@@ -63,6 +80,8 @@ export const useMockApiStore = defineStore("mockApis", () => {
     setMockApis,
     setMockDraft,
     setEnvironmentVariables,
+    setHeaderTemplates,
+    restoreHeaderTemplates,
     setSavedEnvironmentVariableIds,
     setSavedEnvironmentVariableValues,
     addMockDraft,

@@ -73,12 +73,42 @@ export const mockApis = mysqlTable(
       () => serviceEndpoints.id,
       { onDelete: "set null" },
     ),
+    headerTemplateId: varchar("header_template_id", { length: 36 }).references(
+      () => headerTemplates.id,
+      { onDelete: "set null" },
+    ),
+    customHeaders: json("custom_headers")
+      .$type<Array<{ name: string; value: string }>>()
+      .notNull()
+      .default([]),
+    active: boolean("active").notNull().default(true),
+    importMethod: varchar("import_method", { length: 10 }),
+    importUrl: text("import_url"),
+    matchUrl: text("match_url"),
     pathParameters: json("path_parameters").$type<Record<string, string>>().notNull().default({}),
     requestJson: json("request_json").$type<unknown>().notNull(),
     description: text("description").notNull().default(""),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("mock_apis_project_idx").on(table.projectId)],
+);
+
+export const headerTemplates = mysqlTable(
+  "header_templates",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    headers: json("headers").$type<Array<{ name: string; value: string }>>().notNull().default([]),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("header_templates_project_name_unique").on(table.projectId, table.name),
+    index("header_templates_project_idx").on(table.projectId),
+  ],
 );
 
 export const environmentVariables = mysqlTable(

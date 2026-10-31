@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import { resolveJsonVariables } from "./environment-variables";
+import {
+  findVariableReferences,
+  resolveJsonVariables,
+  resolveStringVariables,
+} from "./environment-variables";
 import { resolveEndpointPath } from "./mock-api-paths";
 import { validateEndpointPathParameters } from "./mock-api-validation";
 import { environmentVariableInput } from "./environment-variables";
@@ -22,6 +26,22 @@ describe("shared environment variable resolution", () => {
 
   it("interpolates scalar values inside strings", () => {
     expect(resolveJsonVariables("count={{count}}", variables)).toBe("count=3");
+  });
+
+  it("resolves header strings and accepts defined empty values", () => {
+    expect(resolveStringVariables("Bearer {{token}}", new Map([["token", "abc"]]))).toBe(
+      "Bearer abc",
+    );
+    expect(resolveStringVariables("{{empty}}", new Map([["empty", ""]]))).toBe("");
+  });
+
+  it("collects references from nested JSON strings", () => {
+    expect(
+      findVariableReferences({
+        headers: ["Bearer {{token}}"],
+        nested: { body: "{{tenant}}/{{token}}" },
+      }),
+    ).toEqual(["token", "tenant", "token"]);
   });
 
   it("encodes substituted path values as one segment", () => {

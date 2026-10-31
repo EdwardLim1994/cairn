@@ -1,20 +1,29 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { MockApiRunResponse } from "#shared/api/mock-apis";
-import { MockApiNotFoundError } from "../../repositories/mock-apis/errors";
+import { MockApiNotFoundError, MockApiNotReadyError } from "../../repositories/mock-apis/errors";
 import { resolveJsonVariables } from "../../utils/environment-variables";
 import { resolveEndpointPath } from "../../utils/mock-api-paths";
 import { getOutboundUrl } from "../../utils/outbound-url";
+import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
+import { resolveHeaderRows } from "../../utils/headers";
 
 type ExecutionTarget = {
   mockApiId: string;
-  endpointId: string;
-  method: string;
-  url: string;
+  endpointId: string | null;
+  targetEndpointId: string | null;
+  endpointUrl: string | null;
+  method: string | null;
+  url: string | null;
   requestJson: unknown;
   pathParameters: Record<string, string> | null;
+  active: boolean;
+  headerTemplateId: string | null;
+  headerTemplateExists: boolean;
+  headerTemplateHeaders: Array<{ name: string; value: string }> | null;
+  customHeaders: Array<{ name: string; value: string }>;
   mockApiName: string;
-  baseUrl: string;
-  serviceName: string;
+  baseUrl: string | null;
+  serviceName: string | null;
 };
 
 export function createRunMockApiUseCase(dependencies: {
@@ -52,15 +61,36 @@ export function createRunMockApiUseCase(dependencies: {
   return async (id: string): Promise<MockApiRunResponse> => {
     const projectId = await dependencies.ensureProject();
     const target = await dependencies.getTarget(projectId, id);
-    if (!target) throw new MockApiNotFoundError("Mock API or selected endpoint not found");
+    if (!target) throw new MockApiNotFoundError("Mock API not found");
+    if (!target.active) throw new MockApiNotReadyError("Mock API is inactive");
+
+    const variables = new Map(
+      (await dependencies.getVariables(projectId)).map(({ name, value }) => [name, value]),
+    );
+    const readiness = evaluateMockApiReadiness(
+      {
+        targetEndpointId: target.targetEndpointId,
+        headerTemplateId: target.headerTemplateId,
+        headerTemplateExists: target.headerTemplateExists,
+        pathParameters: target.pathParameters ?? {},
+        requestJson: target.requestJson,
+        customHeaders: target.customHeaders,
+        active: target.active,
+      },
+      target.endpointUrl,
+      target.headerTemplateHeaders ?? [],
+      variables,
+    );
+    if (readiness.status !== "ready")
+      throw new MockApiNotReadyError(readiness.reasons.map(({ message }) => message).join("; "));
+    if (!target.method || !target.url || !target.baseUrl || !target.serviceName)
+      throw new MockApiNotReadyError("Selected service endpoint is unavailable");
 
     const runId = (dependencies.newRunId ?? randomUUID)();
     const { traceId, spanId } = dependencies.newTraceIds?.() ?? {
       traceId: randomBytes(16).toString("hex"),
       spanId: randomBytes(8).toString("hex"),
     };
-    await dependencies.createRun(projectId, id, runId, traceId);
-
     const timeoutMs = dependencies.timeoutMs();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -70,11 +100,11 @@ export function createRunMockApiUseCase(dependencies: {
         await dependencies.addFailureLog({
           projectId,
           traceId,
-          serviceName: target.serviceName,
+          serviceName: target.serviceName!,
           mockApiName: target.mockApiName,
           mockApiId: id,
           runId,
-          method: target.method,
+          method: target.method!,
           url: targetUrl,
           responseStatus,
           message,
@@ -85,21 +115,21 @@ export function createRunMockApiUseCase(dependencies: {
     };
 
     try {
-      const variables = new Map(
-        (await dependencies.getVariables(projectId)).map(({ name, value }) => [name, value]),
-      );
       const resolvedPath = resolveEndpointPath(target.url, target.pathParameters ?? {}, variables);
       targetUrl = getOutboundUrl(resolvedPath, target.baseUrl).toString();
       const isGet = target.method === "GET";
       const requestJson = isGet
         ? target.requestJson
         : resolveJsonVariables(target.requestJson, variables);
+      const headers = new Headers(
+        resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
+      );
+      headers.set("traceparent", `00-${traceId}-${spanId}-01`);
+      if (!isGet && !headers.has("content-type")) headers.set("content-type", "application/json");
+      await dependencies.createRun(projectId, id, runId, traceId);
       const response = await dependencies.fetch(targetUrl, {
         method: target.method,
-        headers: {
-          traceparent: `00-${traceId}-${spanId}-01`,
-          ...(isGet ? {} : { "content-type": "application/json" }),
-        },
+        headers,
         ...(isGet ? {} : { body: JSON.stringify(requestJson) }),
         signal: controller.signal,
       });
