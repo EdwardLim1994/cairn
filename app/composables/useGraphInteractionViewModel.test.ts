@@ -23,7 +23,7 @@ describe("graph interaction view model", () => {
       editService: vi.fn(),
     });
     const graph = document.createElement("div");
-    graph.className = "graph-flow";
+    graph.className = "app__graph-flow";
     const child = document.createElement("div");
     graph.append(child);
     document.body.append(graph);

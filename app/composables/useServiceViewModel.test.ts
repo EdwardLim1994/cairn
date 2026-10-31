@@ -69,7 +69,9 @@ describe("service view model", () => {
       loadCanvas: async () => void events.push("load-canvas"),
       closeSettings: () => events.push("close"),
       frameworkLabel: (framework: string) => (framework.includes(".net") ? ".NET" : framework),
-      onError: (message: string) => errors.push(message),
+      onError: (message: string) => {
+        if (message) errors.push(message);
+      },
       onImportWarnings: (warnings: string[]) => warningBatches.push(warnings),
     };
     return { vm: useServiceViewModel(options), ...options, calls, events, errors, warningBatches };
