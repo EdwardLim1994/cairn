@@ -62,8 +62,8 @@ const nuxtUiStubs = {
                         {
                           "data-menu-item": "",
                           role: "menuitem",
-                          class: ["app__filter-option", item.class],
-                          "aria-pressed": String(item.class?.includes("selected")),
+                          class: [props.ui?.item, item.class],
+                          "aria-pressed": String(item.class?.includes("accent-soft")),
                           onClick: (event: Event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -110,7 +110,10 @@ describe("LogsPanel", () => {
       height: 280,
       formatTime: () => "12:00:00",
     });
-    await wrapper.get(".app__logs-toggle").trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Logs"))!
+      .trigger("click");
     expect(wrapper.emitted("update:open")).toEqual([[true]]);
     expect(wrapper.text()).toContain("Logs");
   });
@@ -128,12 +131,11 @@ describe("LogsPanel", () => {
     });
     expect(wrapper.text()).toContain("Rejected order");
     await wrapper.get('[aria-label="Filter by service"]').trigger("click");
-    await wrapper
-      .get(".app__log-service-options--service [role=menuitem]:nth-child(3)")
-      .trigger("click");
+    await wrapper.get('[role="menu"] [role="menuitem"]:nth-child(3)').trigger("click");
     await wrapper.get('[aria-label="Filter by severity"]').trigger("click");
     await wrapper
-      .get(".app__log-service-options--severity [role=menuitem]:nth-child(2)")
+      .findAll('[role="menu"]')[1]!
+      .get('[role="menuitem"]:nth-child(2)')
       .trigger("click");
     await wrapper.get('[aria-label="Refresh logs"]').trigger("click");
     await wrapper.get('[aria-label="Resize logs panel"]').trigger("keydown", { key: "ArrowUp" });
@@ -159,11 +161,9 @@ describe("LogsPanel", () => {
     });
 
     await wrapper.get('[aria-label="Filter by service"]').trigger("click");
-    await wrapper
-      .get(".app__log-service-options--service [role=menuitem]:nth-child(1)")
-      .trigger("click");
+    await wrapper.get('[role="menu"] [role="menuitem"]:nth-child(1)').trigger("click");
 
     expect(wrapper.emitted("update:serviceFilter")?.at(-1)?.[0]).toEqual([]);
-    expect(wrapper.find(".app__log-service-options").exists()).toBe(true);
+    expect(wrapper.find('[role="menu"]').exists()).toBe(true);
   });
 });

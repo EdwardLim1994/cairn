@@ -1,4 +1,4 @@
-import { resolveJsonVariables } from "./environment-variables";
+import { resolveJsonVariables } from "#shared/utils/environment-variables";
 
 function scalarText(value: unknown) {
   if (typeof value === "string") return value;

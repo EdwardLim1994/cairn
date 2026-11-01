@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { MockApiRunResponse } from "#shared/api/mock-apis";
 import { MockApiNotFoundError, MockApiNotReadyError } from "../../repositories/mock-apis/errors";
-import { resolveJsonVariables } from "../../utils/environment-variables";
+import { resolveJsonVariables } from "#shared/utils/environment-variables";
 import { resolveEndpointPath } from "../../utils/mock-api-paths";
 import { getOutboundUrl } from "../../utils/outbound-url";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";

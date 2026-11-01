@@ -32,11 +32,11 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Cairn project context
 
-Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. The app uses Tailwind utilities and native CSS nesting in `app/app.vue`. Keep app-specific selectors in BEM form (`app__element`, `app__element--modifier`); leave Tailwind utility and third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
+Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. Prefer Tailwind CSS v4 utilities in component templates for visual properties such as layout, spacing, typography, sizing, borders, and states, keeping those choices next to the elements they affect. Keep shared theme tokens, global resets, and custom or third-party integration styles in `app/app.vue` where utility classes are not a good fit. Use app-specific BEM classes (`app__element`, `app__element--modifier`) only when needed for semantic or state hooks, custom selectors, pseudo-elements, or integrations; leave third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
 
 ### UI components
 
-- Prefer Nuxt UI components for generic buttons, inputs, selects, dropdowns, accordions, and alerts. Use their `class` and `ui` props to apply Cairn's existing BEM selectors and theme tokens rather than rebuilding generic interactions.
+- Prefer Nuxt UI components for generic buttons, inputs, selects, dropdowns, accordions, alerts, dialogs, and slideovers. Use their `class` and `ui` props for Tailwind utilities and theme tokens; add BEM classes only when a semantic hook or custom selector is needed rather than rebuilding generic interactions. Preserve Cairn-specific state, dismissal, and save/discard behavior when adopting them.
 - Keep thin Cairn wrappers when they connect a Nuxt UI component to app-specific state or events. Do not wrap Nuxt UI only to rename its API.
 - Keep Vue Flow canvas/nodes and the CodeMirror request editor as Cairn-specific components; their behavior is domain-specific and should not be replaced with generic UI controls.
 - Nuxt UI is registered through `@nuxt/ui` in `nuxt.config.ts`, with its Tailwind styles imported in `app/app.vue`. Component tests that mount panels outside Nuxt should stub the Nuxt UI controls and verify the panel's emitted intents and model updates.

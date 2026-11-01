@@ -7,6 +7,7 @@ const props = defineProps<{
   subtitle?: string;
   deleteLabel: string;
   open?: boolean;
+  compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -26,19 +27,25 @@ function updateOpen(value: string | string[] | undefined) {
 </script>
 
 <template>
-  <div :id="id" class="app__endpoint-form-card" :data-open="Boolean(props.open)">
+  <div
+    :id="id"
+    class="relative flex flex-col rounded-xl border border-[var(--border)] bg-[var(--panel2)]"
+    :class="[
+      props.compact ? 'gap-0 px-2 py-2' : 'gap-2.5 p-3',
+      !props.open && (props.compact ? 'min-h-12 justify-center' : 'min-h-14 justify-center'),
+    ]"
+  >
     <UButton
       type="button"
       color="error"
       variant="outline"
-      class="app__endpoint-delete-button app__endpoint-card-delete"
+      class="absolute z-[1] grid size-6 shrink-0 place-items-center rounded-md border border-[var(--danger)] bg-transparent p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+      :class="props.compact ? 'left-2 top-3' : 'left-3 top-4'"
       :aria-label="deleteLabel"
       :title="deleteLabel"
       @click.stop.prevent="emit('delete')"
     >
-      <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
-      </svg>
+      <UIcon name="i-lucide-trash" class="size-4" aria-hidden="true" />
     </UButton>
     <UAccordion
       :items="items"
@@ -47,20 +54,22 @@ function updateOpen(value: string | string[] | undefined) {
       :unmount-on-hide="false"
       :model-value="props.open ? 'settings-card' : undefined"
       :ui="{
-        root: 'app__endpoint-accordion',
-        item: 'app__endpoint-accordion-item',
-        trigger: 'app__endpoint-form-summary',
-        label: 'app__endpoint-summary-title',
-        trailingIcon: 'app__settings-accordion-chevron',
-        content: 'app__endpoint-accordion-content',
-        body: 'app__endpoint-accordion-body',
+        root: 'w-full',
+        item: 'w-full border-0',
+        trigger: 'flex min-h-8 w-full cursor-pointer items-center gap-2 !py-0 pl-[30px] text-left',
+        label: 'flex min-w-0 flex-1 items-center',
+        trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+        content: 'pt-2.5',
+        body: 'flex w-full flex-col gap-2.5',
       }"
       @update:model-value="updateOpen"
     >
       <template #default>
-        <div class="app__endpoint-summary-copy">
+        <div class="flex min-w-0 flex-1 flex-col">
           <strong>{{ title }}</strong>
-          <span v-if="subtitle">{{ subtitle }}</span>
+          <span v-if="subtitle" class="truncate text-[10px] text-[var(--muted)]">{{
+            subtitle
+          }}</span>
         </div>
       </template>
       <template #body>

@@ -4,41 +4,49 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
 </script>
 
 <template>
-  <header class="app__topbar app__surface">
-    <div class="app__brand-mark">SG</div>
-    <div class="app__brand"><strong>Cairn</strong><span>DATA FLOW OBSERVABILITY</span></div>
-    <div class="app__top-actions">
-      <span class="app__project-label"><i></i> {{ serviceCount }} services</span>
+  <header
+    class="app__surface absolute left-4 right-4 top-3.5 z-30 flex h-[62px] items-center gap-3 rounded-2xl px-3.5 max-[720px]:left-2 max-[720px]:right-2 max-[720px]:top-2 max-[720px]:h-[54px] max-[720px]:px-[9px]"
+  >
+    <div
+      class="grid size-[34px] place-items-center rounded-lg bg-[var(--accent)] font-mono text-xs font-semibold text-[var(--accent-ink)]"
+    >
+      SG
+    </div>
+    <div class="flex flex-col leading-[1.1]">
+      <strong class="text-sm">Cairn</strong
+      ><span class="mt-1 text-[9px] tracking-widest text-[var(--muted)] max-[720px]:hidden"
+        >DATA FLOW OBSERVABILITY</span
+      >
+    </div>
+    <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <span class="px-2 text-xs text-[var(--muted)] max-[720px]:hidden"
+        ><i class="mr-1.5 inline-block size-[7px] rounded-full bg-[#15966f]"></i>
+        {{ serviceCount }} services</span
+      >
       <UButton
         type="button"
         color="neutral"
         variant="ghost"
-        class="app__icon-button"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
         :aria-label="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
         :title="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
         @click.stop="emit('toggleAll')"
       >
-        <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path v-if="allNodesCollapsed" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
-          <path v-else d="M8 8H3V3m13 5h5V3M3 16h5v5m13-5h-5v5" />
-        </svg>
+        <UIcon
+          :name="allNodesCollapsed ? 'i-lucide-expand' : 'i-lucide-minimize-2'"
+          class="size-4"
+          aria-hidden="true"
+        />
       </UButton>
       <UButton
         type="button"
         color="neutral"
         variant="ghost"
-        class="app__icon-button"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
         :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
         @click.stop="emit('toggleTheme')"
       >
-        <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle v-if="dark" cx="12" cy="12" r="4" />
-          <path
-            v-if="dark"
-            d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
-          />
-          <path v-else d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z" />
-        </svg>
+        <UIcon :name="dark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-4" aria-hidden="true" />
       </UButton>
     </div>
   </header>

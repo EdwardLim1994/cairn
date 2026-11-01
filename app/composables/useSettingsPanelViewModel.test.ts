@@ -35,19 +35,24 @@ describe("settings panel view model", () => {
     expect(context.syncNodes).toHaveBeenCalledOnce();
   });
 
-  it("keeps clicks inside a panel open and closes the framework dropdown outside its control", () => {
+  it("keeps the framework dropdown open inside its control and closes it outside", () => {
     const context = setup();
-    const panel = document.createElement("div");
-    panel.className = "app__side-dialog";
+    const control = document.createElement("div");
+    control.className = "app__framework-select";
     const child = document.createElement("button");
-    panel.append(child);
-    document.body.append(panel);
-    const event = new PointerEvent("pointerdown", { bubbles: true });
-    child.dispatchEvent(event);
-    context.model.closeSettingsOutside(event);
+    control.append(child);
+    document.body.append(control);
+    const insideEvent = new PointerEvent("pointerdown", { bubbles: true });
+    child.dispatchEvent(insideEvent);
+    context.model.closeSettingsOutside(insideEvent);
     expect(context.serviceDialog.value).toBe(true);
+    expect(context.frameworkMenuOpen.value).toBe(true);
+
+    const outsideEvent = new PointerEvent("pointerdown", { bubbles: true });
+    document.body.dispatchEvent(outsideEvent);
+    context.model.closeSettingsOutside(outsideEvent);
     expect(context.frameworkMenuOpen.value).toBe(false);
-    document.body.removeChild(panel);
+    document.body.removeChild(control);
   });
 
   it("keeps the settings panel and framework dropdown open for its portaled options", () => {

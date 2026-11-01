@@ -36,6 +36,52 @@ function formControlStub(tag: "input" | "textarea" | "select") {
 }
 
 const settingsUiStubs = {
+  USlideover: defineComponent({
+    name: "USlideover",
+    props: { open: Boolean, side: String, close: [Boolean, Object], content: Object, ui: Object },
+    emits: ["update:open"],
+    setup(props, { emit, slots }) {
+      return () =>
+        h(
+          "div",
+          {
+            class: props.ui?.overlay,
+            onClick: (event: MouseEvent) => {
+              if (event.target !== event.currentTarget) return;
+              const outsideEvent = new Event("interactOutside", { cancelable: true });
+              (props.content?.onInteractOutside as ((event: Event) => void) | undefined)?.(
+                outsideEvent,
+              );
+              if (!outsideEvent.defaultPrevented) emit("update:open", false);
+            },
+          },
+          [
+            h(
+              "section",
+              {
+                ...props.content,
+                class: props.ui?.content,
+                role: "dialog",
+                "aria-modal": "true",
+                onKeydown: (event: KeyboardEvent) => {
+                  if ((event.key === "Escape" || event.keyCode === 27) && props.open) {
+                    emit("update:open", false);
+                  }
+                },
+              },
+              [
+                h("header", { class: props.ui?.header }, [
+                  ...(slots.title?.() ?? []),
+                  ...(slots.description?.() ?? []),
+                ]),
+                h("div", { class: props.ui?.body }, slots.body?.()),
+                h("footer", { class: props.ui?.footer }, slots.footer?.()),
+              ],
+            ),
+          ],
+        );
+    },
+  }),
   UButton: defineComponent({
     inheritAttrs: false,
     props: { type: String },
@@ -170,10 +216,14 @@ describe("MockApiSettingsPanel", () => {
       },
       global: { components: settingsUiStubs },
     });
-    await wrapper.get('[aria-label="Mock API settings"]').trigger("click");
+    await wrapper
+      .findAll("div")
+      .find((node) => node.classes().includes("fixed"))!
+      .trigger("click");
     expect(wrapper.emitted("discard")).toBeUndefined();
-    await wrapper.findAll(".app__endpoint-form-summary")[0]!.trigger("click");
-    await wrapper.findAll(".app__endpoint-form-summary")[1]!.trigger("click");
+    const closedAccordionTriggers = wrapper.findAll('button[aria-expanded="false"]');
+    await closedAccordionTriggers[0]!.trigger("click");
+    await closedAccordionTriggers[1]!.trigger("click");
     expect(wrapper.text()).toContain("Tenant headers");
     expect(wrapper.find('input[aria-label="Custom header name"]').exists()).toBe(true);
     expect(wrapper.find("#mock-api-template-mock-1").exists()).toBe(true);

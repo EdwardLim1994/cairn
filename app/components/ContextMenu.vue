@@ -17,9 +17,9 @@ const items = [
     v-model:open="open"
     :items="items"
     :ui="{
-      content: 'app__context-menu app__surface',
-      item: 'app__context-menu-item',
-      itemLeadingIcon: 'app__context-menu-icon',
+      content: 'app__surface fixed z-[60] min-w-[180px] rounded-xl p-1',
+      item: 'w-full rounded-lg px-2.5 py-2 text-left text-xs text-[var(--text)] hover:bg-[var(--panel2)] data-[highlighted]:bg-[var(--panel2)]',
+      itemLeadingIcon: 'text-[var(--muted)]',
     }"
   >
     <slot />

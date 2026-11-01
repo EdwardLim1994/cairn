@@ -1,11 +1,6 @@
 import { createError } from "h3";
 import { record } from "./graph-validation";
 import { findVariableReferences } from "#shared/utils/environment-variables";
-export {
-  findVariableReferences,
-  resolveJsonVariables,
-  resolveStringVariables,
-} from "#shared/utils/environment-variables";
 
 const variableName = /^[A-Za-z_]\w*$/;
 

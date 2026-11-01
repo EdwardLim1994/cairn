@@ -35,9 +35,9 @@ describe("MockApiGraphNode", () => {
       global: { stubs: { Handle: true } },
     });
 
-    await wrapper.get(".app__run-button").trigger("click");
-    await wrapper.get(".app__mock-endpoint-link").trigger("click");
-    await wrapper.get(".app__collapse-connections").trigger("click");
+    await wrapper.get('[aria-label="Run List orders"]').trigger("click");
+    await wrapper.get('[aria-label="Open endpoint for List orders"]').trigger("click");
+    await wrapper.get('[aria-label="Hide outgoing connections"]').trigger("click");
 
     expect(wrapper.emitted("run")?.[0]?.[0]).toMatchObject(entry);
     expect(wrapper.emitted("open")).toEqual([["mock-1"]]);
@@ -58,7 +58,7 @@ describe("MockApiGraphNode", () => {
     });
     expect(
       wrapper
-        .findAll(".app__run-button")
+        .findAll('button[aria-label^="Run "]')
         .every((button) => button.attributes("disabled") !== undefined),
     ).toBe(true);
   });

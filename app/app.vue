@@ -372,7 +372,7 @@ onUnmounted(() => {
 <template>
   <main
     class="relative h-screen min-h-[620px] overflow-hidden text-sm leading-[1.4] app"
-    :class="{ 'app--dark': dark, 'app--logs-open': logsOpen }"
+    :class="{ 'app--dark': dark }"
   >
     <AppToolbar
       :service-count="services.length"
@@ -382,7 +382,7 @@ onUnmounted(() => {
       @toggle-theme="dark = !dark"
     />
 
-    <section class="app__canvas-shell" @contextmenu="handleCanvasContextMenu">
+    <section class="absolute inset-0" @contextmenu="handleCanvasContextMenu">
       <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">
         <GraphCanvas
           ref="graphCanvas"
@@ -400,16 +400,23 @@ onUnmounted(() => {
           @run-mock-api="runMock"
         />
       </ContextMenu>
-      <div v-if="loading" class="app__loading-banner app__surface">Loading saved graph...</div>
+      <div
+        v-if="loading"
+        class="app__surface absolute left-1/2 top-[86px] -translate-x-1/2 rounded-lg px-3 py-2 text-[11px] text-[var(--muted)]"
+      >
+        Loading saved graph...
+      </div>
       <AppToastStack
         :error-message="errorMessage"
         :warnings="importWarnings"
         @dismiss-error="errorMessage = ''"
         @dismiss-warning="dismissImportWarning"
       />
-      <div class="app__canvas-hint app__surface">
-        <kbd>Right click</kbd> to add a service <span> | </span> Drag from a node to an endpoint to
-        connect
+      <div
+        class="app__surface pointer-events-none absolute bottom-5 left-[72px] rounded-lg px-3 py-2 text-[10px] text-[var(--muted)] max-[720px]:hidden"
+      >
+        <kbd class="rounded border border-[var(--border)] px-1 text-[var(--text)]">Right click</kbd>
+        to add a service <span class="px-1"> | </span> Drag from a node to an endpoint to connect
       </div>
     </section>
 
@@ -596,123 +603,6 @@ body {
   box-shadow: var(--shadow);
 }
 
-.app__topbar {
-  @apply absolute z-30 flex items-center gap-3 rounded-2xl px-3.5;
-  left: 16px;
-  right: 16px;
-  top: 14px;
-  height: 62px;
-}
-
-.app__brand-mark,
-.app__framework-icon,
-.app__mock-icon {
-  @apply grid place-items-center rounded-lg;
-  width: 34px;
-  height: 34px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font:
-    600 12px "IBM Plex Mono",
-    monospace;
-}
-
-.app__brand {
-  @apply flex flex-col;
-  line-height: 1.1;
-}
-
-.app__brand strong {
-  @apply text-sm;
-}
-
-.app__brand span {
-  @apply mt-1 text-[9px] tracking-widest;
-  color: var(--muted);
-}
-
-.app__top-actions {
-  @apply ml-auto flex items-center gap-2;
-}
-
-.app__project-label {
-  @apply px-2 text-xs;
-  color: var(--muted);
-}
-
-.app__project-label i {
-  @apply mr-1.5 inline-block rounded-full;
-  width: 7px;
-  height: 7px;
-  background: #15966f;
-}
-
-.app__button {
-  @apply rounded-lg border px-3 py-2 text-xs font-medium;
-  border-color: var(--border);
-  background: var(--panel);
-
-  &.app__button--primary {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-color: var(--accent);
-  }
-
-  &.app__button--small {
-    @apply px-2 py-1.5 text-[11px];
-  }
-
-  &.app__button--danger-outline {
-    color: var(--danger);
-    border-color: var(--danger);
-  }
-
-  &.app__button--primary:disabled {
-    @apply opacity-60;
-  }
-}
-
-.app__button:hover,
-.app__icon-button:hover,
-.app__context-menu [role="menuitem"]:hover,
-.app__context-menu [role="menuitem"][data-highlighted],
-.app__log-row:hover {
-  background: var(--panel2);
-}
-
-.app__icon-button {
-  @apply inline-grid place-items-center rounded-lg border;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-color: var(--border);
-  background: var(--panel);
-  line-height: 1;
-
-  &.app__icon-button--danger {
-    color: var(--danger);
-  }
-
-  &.app__icon-button--danger:hover {
-    background: var(--danger-soft);
-  }
-}
-
-.app__icon {
-  display: block;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.app__canvas-shell {
-  @apply absolute inset-0;
-}
-
 .app__graph-flow {
   background-color: var(--bg);
   background-image: radial-gradient(circle, var(--dots) 1.1px, transparent 1.3px);
@@ -781,7 +671,6 @@ body {
 
 .app__graph-node--service,
 .app__graph-node--mock {
-  @apply relative rounded-2xl;
   width: 288px;
   overflow: visible;
 }
@@ -807,125 +696,8 @@ body {
   outline-offset: 2px;
 }
 
-.app__node-header {
-  @apply flex items-center gap-2 border-b px-3;
-  height: 58px;
-  border-color: var(--border);
-}
-
-.app__node-heading {
-  @apply flex min-w-0 flex-1 flex-col;
-}
-
-.app__node-heading strong {
-  @apply truncate font-semibold;
-}
-
-.app__node-name-line {
-  @apply flex min-w-0 items-center gap-1.5;
-}
-
-.app__node-heading span {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.app__collapse-connections {
-  @apply grid shrink-0 place-items-center rounded-md border;
-  width: 24px;
-  height: 24px;
-  border-color: var(--border);
-  background: var(--panel2);
-  color: var(--muted);
-}
-
-.app__collapse-connections:hover {
-  color: var(--text);
-}
-
-.app__framework-icon,
-.app__mock-icon {
-  width: 31px;
-  height: 31px;
-  border-radius: 9px;
-  background: #0b7a6c;
-  color: white;
-  font:
-    500 11px "IBM Plex Mono",
-    monospace;
-}
-
-.app__framework-icon {
-  background: transparent;
-}
-
-.app__framework-icon img {
-  width: 25px;
-  height: 25px;
-}
-
-.app__mock-icon {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.app__service-status-dot {
-  display: inline-block;
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--panel);
-  border-radius: 50%;
-
-  &.app__service-status-dot--on {
-    background: #15966f;
-  }
-
-  &.app__service-status-dot--off {
-    background: var(--danger);
-  }
-
-  &.app__service-status-dot--checking {
-    background: var(--muted);
-  }
-}
-
-.app__endpoint-heading,
-.app__section-title {
-  @apply flex items-center justify-between;
-}
-
-.app__endpoint-heading {
-  @apply px-3;
-  height: 35px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-}
-
-.app__endpoint-heading--collapsed {
-  font-size: 9px;
-  letter-spacing: 0;
-  white-space: nowrap;
-}
-
-.app__text-button {
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 11px;
-}
-
-.app__text-button.app__text-button--danger,
 .app__status-text {
   color: var(--danger);
-}
-
-.app__endpoint-row {
-  @apply relative flex items-center gap-2 border-t border-dashed px-3;
-  height: 47px;
-  border-color: var(--border);
-  min-width: 0;
 }
 
 .app__endpoint-row--collapsed {
@@ -948,47 +720,8 @@ body {
   display: none;
 }
 
-.app__endpoint-row code,
-.app__mock-copy span,
-.app__method-tag,
-.app__run-details pre,
-.app__log-row,
-.app__canvas-hint kbd {
-  font-family: "IBM Plex Mono", monospace;
-}
-
-.app__endpoint-row code {
-  @apply ml-auto truncate;
-  color: var(--muted);
-  max-width: 78px;
-  font-size: 10px;
-}
-
-.app__endpoint-name {
-  @apply max-w-24 truncate whitespace-nowrap;
-  font-size: 11px;
-}
-
-.app__endpoint-link {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.app__endpoint-link:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.app__method-tag {
-  @apply rounded px-1 py-0.5;
-  font-size: 9px;
-}
-
 .app__method-tag--get,
-.app__severity.app__severity--info {
+.app__severity--info {
   color: var(--get-fg);
   background: var(--get-bg);
 }
@@ -998,14 +731,14 @@ body {
   background: var(--post-bg);
 }
 
-.app__severity.app__severity--error,
-.app__severity.app__severity--fatal {
+.app__severity--error,
+.app__severity--fatal {
   color: var(--danger);
   background: var(--danger-soft);
 }
 
 .app__method-tag--put,
-.app__severity.app__severity--warn {
+.app__severity--warn {
   color: var(--put-fg);
   background: var(--put-bg);
 }
@@ -1020,11 +753,12 @@ body {
   background: var(--delete-bg);
 }
 
-.app__empty-endpoints,
-.app__empty-logs {
-  @apply p-5 text-center;
-  color: var(--muted);
-  font-size: 11px;
+.app__run-state--completed {
+  color: #047857;
+}
+
+.app__run-state--failed {
+  color: var(--danger);
 }
 
 .app .app__endpoint-handle,
@@ -1049,29 +783,6 @@ body {
   top: 28px;
 }
 
-.app__error-indicator {
-  @apply border-t px-3 py-2;
-  color: var(--danger);
-  border-color: var(--border);
-  font-size: 10px;
-}
-
-.app__error-mark {
-  @apply mr-1 inline-grid h-4 w-4 place-items-center rounded-full;
-  background: var(--danger-soft);
-  font-weight: 700;
-}
-
-.app__mock-row {
-  @apply relative flex items-center gap-2 border-b border-dashed px-2 py-2;
-  min-height: 62px;
-  border-color: var(--border);
-
-  &.app__mock-row--running {
-    background: var(--accent-soft);
-  }
-}
-
 .app__mock-row--collapsed {
   display: none;
 }
@@ -1093,28 +804,6 @@ body {
   display: none;
 }
 
-.app__mock-collapsed-summary {
-  @apply border-b px-3 py-3;
-  border-color: var(--border);
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.app .app__run-button {
-  @apply flex items-center justify-center rounded-full;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  margin-left: auto;
-  border: 0;
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.app__run-button:disabled {
-  @apply opacity-50;
-}
-
 .app__run-spinner {
   fill: none;
   stroke: currentColor;
@@ -1127,154 +816,6 @@ body {
   to {
     transform: rotate(360deg);
   }
-}
-
-.app__mock-copy {
-  @apply flex min-w-0 flex-1 flex-col gap-1;
-}
-
-.app__mock-copy strong,
-.app__mock-copy span {
-  @apply truncate whitespace-nowrap;
-}
-
-.app__mock-copy strong {
-  font-size: 11px;
-}
-
-.app__mock-endpoint-link {
-  @apply block w-full truncate whitespace-nowrap;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 9px;
-  text-align: left;
-}
-
-.app__mock-endpoint-link:hover {
-  color: var(--accent);
-}
-
-.app__mock-no-endpoint {
-  color: var(--muted);
-}
-
-.app__run-state {
-  @apply uppercase;
-  color: var(--muted);
-  font-size: 9px;
-
-  &.app__run-state--completed {
-    color: #047857;
-  }
-
-  &.app__run-state--failed {
-    color: var(--danger);
-  }
-}
-
-.app__canvas-hint {
-  @apply absolute rounded-lg px-3 py-2;
-  left: 72px;
-  bottom: 20px;
-  color: var(--muted);
-  font-size: 10px;
-  pointer-events: none;
-}
-
-.app__canvas-hint kbd {
-  @apply rounded border px-1;
-  border-color: var(--border);
-  color: var(--text);
-}
-
-.app__canvas-hint span {
-  @apply px-1;
-}
-
-.app__context-menu {
-  @apply fixed z-[60] rounded-xl p-1;
-  min-width: 180px;
-}
-
-.app__context-menu-item {
-  @apply w-full rounded-lg px-2.5 py-2 text-left text-xs;
-  color: var(--text);
-}
-
-.app__loading-banner {
-  @apply absolute rounded-lg px-3 py-2;
-  left: 50%;
-  top: 86px;
-  transform: translateX(-50%);
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.app__toast-stack {
-  @apply absolute z-[80] flex max-h-[60vh] flex-col gap-2 overflow-y-auto;
-  top: 88px;
-  right: 18px;
-  width: min(520px, calc(100vw - 36px));
-}
-
-.app__toast {
-  @apply flex gap-3 rounded-lg p-3 justify-between;
-  background: var(--danger-soft);
-  color: var(--danger);
-  box-shadow: var(--shadow);
-  font-size: 12px;
-}
-
-.app__toast--warning {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.app__toast button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 17px;
-}
-
-.app__logs-toggle {
-  @apply absolute z-40 flex items-center gap-2.5 rounded-full px-3.5;
-  right: 16px;
-  bottom: 16px;
-  height: 46px;
-  background: var(--panel);
-  font-size: 12px;
-
-  &.app__logs-toggle--active {
-    border-color: var(--accent);
-  }
-}
-
-.app__logs-toggle > span:first-child {
-  color: var(--accent);
-}
-
-.app__logs-toggle em {
-  color: var(--muted);
-  font-size: 10px;
-  font-style: normal;
-}
-
-.app__toggle-chevron {
-  @apply ml-auto;
-  color: var(--muted);
-}
-
-.app__logs-panel {
-  @apply absolute z-[35] flex flex-col overflow-hidden;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  height: var(--logs-panel-height, max(20vh, 200px));
-  max-height: calc(100vh - 32px);
-  border-radius: 18px;
 }
 
 .app__logs-resize-control {
@@ -1314,392 +855,6 @@ body {
   outline-offset: -2px;
 }
 
-.app__logs-panel .app__logs-toolbar {
-  padding-top: 12px;
-}
-
-.app--logs-open .app__logs-toggle {
-  display: none;
-}
-
-.app__logs-toolbar {
-  @apply flex flex-wrap items-center gap-2 border-b px-3 py-2;
-  min-height: 54px;
-  border-color: var(--border);
-}
-
-.app__logs-title {
-  @apply mr-auto flex items-baseline gap-2;
-}
-
-.app__logs-title strong {
-  font-size: 14px;
-}
-
-.app__logs-title span {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.app__control {
-  @apply w-full rounded-lg border px-2.5 py-2 text-[11px] outline-none;
-  border-color: var(--border);
-  background: var(--panel);
-}
-
-.app__control:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-.app__control--framework-select {
-  min-height: 38px;
-}
-
-.app__control--framework-select img {
-  width: 19px;
-  height: 19px;
-  flex: none;
-}
-
-.app__logs-toolbar .app__control {
-  width: auto;
-  min-width: 130px;
-  padding: 7px 9px;
-}
-
-.app__log-service-options {
-  @apply z-20 flex max-h-48 min-w-full flex-col gap-1 overflow-auto rounded-lg border p-1.5 shadow-lg;
-  border-color: var(--border);
-  background: var(--panel);
-}
-
-.app__log-service-options .app__filter-option {
-  @apply cursor-pointer whitespace-nowrap rounded px-2 py-1.5 text-left;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: 11px;
-}
-
-.app__log-service-options .app__filter-option:hover,
-.app__log-service-options .app__filter-option[data-highlighted] {
-  background: var(--panel2);
-}
-
-.app__log-service-options .app__filter-option--selected {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.app__logs-toolbar .app__control--search {
-  width: min(250px, 26vw);
-}
-
-.app__logs-list {
-  @apply flex-1 overflow-auto px-2.5 py-1.5;
-}
-
-.app__log-row {
-  @apply grid items-center gap-2.5 rounded-lg px-2 py-1;
-  min-height: 30px;
-  grid-template-columns: 80px 72px 145px minmax(0, 1fr);
-  font-size: 10px;
-}
-
-.app__log-row time {
-  color: var(--muted);
-}
-
-.app__log-row strong {
-  @apply truncate whitespace-nowrap;
-  font-weight: 500;
-}
-
-.app__severity {
-  @apply justify-self-start rounded px-1 py-0.5;
-  font-size: 9px;
-}
-
-.app__log-message {
-  @apply truncate whitespace-nowrap;
-
-  &.app__log-message--error {
-    @apply whitespace-pre-wrap break-words;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-  }
-}
-
-.app__log-row--error {
-  align-items: start;
-}
-
-.app__dialog-backdrop {
-  @apply fixed inset-0 z-[70] flex justify-end;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: rgba(20, 24, 28, 0.4);
-}
-
-.app__dialog-backdrop::backdrop {
-  background: transparent;
-}
-
-.app__side-dialog {
-  @apply flex h-full flex-col overflow-hidden;
-  width: min(520px, 100vw);
-  border-radius: 18px 0 0 18px;
-  background: var(--panel);
-}
-
-.app__dialog-header {
-  @apply flex items-center justify-between border-b px-5 py-4;
-  border-color: var(--border);
-}
-
-.app__dialog-header > div,
-.app__field,
-.app__switch-row span {
-  @apply flex flex-col;
-}
-
-.app__dialog-header strong {
-  font-size: 15px;
-}
-
-.app__dialog-header span {
-  @apply mt-1;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.app__dialog-body {
-  @apply flex flex-1 flex-col gap-3 overflow-auto px-5 py-4;
-}
-
-.app__service-config-fields {
-  @apply flex flex-col gap-0;
-}
-
-.app__dialog-footer {
-  @apply flex justify-end gap-2 border-t px-5 py-3;
-  border-color: var(--border);
-}
-
-.app__field {
-  @apply min-w-0 flex-1 gap-1;
-}
-
-.app__request-fieldset {
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.app__field > span,
-.app__field > legend {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.app__field-row {
-  @apply flex gap-2.5;
-}
-
-.app__header-row {
-  @apply grid grid-cols-[1fr_1fr_auto] items-center gap-2;
-}
-
-.app__readiness-reasons {
-  @apply list-disc pl-4;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.app__readiness-badge {
-  @apply rounded-full border px-2 py-0.5;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.app__switch-row {
-  @apply flex items-center justify-between rounded-lg border px-3 py-2.5;
-  border-color: var(--border);
-}
-
-.app__switch-row strong {
-  font-size: 11px;
-}
-
-.app__switch-row small {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.app__switch-row input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
-}
-
-.app__section-title {
-  @apply mt-1 gap-2;
-}
-
-.app__endpoint-actions {
-  @apply flex items-center gap-2;
-}
-
-.app__openapi-file-input {
-  display: none;
-}
-
-.app__section-title strong {
-  font-size: 12px;
-}
-
-.app__endpoint-form-card {
-  @apply flex flex-col gap-2.5 rounded-xl border p-3;
-  position: relative;
-  padding-bottom: 0px;
-  border-color: var(--border);
-  background: var(--panel2);
-}
-
-.app__endpoint-accordion,
-.app__endpoint-accordion-item {
-  width: 100%;
-  border: 0;
-}
-
-.app__endpoint-form-summary {
-  @apply flex w-full cursor-pointer items-center gap-2 text-left;
-  min-height: 32px;
-  padding-left: 30px;
-}
-
-.app__endpoint-summary-title {
-  @apply flex min-w-0 flex-1 items-center;
-}
-
-.app__endpoint-summary-copy {
-  @apply flex min-w-0 flex-1 flex-col;
-}
-
-.app__endpoint-summary-copy span {
-  @apply truncate;
-}
-
-.app__endpoint-delete-button {
-  @apply grid shrink-0 place-items-center rounded-md border;
-  width: 24px;
-  height: 24px;
-  border-color: var(--danger);
-  background: transparent;
-  color: var(--danger);
-}
-
-.app__endpoint-card-delete {
-  position: absolute;
-  z-index: 1;
-  top: 12px;
-  left: 12px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-}
-
-.app__endpoint-delete-button .app__icon {
-  stroke: var(--danger);
-}
-
-.app__endpoint-delete-button:hover {
-  background: var(--danger-soft);
-}
-
-.app__endpoint-form-card[data-open="false"] {
-  min-height: 56px;
-  justify-content: center;
-}
-
-.app__settings-accordion-chevron {
-  color: var(--muted);
-  transition: transform 0.15s ease;
-}
-
-.app__endpoint-accordion-content {
-  padding-top: 10px;
-}
-
-.app__endpoint-accordion-body {
-  @apply flex flex-col gap-2.5;
-}
-
-.app__endpoint-form-summary span {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.app__endpoint-form-actions {
-  @apply flex justify-end;
-}
-
-.app__code-input {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  resize: vertical;
-}
-
-.app__run-drawer {
-  @apply absolute z-30 overflow-hidden rounded-xl;
-  right: 16px;
-  top: 88px;
-  width: min(390px, calc(100vw - 32px));
-  max-height: 38vh;
-  background: var(--panel);
-}
-
-.app__run-drawer > header {
-  @apply flex items-center justify-between border-b px-3 py-2;
-  border-color: var(--border);
-}
-
-.app__run-drawer > header > div {
-  @apply flex items-center gap-2.5;
-}
-
-.app__run-drawer > header strong {
-  font-size: 12px;
-}
-
-.app__run-details {
-  @apply overflow-auto p-3;
-  max-height: calc(38vh - 42px);
-}
-
-.app__run-details pre {
-  @apply overflow-auto whitespace-pre-wrap;
-  margin: 0;
-  max-height: 150px;
-  overflow-wrap: anywhere;
-  font-size: 10px;
-}
-
-.app__run-details small {
-  @apply mt-2 block;
-  color: var(--muted);
-  font-size: 9px;
-}
-
 .app__status-text.app__status-text--error {
   font-size: 11px;
 }
@@ -1715,112 +870,9 @@ body {
 }
 
 @media (max-width: 720px) {
-  .app__topbar {
-    left: 8px;
-    right: 8px;
-    top: 8px;
-    height: 54px;
-    padding: 0 9px;
-  }
-
-  .app__brand span,
-  .app__project-label,
-  .app__top-actions .app__button--secondary {
-    display: none;
-  }
-
-  .app__top-actions {
-    gap: 5px;
-  }
-
-  .app__button {
-    padding: 7px 8px;
-    font-size: 10px;
-  }
-
-  .app__canvas-hint,
   .vue-flow__minimap {
     display: none;
   }
-
-  .app__logs-panel {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-  }
-
-  .app__logs-toolbar .app__control--search {
-    width: 100%;
-  }
-
-  .app__log-row {
-    grid-template-columns: 55px 55px 80px minmax(0, 1fr);
-    gap: 5px;
-    font-size: 9px;
-  }
-
-  .app__field-row {
-    flex-direction: column;
-  }
-
-  .app__side-dialog {
-    width: 100%;
-    border-radius: 0;
-  }
-}
-
-.app__environment-variable-section {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-}
-
-.app__environment-variable-header {
-  margin-bottom: 0.5rem;
-}
-
-.app__settings-accordion-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.app__settings-section-accordion {
-  flex: 1;
-  min-width: 0;
-}
-
-.app__settings-section-accordion-item {
-  border: 0;
-}
-
-.app__settings-accordion-content {
-  padding-top: 0.75rem;
-}
-
-.app__settings-accordion-body {
-  width: 100%;
-}
-
-.app__environment-variable-list {
-  display: grid;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.app__environment-variable-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
 }
 
 .cm-editor {

@@ -3,7 +3,7 @@ import {
   findVariableReferences,
   resolveJsonVariables,
   resolveStringVariables,
-} from "./environment-variables";
+} from "#shared/utils/environment-variables";
 import { resolveEndpointPath } from "./mock-api-paths";
 import { validateEndpointPathParameters } from "./mock-api-validation";
 import { environmentVariableInput } from "./environment-variables";

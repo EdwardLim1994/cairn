@@ -5,6 +5,53 @@ import { defineComponent, h } from "vue";
 import ServiceSettingsPanel from "./ServiceSettingsPanel.vue";
 
 const nuxtUiStubs = {
+  USlideover: defineComponent({
+    name: "USlideover",
+    props: { open: Boolean, side: String, close: [Boolean, Object], content: Object, ui: Object },
+    emits: ["update:open"],
+    setup(props, { emit, slots }) {
+      return () =>
+        h(
+          "div",
+          {
+            class: props.ui?.overlay,
+            onClick: (event: MouseEvent) => {
+              if (event.target !== event.currentTarget) return;
+              const outsideEvent = new Event("interactOutside", { cancelable: true });
+              (props.content?.onInteractOutside as ((event: Event) => void) | undefined)?.(
+                outsideEvent,
+              );
+              if (!outsideEvent.defaultPrevented) emit("update:open", false);
+            },
+          },
+          [
+            h(
+              "section",
+              {
+                ...props.content,
+                class: props.ui?.content,
+                role: "dialog",
+                "aria-modal": "true",
+                onKeydown: (event: KeyboardEvent) => {
+                  if ((event.key === "Escape" || event.keyCode === 27) && props.open) {
+                    emit("update:open", false);
+                  }
+                },
+              },
+              [
+                h("header", { class: props.ui?.header }, [
+                  ...(slots.title?.() ?? []),
+                  ...(slots.description?.() ?? []),
+                  ...(slots.actions?.() ?? []),
+                ]),
+                h("div", { class: props.ui?.body }, slots.body?.()),
+                h("footer", { class: props.ui?.footer }, slots.footer?.()),
+              ],
+            ),
+          ],
+        );
+    },
+  }),
   UButton: defineComponent({
     inheritAttrs: false,
     props: { type: String },
@@ -134,7 +181,10 @@ describe("ServiceSettingsPanel", () => {
       frameworkMenuOpen: false,
       editingServiceId: "service-1",
     });
-    await wrapper.get('[aria-label="Service settings"]').trigger("click");
+    await wrapper
+      .findAll("div")
+      .find((node) => node.classes().includes("fixed"))!
+      .trigger("click");
     expect(wrapper.emitted("discard")).toBeUndefined();
   });
 
@@ -168,9 +218,18 @@ describe("ServiceSettingsPanel", () => {
       frameworkMenuOpen: false,
       editingServiceId: "service-1",
     });
-    await wrapper.get("button.app__button--primary").trigger("click");
-    await wrapper.get("footer button.app__button--secondary").trigger("click");
-    await wrapper.get(".app__endpoint-actions button:last-child").trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Save")!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Discard")!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "+ New endpoint")!
+      .trigger("click");
     await wrapper.get('[aria-label="Remove List orders"]').trigger("click");
     await wrapper.get('[aria-label="Remove service"]').trigger("click");
 
@@ -191,7 +250,10 @@ describe("ServiceSettingsPanel", () => {
     const click = vi.spyOn(input.element as HTMLInputElement, "click");
     const file = new File(["openapi: 3.1.0"], "service.yaml", { type: "text/yaml" });
 
-    await wrapper.get("button.app__button--small").trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Import OpenAPI")!
+      .trigger("click");
     expect(click).toHaveBeenCalledOnce();
     expect((input.element as HTMLInputElement).accept).toContain(".json");
     expect((input.element as HTMLInputElement).accept).toContain(".yaml");
@@ -211,8 +273,9 @@ describe("ServiceSettingsPanel", () => {
 
     await wrapper.get('[aria-expanded="false"]').trigger("click");
 
-    expect(wrapper.findAll(".app__control")).toHaveLength(7);
-    expect(wrapper.findAll(".app__button")).toHaveLength(4);
+    expect(wrapper.findAll('input:not([type="file"])')).toHaveLength(4);
+    expect(wrapper.findAll("select")).toHaveLength(3);
+    expect(wrapper.findAll("button")).toHaveLength(6);
     expect(wrapper.find('select option[value="PATCH"]').exists()).toBe(true);
     await wrapper.get('input[placeholder="e.g. Checkout API"]').setValue("Catalog API");
     await wrapper.findAll("select").at(2)!.setValue("POST");

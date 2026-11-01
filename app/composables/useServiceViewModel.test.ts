@@ -9,6 +9,23 @@ import { mount } from "@vue/test-utils";
 import ServiceSettingsPanel from "../components/ServiceSettingsPanel.vue";
 
 const nuxtUiStubs = {
+  USlideover: defineComponent({
+    props: { ui: Object, content: Object },
+    setup(props, { slots }) {
+      return () =>
+        h("div", { class: props.ui?.overlay }, [
+          h("section", { class: props.ui?.content }, [
+            h("header", { class: props.ui?.header }, [
+              ...(slots.title?.() ?? []),
+              ...(slots.description?.() ?? []),
+              ...(slots.actions?.() ?? []),
+            ]),
+            h("div", { class: props.ui?.body }, slots.body?.()),
+            h("footer", { class: props.ui?.footer }, slots.footer?.()),
+          ]),
+        ]);
+    },
+  }),
   UButton: defineComponent({
     inheritAttrs: false,
     props: { type: String },
@@ -214,7 +231,10 @@ describe("service view model", () => {
       },
       global: { components: nuxtUiStubs },
     });
-    await wrapper.get("footer button.app__button--primary").trigger("click");
+    await wrapper
+      .findAll("footer button")
+      .find((button) => button.text() === "Save")!
+      .trigger("click");
     context.draft.value.name = "Updated Orders";
     await context.vm.saveService();
     graphStore.services[0]!.name = context.draft.value.name;
@@ -389,7 +409,10 @@ describe("service view model", () => {
     await importPromise;
     expect(context.draft.value.endpoints).toHaveLength(2);
 
-    await wrapper.get("footer button.app__button--secondary").trigger("click");
+    await wrapper
+      .findAll("footer button")
+      .find((button) => button.text() === "Discard")!
+      .trigger("click");
     expect(context.events).toContain("close");
     expect(context.calls).toEqual([]);
     expect(context.vm.editService("service-1")).toBe(true);

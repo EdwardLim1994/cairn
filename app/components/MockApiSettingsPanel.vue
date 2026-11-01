@@ -70,6 +70,14 @@ function removeHeaderRow(rows: { name: string; value: string }[], index: number)
   rows.splice(index, 1);
 }
 
+function preventOutsideDismiss(event: Event) {
+  event.preventDefault();
+}
+
+function handleOpenChange(open: boolean) {
+  if (!open) emit("discard");
+}
+
 watchEffect(() => {
   const variables = new Map(environmentVariables.value.map(({ name, value }) => [name, value]));
   for (const entry of mockDraft.value) {
@@ -95,198 +103,261 @@ watchEffect(() => {
 </script>
 
 <template>
-  <dialog
-    open
-    class="app__dialog-backdrop"
-    aria-modal="true"
-    aria-label="Mock API settings"
-    @keydown.esc.prevent="emit('discard')"
+  <USlideover
+    :open="true"
+    side="right"
+    :portal="false"
+    :close="false"
+    :content="{
+      'aria-label': 'Mock API settings',
+      onInteractOutside: preventOutsideDismiss,
+    }"
+    :ui="{
+      overlay:
+        'fixed inset-0 z-[70] flex h-full w-full max-h-none max-w-none justify-end m-0 border-0 bg-[rgba(20,24,28,0.4)] p-0 text-inherit',
+      content:
+        'z-[71] flex h-full w-[min(520px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
+      header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
+      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
+      footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
+    }"
+    @update:open="handleOpenChange"
   >
-    <section class="app__side-dialog app__surface">
-      <header class="app__dialog-header">
-        <div>
-          <strong>Mock APIs</strong><span>Calls linked to registered service endpoints</span>
-        </div>
-      </header>
-      <div class="app__dialog-body">
-        <section class="app__environment-variable-section">
-          <div class="app__section-title">
-            <strong>Shareable header templates</strong>
-            <UButton
-              type="button"
-              class="app__button app__button--secondary app__button--small"
-              @click="emit('addHeaderTemplate')"
-              >New template</UButton
-            >
-          </div>
-          <SettingsAccordionCard
-            v-for="template in headerTemplates"
-            :key="template.id"
-            :title="template.name || 'New header template'"
-            :delete-label="`Delete ${template.name || 'header template'}`"
-            @delete="emit('deleteHeaderTemplate', template)"
+    <template #title>Mock APIs</template>
+    <template #description>Calls linked to registered service endpoints</template>
+    <template #body>
+      <section class="mt-5">
+        <div class="mt-1 flex items-center justify-between gap-2">
+          <strong>Shareable header templates</strong>
+          <UButton
+            type="button"
+            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+            @click="emit('addHeaderTemplate')"
+            >New template</UButton
           >
-            <label :for="`header-template-name-${template.id}`" class="app__field">
-              <span>Name</span>
-              <UInput
-                :id="`header-template-name-${template.id}`"
-                v-model="template.name"
-                :ui="{ base: 'app__control' }"
-              />
-            </label>
-            <div v-for="(header, row) in template.headers" :key="row" class="app__header-row">
-              <UInput
-                v-model="header.name"
-                aria-label="Header name"
-                placeholder="Header"
-                :ui="{ base: 'app__control' }"
-              />
-              <UInput
-                v-model="header.value"
-                aria-label="Header value"
-                placeholder="Value or {{variable}}"
-                :ui="{ base: 'app__control' }"
-              />
-              <UButton
-                type="button"
-                aria-label="Remove header row"
-                class="app__button app__button--secondary app__button--small"
-                @click="removeHeaderRow(template.headers, row)"
-                >Remove</UButton
-              >
-            </div>
+        </div>
+        <SettingsAccordionCard
+          v-for="template in headerTemplates"
+          :key="template.id"
+          :title="template.name || 'New header template'"
+          :delete-label="`Delete ${template.name || 'header template'}`"
+          @delete="emit('deleteHeaderTemplate', template)"
+        >
+          <label
+            :for="`header-template-name-${template.id}`"
+            class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+          >
+            <span>Name</span>
+            <UInput
+              :id="`header-template-name-${template.id}`"
+              v-model="template.name"
+              :ui="{
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              }"
+            />
+          </label>
+          <div
+            v-for="(header, row) in template.headers"
+            :key="row"
+            class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
+          >
+            <UInput
+              v-model="header.name"
+              aria-label="Header name"
+              placeholder="Header"
+              :ui="{
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              }"
+            />
+            <UInput
+              v-model="header.value"
+              aria-label="Header value"
+              placeholder="Value or {{variable}}"
+              :ui="{
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              }"
+            />
             <UButton
               type="button"
-              class="app__button app__button--secondary app__button--small"
-              @click="addHeaderRow(template.headers)"
-              >Add header</UButton
+              aria-label="Remove header row"
+              class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+              @click="removeHeaderRow(template.headers, row)"
+              >Remove</UButton
             >
-          </SettingsAccordionCard>
-        </section>
-        <section class="app__environment-variable-section">
-          <div class="app__section-title app__environment-variable-header">
-            <UAccordion
-              id="shared-environment-variables-toggle"
-              class="app__settings-section-accordion"
-              :items="variableSectionItems"
-              type="single"
-              collapsible
-              :unmount-on-hide="false"
-              :model-value="variablesOpen ? 'variables' : undefined"
-              :ui="{
-                root: 'app__settings-section-accordion',
-                item: 'app__settings-section-accordion-item',
-                trigger: 'app__settings-accordion-toggle',
-                trailingIcon: 'app__settings-accordion-chevron',
-                content: 'app__settings-accordion-content',
-                body: 'app__settings-accordion-body',
-              }"
-              @update:model-value="variablesOpen = $event === 'variables'"
-            >
-              <template #default><strong>Shared environment variables</strong></template>
-              <template #body>
-                <div class="flex gap-2">
-                  <input
-                    ref="environmentFileInput"
-                    id="postman-environment-file"
-                    class="hidden"
-                    type="file"
-                    accept="application/json,.json"
-                    aria-label="Postman environment JSON"
-                    @change="emit('importEnvironment', $event)"
-                  />
-                  <UButton
-                    type="button"
-                    color="neutral"
-                    variant="outline"
-                    class="app__button app__button--secondary app__button--small"
-                    @click="environmentFileInput?.click()"
-                    >Import environment</UButton
-                  >
-                  <UButton
-                    type="button"
-                    color="neutral"
-                    variant="outline"
-                    class="app__button app__button--secondary app__button--small"
-                    :disabled="props.environmentVariablesLoading"
-                    @click="emit('addVariable')"
-                    >New variable</UButton
-                  >
-                </div>
-                <div id="shared-environment-variables-content">
-                  <div v-if="environmentVariables.length" class="app__environment-variable-list">
-                    <SettingsAccordionCard
-                      v-for="variable in environmentVariables"
-                      :key="variable.id"
-                      :id="`environment-variable-${variable.id}`"
-                      :title="variable.name || 'New variable'"
-                      :delete-label="`Delete ${variable.name || 'variable'}`"
-                      :open="props.expandedEnvironmentVariableId === variable.id"
-                      @expand="emit('openVariable', variable)"
-                      @collapse="emit('closeVariable', variable)"
-                      @delete="emit('deleteVariable', variable)"
-                    >
-                      <template v-if="props.editingEnvironmentVariableId === variable.id">
-                        <label :for="`environment-variable-name-${variable.id}`" class="app__field">
-                          <span>Name</span>
-                          <UInput
-                            :id="`environment-variable-name-${variable.id}`"
-                            v-model="variableDraft.name"
-                            :ui="{ base: 'app__control' }"
-                          />
-                        </label>
-                        <label
-                          :for="`environment-variable-value-${variable.id}`"
-                          class="app__field"
-                        >
-                          <span>Value</span>
-                          <UTextarea
-                            :id="`environment-variable-value-${variable.id}`"
-                            v-model="variableDraft.value"
-                            :ui="{ base: 'app__control' }"
-                            :rows="2"
-                          />
-                        </label>
-                        <footer class="app__environment-variable-card-footer">
-                          <UButton
-                            type="button"
-                            color="primary"
-                            class="app__button app__button--primary app__button--small"
-                            v-if="!variable.pendingCreate"
-                            @click="emit('updateVariable')"
-                          >
-                            Update
-                          </UButton>
-                        </footer>
-                      </template>
-                    </SettingsAccordionCard>
-                  </div>
-                </div>
-              </template>
-            </UAccordion>
           </div>
-        </section>
-        <div class="app__section-title app__registered-mock-api-header">
+          <UButton
+            type="button"
+            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+            @click="addHeaderRow(template.headers)"
+            >Add header</UButton
+          >
+        </SettingsAccordionCard>
+      </section>
+      <section class="mt-5">
+        <div class="text-xs">
+          <UAccordion
+            id="shared-environment-variables-toggle"
+            class="w-full min-w-0"
+            :items="variableSectionItems"
+            type="single"
+            collapsible
+            :unmount-on-hide="false"
+            :model-value="variablesOpen ? 'variables' : undefined"
+            :ui="{
+              root: 'w-full min-w-0',
+              item: 'border-0',
+              trigger:
+                'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
+              trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+              content: 'pt-3',
+              body: 'w-full',
+            }"
+            @update:model-value="variablesOpen = $event === 'variables'"
+          >
+            <template #default><strong>Shared environment variables</strong></template>
+            <template #body>
+              <div class="mb-3 flex justify-end gap-2">
+                <input
+                  ref="environmentFileInput"
+                  id="postman-environment-file"
+                  class="hidden"
+                  type="file"
+                  accept="application/json,.json"
+                  aria-label="Postman environment JSON"
+                  @change="emit('importEnvironment', $event)"
+                />
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                  @click="environmentFileInput?.click()"
+                  >Import environment</UButton
+                >
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                  :disabled="props.environmentVariablesLoading"
+                  @click="emit('addVariable')"
+                  >New variable</UButton
+                >
+              </div>
+              <div id="shared-environment-variables-content">
+                <div v-if="environmentVariables.length" class="grid gap-2">
+                  <SettingsAccordionCard
+                    v-for="variable in environmentVariables"
+                    :key="variable.id"
+                    :id="`environment-variable-${variable.id}`"
+                    :title="variable.name || 'New variable'"
+                    :delete-label="`Delete ${variable.name || 'variable'}`"
+                    :open="props.expandedEnvironmentVariableId === variable.id"
+                    @expand="emit('openVariable', variable)"
+                    @collapse="emit('closeVariable', variable)"
+                    @delete="emit('deleteVariable', variable)"
+                  >
+                    <template v-if="props.editingEnvironmentVariableId === variable.id">
+                      <label
+                        :for="`environment-variable-name-${variable.id}`"
+                        class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                      >
+                        <span>Name</span>
+                        <UInput
+                          :id="`environment-variable-name-${variable.id}`"
+                          v-model="variableDraft.name"
+                          :ui="{
+                            base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                          }"
+                        />
+                      </label>
+                      <label
+                        :for="`environment-variable-value-${variable.id}`"
+                        class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                      >
+                        <span>Value</span>
+                        <UTextarea
+                          :id="`environment-variable-value-${variable.id}`"
+                          v-model="variableDraft.value"
+                          :ui="{
+                            base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                          }"
+                          :rows="2"
+                        />
+                      </label>
+                      <footer
+                        class="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3"
+                      >
+                        <UButton
+                          type="button"
+                          color="primary"
+                          class="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-2 py-1.5 text-[11px] font-medium text-[var(--accent-ink)] disabled:opacity-60"
+                          v-if="!variable.pendingCreate"
+                          @click="emit('updateVariable')"
+                        >
+                          Update
+                        </UButton>
+                      </footer>
+                    </template>
+                  </SettingsAccordionCard>
+                </div>
+              </div>
+            </template>
+          </UAccordion>
+        </div>
+      </section>
+      <section class="mt-5">
+        <div class="text-xs">
           <UAccordion
             id="registered-mock-apis-toggle"
-            class="app__settings-section-accordion"
+            class="w-full min-w-0"
             :items="mockApiSectionItems"
             type="single"
             collapsible
             :unmount-on-hide="false"
             :model-value="apisOpen ? 'apis' : undefined"
             :ui="{
-              root: 'app__settings-section-accordion',
-              item: 'app__settings-section-accordion-item',
-              trigger: 'app__settings-accordion-toggle',
-              trailingIcon: 'app__settings-accordion-chevron',
-              content: 'app__settings-accordion-content',
-              body: 'app__settings-accordion-body',
+              root: 'w-full min-w-0',
+              item: 'border-0',
+              trigger:
+                'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
+              trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+              content: 'pt-3',
+              body: 'w-full',
             }"
             @update:model-value="apisOpen = $event === 'apis'"
           >
             <template #default><strong>Registered mock APIs</strong></template>
             <template #body>
+              <div class="mb-3 flex justify-end gap-2">
+                <input
+                  ref="fileInput"
+                  id="postman-collection-file"
+                  class="hidden"
+                  type="file"
+                  accept="application/json,.json"
+                  aria-label="Postman collection JSON"
+                  @change="emit('importCollection', $event)"
+                />
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                  @click="fileInput?.click()"
+                >
+                  Import APIs
+                </UButton>
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                  @click="emit('addMockApi')"
+                >
+                  + New API
+                </UButton>
+              </div>
               <div id="registered-mock-apis-content" class="flex flex-col gap-y-3">
                 <SettingsAccordionCard
                   v-for="(entry, index) in mockDraft"
@@ -298,24 +369,35 @@ watchEffect(() => {
                       ?.label ?? 'Select service endpoint'
                   "
                   :delete-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
+                  compact
                   @delete="emit('removeMockApi', index)"
                 >
-                  <label :for="`mock-api-name-${entry.id || index}`" class="app__field">
+                  <label
+                    :for="`mock-api-name-${entry.id || index}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <span>Name</span>
                     <UInput
                       :id="`mock-api-name-${entry.id || index}`"
                       v-model="entry.name"
-                      :ui="{ base: 'app__control' }"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                       placeholder="e.g. Create order"
                     />
                   </label>
-                  <label :for="`mock-api-endpoint-${entry.id || index}`" class="app__field">
+                  <label
+                    :for="`mock-api-endpoint-${entry.id || index}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <span>Service endpoint</span>
                     <USelect
                       :id="`mock-api-endpoint-${entry.id || index}`"
                       v-model="entry.targetEndpointId"
                       :items="endpointOptions()"
-                      :ui="{ base: 'app__control' }"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                       @update:model-value="emit('setMockEndpoint', entry)"
                     />
                   </label>
@@ -323,63 +405,81 @@ watchEffect(() => {
                     v-for="name in props.endpointPathParameterNames(entry)"
                     :key="name"
                     :for="`mock-api-path-${entry.id || index}-${name}`"
-                    class="app__field"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
                     <span>Path parameter: {{ name }}</span>
                     <UInput
                       :id="`mock-api-path-${entry.id || index}-${name}`"
                       v-model="entry.pathParameters[name]"
-                      :ui="{ base: 'app__control' }"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                       :placeholder="`Value or {{${name}}}`"
                     />
                   </label>
-                  <label :for="`mock-api-template-${entry.id || index}`" class="app__field">
+                  <label
+                    :for="`mock-api-template-${entry.id || index}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <span>Header template</span>
                     <USelect
                       :id="`mock-api-template-${entry.id || index}`"
                       v-model="entry.headerTemplateId"
                       :items="templateOptions()"
-                      :ui="{ base: 'app__control' }"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                     />
                   </label>
-                  <div class="app__field">
+                  <div
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <span>Custom headers</span>
                     <div
                       v-for="(header, row) in entry.customHeaders ??= []"
                       :key="row"
-                      class="app__header-row"
+                      class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
                     >
                       <UInput
                         v-model="header.name"
                         aria-label="Custom header name"
                         placeholder="Header"
-                        :ui="{ base: 'app__control' }"
+                        :ui="{
+                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                        }"
                       />
                       <UInput
                         v-model="header.value"
                         aria-label="Custom header value"
                         placeholder="Value or {{variable}}"
-                        :ui="{ base: 'app__control' }"
+                        :ui="{
+                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                        }"
                       />
                       <UButton
                         type="button"
                         aria-label="Remove custom header row"
-                        class="app__button app__button--secondary app__button--small"
+                        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
                         @click="removeHeaderRow(entry.customHeaders!, row)"
                         >Remove</UButton
                       >
                     </div>
                     <UButton
                       type="button"
-                      class="app__button app__button--secondary app__button--small"
+                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
                       @click="addHeaderRow((entry.customHeaders ??= []))"
                       >Add header</UButton
                     >
                   </div>
-                  <div class="app__field">
+                  <div
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <UCheckbox v-model="entry.active" label="Active" />
                     <span v-if="entry.status">Status: {{ entry.status }}</span>
-                    <ul v-if="entry.readinessReasons?.length" class="app__readiness-reasons">
+                    <ul
+                      v-if="entry.readinessReasons?.length"
+                      class="list-disc pl-4 text-[10px] text-[var(--muted)]"
+                    >
                       <li
                         v-for="reason in entry.readinessReasons"
                         :key="reason.code + reason.message"
@@ -388,14 +488,16 @@ watchEffect(() => {
                       </li>
                     </ul>
                   </div>
-                  <fieldset class="app__field app__request-fieldset">
+                  <fieldset
+                    class="min-w-0 flex flex-1 flex-col gap-1 m-0 border-0 p-0 [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <legend>Request (JSON)</legend>
                     <div class="flex justify-end">
                       <UButton
                         type="button"
                         color="neutral"
                         variant="outline"
-                        class="app__button app__button--secondary app__button--small"
+                        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
                         @click="emit('formatRequest', entry)"
                       >
                         Format JSON
@@ -407,71 +509,50 @@ watchEffect(() => {
                       @update:model-value="entry.requestJson = $event"
                     />
                   </fieldset>
-                  <label :for="`mock-api-description-${entry.id || index}`" class="app__field">
+                  <label
+                    :for="`mock-api-description-${entry.id || index}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
                     <span>Description</span>
                     <UInput
                       :id="`mock-api-description-${entry.id || index}`"
                       v-model="entry.description"
-                      :ui="{ base: 'app__control' }"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                       placeholder="Optional note"
                     />
                   </label>
                 </SettingsAccordionCard>
-                <div v-if="!mockDraft.length" class="app__empty-logs">
+                <div
+                  v-if="!mockDraft.length"
+                  class="rounded-lg border border-dashed border-[var(--border)] p-3 text-[11px] text-[var(--muted)]"
+                >
                   No mock API rows yet. Add one to get started.
                 </div>
               </div>
             </template>
           </UAccordion>
-          <div class="flex gap-2">
-            <input
-              ref="fileInput"
-              id="postman-collection-file"
-              class="hidden"
-              type="file"
-              accept="application/json,.json"
-              aria-label="Postman collection JSON"
-              @change="emit('importCollection', $event)"
-            />
-            <UButton
-              type="button"
-              color="neutral"
-              variant="outline"
-              class="app__button app__button--secondary app__button--small"
-              @click="fileInput?.click()"
-            >
-              Import APIs
-            </UButton>
-            <UButton
-              type="button"
-              color="neutral"
-              variant="outline"
-              class="app__button app__button--secondary app__button--small"
-              @click="emit('addMockApi')"
-            >
-              + New API
-            </UButton>
-          </div>
         </div>
-      </div>
-      <footer class="app__dialog-footer">
-        <UButton
-          type="button"
-          color="neutral"
-          variant="outline"
-          class="app__button app__button--secondary"
-          @click="emit('discard')"
-          >Discard</UButton
-        >
-        <UButton
-          type="button"
-          class="app__button app__button--primary"
-          :disabled="props.environmentVariablesLoading"
-          @click="emit('save')"
-        >
-          Save
-        </UButton>
-      </footer>
-    </section>
-  </dialog>
+      </section>
+    </template>
+    <template #footer>
+      <UButton
+        type="button"
+        color="neutral"
+        variant="outline"
+        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel2)]"
+        @click="emit('discard')"
+        >Discard</UButton
+      >
+      <UButton
+        type="button"
+        class="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-xs font-medium text-[var(--accent-ink)] disabled:opacity-60"
+        :disabled="props.environmentVariablesLoading"
+        @click="emit('save')"
+      >
+        Save
+      </UButton>
+    </template>
+  </USlideover>
 </template>

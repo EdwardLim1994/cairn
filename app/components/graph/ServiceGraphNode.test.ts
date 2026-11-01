@@ -32,8 +32,8 @@ describe("ServiceGraphNode", () => {
       global: { stubs: { Handle: true } },
     });
 
-    await wrapper.get(".app__endpoint-link").trigger("click");
-    await wrapper.get(".app__collapse-connections").trigger("click");
+    await wrapper.get('[aria-label="Open endpoint List orders"]').trigger("click");
+    await wrapper.get('[aria-label="Collapse service endpoints"]').trigger("click");
 
     expect(wrapper.emitted("openEndpoint")).toEqual([["endpoint-1"]]);
     expect(wrapper.emitted("toggleEndpoints")).toEqual([["service-1"]]);

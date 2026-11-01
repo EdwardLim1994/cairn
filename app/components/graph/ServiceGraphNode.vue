@@ -26,10 +26,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <article class="app__graph-node--service app__graph-node">
+  <article class="app__graph-node--service app__graph-node relative rounded-2xl">
     <Handle id="service-out" type="source" :position="Position.Right" class="app__service-source" />
-    <div class="app__node-header">
-      <div class="app__framework-icon">
+    <div class="flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3">
+      <div class="grid size-[31px] shrink-0 place-items-center rounded-[9px] bg-transparent">
         <img
           v-if="data.framework.toLowerCase().includes('spring')"
           :src="'/icons/spring-boot.svg'"
@@ -37,16 +37,16 @@ const emit = defineEmits<{
         />
         <img v-else :src="'/icons/dotnet.svg'" alt=".NET" />
       </div>
-      <div class="app__node-heading">
-        <div class="app__node-name-line">
+      <div class="flex min-w-0 flex-1 flex-col">
+        <div class="flex min-w-0 items-center gap-1.5">
           <output
-            class="app__service-status-dot"
+            class="inline-block size-[9px] shrink-0 rounded-full border-2 border-[var(--panel)]"
             :class="
               data.online === true
-                ? 'app__service-status-dot--on'
+                ? 'bg-[#15966f]'
                 : data.online === false
-                  ? 'app__service-status-dot--off'
-                  : 'app__service-status-dot--checking'
+                  ? 'bg-[var(--danger)]'
+                  : 'bg-[var(--muted)]'
             "
             :aria-label="
               data.online === true
@@ -59,29 +59,32 @@ const emit = defineEmits<{
               data.online === true ? 'Online' : data.online === false ? 'Offline' : 'Checking'
             "
           ></output>
-          <strong>{{ data.name }}</strong>
+          <strong class="truncate font-semibold">{{ data.name }}</strong>
         </div>
-        <span>{{ data.framework }} | {{ data.endpoints.length }} endpoints</span>
+        <span class="text-[10px] text-[var(--muted)]"
+          >{{ data.framework }} | {{ data.endpoints.length }} endpoints</span
+        >
       </div>
       <button
         v-if="data.endpoints.length"
         type="button"
-        class="app__collapse-connections nodrag"
+        class="nodrag grid size-6 shrink-0 place-items-center rounded-md border border-[var(--border)] bg-[var(--panel2)] text-[var(--muted)] hover:text-[var(--text)]"
         :aria-label="
           data.endpointsCollapsed ? 'Show service endpoints' : 'Collapse service endpoints'
         "
         :title="data.endpointsCollapsed ? 'Show service endpoints' : 'Collapse service endpoints'"
         @click.stop="emit('toggleEndpoints', data.serviceId)"
       >
-        <svg class="app__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path v-if="data.endpointsCollapsed" d="M12 5v14m-7-7h14" />
-          <path v-else d="M5 12h14" />
-        </svg>
+        <UIcon
+          :name="data.endpointsCollapsed ? 'i-lucide-plus' : 'i-lucide-minus'"
+          class="size-4"
+          aria-hidden="true"
+        />
       </button>
     </div>
     <div
-      class="app__endpoint-heading"
-      :class="{ 'app__endpoint-heading--collapsed': data.endpointsCollapsed }"
+      class="flex h-[35px] items-center justify-between px-3 text-[9px] text-[var(--muted)]"
+      :class="data.endpointsCollapsed ? 'whitespace-nowrap tracking-normal' : 'tracking-[0.08em]'"
     >
       <span>{{
         data.endpointsCollapsed
@@ -92,7 +95,7 @@ const emit = defineEmits<{
     <div
       v-for="endpoint in data.endpoints"
       :key="endpoint.id"
-      class="app__endpoint-row"
+      class="app__endpoint-row relative flex h-[47px] min-w-0 items-center gap-2 border-t border-dashed border-[var(--border)] px-3"
       :class="{
         'app__endpoint-row--collapsed': data.endpointsCollapsed,
         'app__endpoint-row--bundle':
@@ -106,20 +109,33 @@ const emit = defineEmits<{
         :position="Position.Left"
         class="app__endpoint-handle"
       />
-      <span class="app__method-tag" :class="`app__method-tag--${endpoint.method.toLowerCase()}`">
+      <span
+        class="rounded px-1 py-0.5 font-mono text-[9px]"
+        :class="`app__method-tag--${endpoint.method.toLowerCase()}`"
+      >
         {{ endpoint.method }}
       </span>
       <button
         type="button"
-        class="app__endpoint-name app__endpoint-link"
+        class="max-w-24 truncate whitespace-nowrap border-0 bg-transparent p-0 text-left text-[11px] text-inherit hover:text-[var(--accent)] hover:underline"
+        :aria-label="`Open endpoint ${endpoint.name}`"
         @click.stop="emit('openEndpoint', endpoint.id)"
       >
         {{ endpoint.name }}
       </button>
     </div>
-    <div v-if="!data.endpoints.length" class="app__empty-endpoints">No endpoints registered</div>
-    <div v-if="data.hasError" class="app__error-indicator">
-      <span class="app__error-mark">!</span> Error reported for this service
+    <div v-if="!data.endpoints.length" class="p-5 text-center text-[11px] text-[var(--muted)]">
+      No endpoints registered
+    </div>
+    <div
+      v-if="data.hasError"
+      class="border-t border-[var(--border)] px-3 py-2 text-[10px] text-[var(--danger)]"
+    >
+      <span
+        class="mr-1 inline-grid size-4 place-items-center rounded-full bg-[var(--danger-soft)] font-bold"
+        >!</span
+      >
+      Error reported for this service
     </div>
   </article>
 </template>
