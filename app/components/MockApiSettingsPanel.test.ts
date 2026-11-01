@@ -92,21 +92,20 @@ const settingsUiStubs = {
   UInput: formControlStub("input"),
   UTextarea: formControlStub("textarea"),
   USelect: formControlStub("select"),
-  UCheckbox: defineComponent({
-    name: "UCheckboxStub",
-    props: { modelValue: Boolean, label: String },
+  USwitch: defineComponent({
+    name: "USwitchStub",
+    props: { modelValue: Boolean, size: String, disabled: Boolean },
     emits: ["update:modelValue"],
     setup(props, { emit }) {
       return () =>
-        h("label", [
-          h("input", {
-            type: "checkbox",
-            checked: props.modelValue,
-            onChange: (event: Event) =>
-              emit("update:modelValue", (event.target as HTMLInputElement).checked),
-          }),
-          props.label,
-        ]);
+        h("input", {
+          type: "checkbox",
+          role: "switch",
+          disabled: props.disabled,
+          checked: props.modelValue,
+          onChange: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).checked),
+        });
     },
   }),
   UAccordion: defineComponent({

@@ -35,18 +35,6 @@ function updateOpen(value: string | string[] | undefined) {
       !props.open && (props.compact ? 'min-h-12 justify-center' : 'min-h-14 justify-center'),
     ]"
   >
-    <UButton
-      type="button"
-      color="error"
-      variant="outline"
-      class="absolute z-[1] grid size-6 shrink-0 place-items-center rounded-md border border-[var(--danger)] bg-transparent p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
-      :class="props.compact ? 'left-2 top-3' : 'left-3 top-4'"
-      :aria-label="deleteLabel"
-      :title="deleteLabel"
-      @click.stop.prevent="emit('delete')"
-    >
-      <UIcon name="i-lucide-trash" class="size-4" aria-hidden="true" />
-    </UButton>
     <UAccordion
       :items="items"
       type="single"
@@ -56,9 +44,11 @@ function updateOpen(value: string | string[] | undefined) {
       :ui="{
         root: 'w-full',
         item: 'w-full border-0',
-        trigger: 'flex min-h-8 w-full cursor-pointer items-center gap-2 !py-0 pl-[30px] text-left',
+        trigger: $slots.actions
+          ? 'flex min-h-8 w-full cursor-pointer items-center gap-2 !py-0 pl-1 !pr-20 text-left'
+          : 'flex min-h-8 w-full cursor-pointer items-center gap-2 !py-0 pl-1 !pr-10 text-left',
         label: 'flex min-w-0 flex-1 items-center',
-        trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+        trailingIcon: 'order-first text-[var(--muted)] transition-transform duration-150',
         content: 'pt-2.5',
         body: 'flex w-full flex-col gap-2.5',
       }"
@@ -76,5 +66,23 @@ function updateOpen(value: string | string[] | undefined) {
         <slot />
       </template>
     </UAccordion>
+    <div
+      class="absolute right-2 z-[2] flex items-center gap-1.5"
+      :class="props.compact ? 'top-3.5' : 'top-4'"
+      @click.stop
+    >
+      <slot name="actions" />
+      <UButton
+        type="button"
+        color="error"
+        variant="outline"
+        class="grid size-6 shrink-0 place-items-center rounded-md border border-[var(--danger)] bg-transparent p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        :aria-label="deleteLabel"
+        :title="deleteLabel"
+        @click.stop.prevent="emit('delete')"
+      >
+        <UIcon name="i-lucide-trash" class="size-4" aria-hidden="true" />
+      </UButton>
+    </div>
   </div>
 </template>

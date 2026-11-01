@@ -22,7 +22,7 @@ const draft = defineModel<ServiceDraft>("draft", { required: true });
 const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: true });
 const props = defineProps<{ editingServiceId: string | null }>();
 const openApiFileInput = ref<HTMLInputElement | null>(null);
-const expandedEndpointKeys = ref<string[]>([]);
+const expandedEndpointKey = ref<string | null>(null);
 const frameworks = [
   { label: "Spring Boot", value: "Spring Boot" },
   { label: ".NET", value: ".NET" },
@@ -56,14 +56,13 @@ function endpointKey(endpoint: EndpointDraft, index: number) {
 }
 
 function isEndpointOpen(endpoint: EndpointDraft, index: number) {
-  return expandedEndpointKeys.value.includes(endpointKey(endpoint, index));
+  return expandedEndpointKey.value === endpointKey(endpoint, index);
 }
 
 function toggleEndpoint(endpoint: EndpointDraft, index: number, open: boolean) {
   const key = endpointKey(endpoint, index);
-  expandedEndpointKeys.value = open
-    ? [...new Set([...expandedEndpointKeys.value, key])]
-    : expandedEndpointKeys.value.filter((expandedKey) => expandedKey !== key);
+  if (open) expandedEndpointKey.value = key;
+  else if (expandedEndpointKey.value === key) expandedEndpointKey.value = null;
 }
 
 function preventOutsideDismiss(event: Event) {

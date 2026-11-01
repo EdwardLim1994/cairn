@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect } from "vue";
+import { ref, watch, watchEffect } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import RequestJsonEditor from "./RequestJsonEditor.vue";
 import type { EnvironmentVariable, HeaderTemplateDraft, MockApiDraft } from "../models/mock-api";
@@ -44,6 +44,38 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const environmentFileInput = ref<HTMLInputElement | null>(null);
 const variableSectionItems = [{ value: "variables", label: "Shared environment variables" }];
 const mockApiSectionItems = [{ value: "apis", label: "Registered mock APIs" }];
+const expandedCardId = ref<string | null>(null);
+
+function expandCard(id: string) {
+  const expandedVariableId = props.expandedEnvironmentVariableId;
+  if (expandedVariableId && id !== `variable:${expandedVariableId}`) {
+    const variable = environmentVariables.value.find(({ id }) => id === expandedVariableId);
+    if (variable) emit("closeVariable", variable);
+  }
+  expandedCardId.value = id;
+}
+
+function collapseCard(id: string) {
+  if (expandedCardId.value === id) expandedCardId.value = null;
+}
+
+function setCardOpen(id: string, open: boolean) {
+  if (open) expandCard(id);
+  else collapseCard(id);
+}
+
+function mockApiKey(entry: MockApiDraft, index: number) {
+  return entry.id || `mock-api-${index}`;
+}
+
+watch(
+  () => props.expandedEnvironmentVariableId,
+  (id) => {
+    if (id) expandedCardId.value = `variable:${id}`;
+    else if (expandedCardId.value?.startsWith("variable:")) expandedCardId.value = null;
+  },
+  { immediate: true },
+);
 
 function endpointOptions() {
   return [
@@ -141,6 +173,8 @@ watchEffect(() => {
           :key="template.id"
           :title="template.name || 'New header template'"
           :delete-label="`Delete ${template.name || 'header template'}`"
+          :open="expandedCardId === `template:${template.id}`"
+          @toggle="setCardOpen(`template:${template.id}`, $event)"
           @delete="emit('deleteHeaderTemplate', template)"
         >
           <label
@@ -252,7 +286,8 @@ watchEffect(() => {
                     :id="`environment-variable-${variable.id}`"
                     :title="variable.name || 'New variable'"
                     :delete-label="`Delete ${variable.name || 'variable'}`"
-                    :open="props.expandedEnvironmentVariableId === variable.id"
+                    :open="expandedCardId === `variable:${variable.id}`"
+                    @toggle="setCardOpen(`variable:${variable.id}`, $event)"
                     @expand="emit('openVariable', variable)"
                     @collapse="emit('closeVariable', variable)"
                     @delete="emit('deleteVariable', variable)"
@@ -369,9 +404,21 @@ watchEffect(() => {
                       ?.label ?? 'Select service endpoint'
                   "
                   :delete-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
+                  :open="expandedCardId === `mock:${mockApiKey(entry, index)}`"
                   compact
+                  @toggle="setCardOpen(`mock:${mockApiKey(entry, index)}`, $event)"
                   @delete="emit('removeMockApi', index)"
                 >
+                  <template #actions>
+                    <div class="flex items-center" @click.stop>
+                      <USwitch
+                        v-model="entry.active"
+                        :aria-label="`${entry.active ? 'Deactivate' : 'Activate'} ${entry.name || `Mock API ${index + 1}`}`"
+                        :disabled="entry.status === 'draft'"
+                        size="sm"
+                      />
+                    </div>
+                  </template>
                   <label
                     :for="`mock-api-name-${entry.id || index}`"
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
@@ -474,7 +521,6 @@ watchEffect(() => {
                   <div
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
-                    <UCheckbox v-model="entry.active" label="Active" />
                     <span v-if="entry.status">Status: {{ entry.status }}</span>
                     <ul
                       v-if="entry.readinessReasons?.length"
