@@ -2,7 +2,13 @@ import { asc, and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../../db/schema";
-import { environmentVariables, headerTemplates, mockApis, serviceEndpoints } from "../../db/schema";
+import {
+  environmentVariables,
+  headerTemplates,
+  mockApis,
+  serviceEndpoints,
+  services,
+} from "../../db/schema";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 import { deactivateInvalidMockApis } from "./reconcile-readiness";
 
@@ -60,6 +66,10 @@ export async function deleteHeaderTemplate(projectId: string, id: string, db: Da
       .update(mockApis)
       .set({ headerTemplateId: null })
       .where(and(eq(mockApis.projectId, projectId), eq(mockApis.headerTemplateId, id)));
+    await tx
+      .update(services)
+      .set({ healthCheckHeaderTemplateId: null })
+      .where(and(eq(services.projectId, projectId), eq(services.healthCheckHeaderTemplateId, id)));
     const result = await tx
       .delete(headerTemplates)
       .where(and(eq(headerTemplates.projectId, projectId), eq(headerTemplates.id, id)));

@@ -226,7 +226,7 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.text()).toContain("Tenant headers");
     expect(wrapper.find('input[aria-label="Custom header name"]').exists()).toBe(true);
     expect(wrapper.find("#mock-api-template-mock-1").exists()).toBe(true);
-    expect(wrapper.text()).toContain("Active");
+    expect(wrapper.text()).not.toContain("Active");
     expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(1);
     await wrapper
       .findAll("button")

@@ -8,7 +8,7 @@ import { useGraphInteractionViewModel } from "./useGraphInteractionViewModel";
 describe("graph interaction view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("opens a positioned context menu only inside the graph and closes it on the next click", () => {
+  it("records pane coordinates without preventing Nuxt UI from opening the context menu", () => {
     const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
     const graphCanvas = ref({
       screenToFlowCoordinate: vi.fn().mockReturnValue({ x: 120, y: 80 }),
@@ -35,13 +35,35 @@ describe("graph interaction view model", () => {
     });
     child.dispatchEvent(event);
     model.handleCanvasContextMenu(event);
-    expect(event.defaultPrevented).toBe(true);
+    expect(event.defaultPrevented).toBe(false);
     expect(contextMenu.value).toEqual({ x: 20, y: 30, flowX: 120, flowY: 80 });
 
-    const outside = new MouseEvent("contextmenu", { cancelable: true });
-    model.handleCanvasContextMenu(outside);
-    expect(contextMenu.value).toBeNull();
+    graphCanvas.value!.screenToFlowCoordinate = vi.fn().mockReturnValue({ x: 300, y: 180 });
+    const secondClick = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 45,
+      clientY: 55,
+    });
+    child.dispatchEvent(secondClick);
+    model.handleCanvasContextMenu(secondClick);
+    expect(secondClick.defaultPrevented).toBe(false);
+    expect(contextMenu.value).toEqual({ x: 45, y: 55, flowX: 300, flowY: 180 });
     document.body.removeChild(graph);
+  });
+
+  it("keeps the menu usable if Vue Flow cannot map the click to flow coordinates", () => {
+    const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
+    const model = useGraphInteractionViewModel({
+      store: useGraphStore(),
+      contextMenu,
+      graphCanvas: ref(null),
+      syncNodes: vi.fn(),
+      openMockPanel: vi.fn(),
+      editService: vi.fn(),
+    });
+    model.handleCanvasContextMenu(new MouseEvent("contextmenu", { clientX: 30, clientY: 40 }));
+    expect(contextMenu.value).toEqual({ x: 30, y: 40, flowX: 160, flowY: 120 });
   });
 
   it("selects, synchronizes, and focuses the clicked node before opening its panel", () => {

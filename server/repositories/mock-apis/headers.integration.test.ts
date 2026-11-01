@@ -56,6 +56,36 @@ integration("header template repository with MySQL", () => {
 
     expect(await findHeaderTemplate(projectId, "header-template-1", db)).toBe(true);
     expect(await findHeaderTemplate(otherProjectId, "header-template-1", db)).toBe(false);
+    await createHeaderTemplate(
+      "foreign-health-template",
+      otherProjectId,
+      { name: "Foreign", headers: [] },
+      db,
+    );
+    await db.insert(services).values({
+      id: "health-template-owner-service",
+      projectId,
+      name: "Orders",
+      framework: "Other",
+      baseUrl: "http://localhost:8080",
+    });
+    await expect(
+      updateService(
+        projectId,
+        "health-template-owner-service",
+        {
+          name: "Orders",
+          framework: "Other",
+          baseUrl: "http://localhost:8080",
+          healthCheckUrl: "/health",
+          healthCheckHeaderTemplateId: "foreign-health-template",
+          healthCheckCustomHeaders: [],
+          active: true,
+          endpoints: [],
+        },
+        db,
+      ),
+    ).rejects.toThrow("Selected health-check header template is not in this project");
   });
 
   it("detaches referencing APIs and rolls back on delete failure", async () => {
@@ -77,6 +107,15 @@ integration("header template repository with MySQL", () => {
       headerTemplateId: "header-template-2",
       customHeaders: [{ name: "X-Request", value: "kept" }],
       active: false,
+    });
+    await db.insert(services).values({
+      id: "header-template-service",
+      projectId,
+      name: "Orders",
+      framework: "Other",
+      baseUrl: "http://localhost:8080",
+      healthCheckHeaderTemplateId: "header-template-2",
+      healthCheckCustomHeaders: [{ name: "X-Local", value: "kept" }],
     });
 
     const failingDb = {
@@ -103,6 +142,12 @@ integration("header template repository with MySQL", () => {
     const [api] = await db.select().from(mockApis).where(eq(mockApis.id, "header-template-api"));
     expect(api?.headerTemplateId).toBeNull();
     expect(api?.customHeaders).toEqual([{ name: "X-Request", value: "kept" }]);
+    const [service] = await db
+      .select()
+      .from(services)
+      .where(eq(services.id, "header-template-service"));
+    expect(service?.healthCheckHeaderTemplateId).toBeNull();
+    expect(service?.healthCheckCustomHeaders).toEqual([{ name: "X-Local", value: "kept" }]);
     expect(
       await db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
     ).toEqual([]);
@@ -245,6 +290,9 @@ integration("header template repository with MySQL", () => {
         name: "Orders",
         framework: "REST",
         baseUrl: "http://localhost:8080",
+        healthCheckUrl: null,
+        healthCheckHeaderTemplateId: null,
+        healthCheckCustomHeaders: [],
         active: true,
         endpoints: [
           {
@@ -266,6 +314,9 @@ integration("header template repository with MySQL", () => {
         name: "Orders",
         framework: "REST",
         baseUrl: "http://localhost:8080",
+        healthCheckUrl: null,
+        healthCheckHeaderTemplateId: null,
+        healthCheckCustomHeaders: [],
         active: true,
         endpoints: [
           {

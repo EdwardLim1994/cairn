@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ serviceCount: number; allNodesCollapsed: boolean; dark: boolean }>();
+defineProps<{ allNodesCollapsed: boolean; dark: boolean }>();
 const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
 </script>
 
@@ -19,10 +19,6 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
-      <span class="px-2 text-xs text-[var(--muted)] max-[720px]:hidden"
-        ><i class="mr-1.5 inline-block size-[7px] rounded-full bg-[#15966f]"></i>
-        {{ serviceCount }} services</span
-      >
       <UButton
         type="button"
         color="neutral"

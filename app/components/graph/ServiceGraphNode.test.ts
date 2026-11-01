@@ -26,6 +26,14 @@ describe("ServiceGraphNode", () => {
     expect(wrapper.get('[aria-label="Service online"]').element.tagName).toBe("OUTPUT");
   });
 
+  it("uses the first two service-name characters for Other frameworks", () => {
+    const wrapper = mount(ServiceGraphNode, {
+      props: { data: { ...data, framework: "Other" } },
+      global: { stubs: { Handle: true } },
+    });
+    expect(wrapper.get('[aria-label="Other framework"]').text()).toBe("Or");
+  });
+
   it("emits endpoint and collapse actions", async () => {
     const wrapper = mount(ServiceGraphNode, {
       props: { data },

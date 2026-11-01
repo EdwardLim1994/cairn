@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
+import HeaderRowsEditor from "./HeaderRowsEditor.vue";
+import type { HeaderTemplateDraft } from "../models/mock-api";
 
 type EndpointDraft = {
   id?: string;
@@ -14,18 +16,25 @@ type ServiceDraft = {
   name: string;
   framework: string;
   baseUrl: string;
+  healthCheckUrl: string | null;
+  healthCheckHeaderTemplateId: string | null;
+  healthCheckCustomHeaders: Array<{ name: string; value: string }>;
   active: boolean;
   endpoints: EndpointDraft[];
 };
 
 const draft = defineModel<ServiceDraft>("draft", { required: true });
 const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: true });
-const props = defineProps<{ editingServiceId: string | null }>();
+const props = defineProps<{
+  editingServiceId: string | null;
+  headerTemplates: HeaderTemplateDraft[];
+}>();
 const openApiFileInput = ref<HTMLInputElement | null>(null);
 const expandedEndpointKey = ref<string | null>(null);
 const frameworks = [
   { label: "Spring Boot", value: "Spring Boot" },
   { label: ".NET", value: ".NET" },
+  { label: "Other", value: "Other" },
 ];
 const apiTypes = ["REST"];
 const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -46,9 +55,19 @@ function handleOpenApiFileChange(event: Event) {
 }
 
 function frameworkIconSource(framework: string) {
-  return framework.toLowerCase().includes("spring")
-    ? "/icons/spring-boot.svg"
-    : "/icons/dotnet.svg";
+  if (framework.toLowerCase().includes("spring")) return "/icons/spring-boot.svg";
+  if (framework.toLowerCase().includes(".net")) return "/icons/dotnet.svg";
+  return "";
+}
+
+function healthTemplateOptions() {
+  return [
+    { label: "No template", value: "" },
+    ...props.headerTemplates.map(({ id, name }) => ({
+      label: name || "Untitled template",
+      value: id,
+    })),
+  ];
 }
 
 function endpointKey(endpoint: EndpointDraft, index: number) {
@@ -148,7 +167,7 @@ function handleOpenChange(open: boolean) {
             >
               <template #leading="{ modelValue }">
                 <img
-                  v-if="modelValue"
+                  v-if="modelValue && frameworkIconSource(String(modelValue))"
                   class="h-[19px] w-[19px] shrink-0"
                   :src="frameworkIconSource(String(modelValue))"
                   alt=""
@@ -157,6 +176,7 @@ function handleOpenChange(open: boolean) {
               </template>
               <template #item-leading="{ item }">
                 <img
+                  v-if="frameworkIconSource(String(item.value))"
                   class="h-[19px] w-[19px] shrink-0"
                   :src="frameworkIconSource(String(item.value))"
                   alt=""
@@ -178,6 +198,40 @@ function handleOpenChange(open: boolean) {
           </label>
         </div>
       </div>
+      <section
+        v-if="draft.framework === 'Other'"
+        class="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
+      >
+        <strong class="text-xs">Custom health check</strong>
+        <label for="service-health-check-url" class="flex flex-col gap-1">
+          <span class="text-[10px] font-medium text-[var(--muted)]">Health-check URL</span>
+          <UInput
+            id="service-health-check-url"
+            v-model="draft.healthCheckUrl"
+            placeholder="/health or https://service.example/health"
+            :ui="{
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+            }"
+          />
+          <span class="text-[10px] text-[var(--muted)]">Only GET requests are allowed.</span>
+        </label>
+        <label for="service-health-header-template" class="flex flex-col gap-1">
+          <span class="text-[10px] font-medium text-[var(--muted)]">Header template</span>
+          <USelect
+            id="service-health-header-template"
+            v-model="draft.healthCheckHeaderTemplateId"
+            :items="healthTemplateOptions()"
+            :ui="{
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+            }"
+          />
+        </label>
+        <HeaderRowsEditor
+          v-model="draft.healthCheckCustomHeaders"
+          label="Custom headers"
+          aria-prefix="Health-check header"
+        />
+      </section>
       <div class="mt-1 flex items-center justify-between gap-2">
         <strong class="text-xs">Available endpoints</strong>
         <div class="flex items-center gap-2">

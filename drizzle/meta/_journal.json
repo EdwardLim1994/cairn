@@ -43,6 +43,13 @@
       "when": 1793438651772,
       "tag": "0005_flawless_raza",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1793527083037,
+      "tag": "0006_fast_mandroid",
+      "breakpoints": true
     }
   ]
 }

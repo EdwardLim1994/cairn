@@ -2,6 +2,7 @@
 import { ref, watch, watchEffect } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import RequestJsonEditor from "./RequestJsonEditor.vue";
+import HeaderRowsEditor from "./HeaderRowsEditor.vue";
 import type { EnvironmentVariable, HeaderTemplateDraft, MockApiDraft } from "../models/mock-api";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 
@@ -478,46 +479,7 @@ watchEffect(() => {
                       }"
                     />
                   </label>
-                  <div
-                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
-                  >
-                    <span>Custom headers</span>
-                    <div
-                      v-for="(header, row) in entry.customHeaders ??= []"
-                      :key="row"
-                      class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
-                    >
-                      <UInput
-                        v-model="header.name"
-                        aria-label="Custom header name"
-                        placeholder="Header"
-                        :ui="{
-                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                        }"
-                      />
-                      <UInput
-                        v-model="header.value"
-                        aria-label="Custom header value"
-                        placeholder="Value or {{variable}}"
-                        :ui="{
-                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                        }"
-                      />
-                      <UButton
-                        type="button"
-                        aria-label="Remove custom header row"
-                        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
-                        @click="removeHeaderRow(entry.customHeaders!, row)"
-                        >Remove</UButton
-                      >
-                    </div>
-                    <UButton
-                      type="button"
-                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
-                      @click="addHeaderRow((entry.customHeaders ??= []))"
-                      >Add header</UButton
-                    >
-                  </div>
+                  <HeaderRowsEditor v-model="entry.customHeaders" />
                   <div
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >

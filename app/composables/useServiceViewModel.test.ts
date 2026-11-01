@@ -88,6 +88,9 @@ const service = {
   name: "Orders",
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  healthCheckUrl: "/ready",
+  healthCheckHeaderTemplateId: "template-1",
+  healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
   active: true,
   positionX: 1,
   positionY: 2,
@@ -119,6 +122,9 @@ describe("service view model", () => {
       name: "Orders",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8080",
+      healthCheckUrl: null,
+      healthCheckHeaderTemplateId: null,
+      healthCheckCustomHeaders: [],
       active: true,
       endpoints: [
         { id: "endpoint-1", name: "List orders", apiType: "REST", method: "GET", url: "/orders" },
@@ -157,6 +163,9 @@ describe("service view model", () => {
       name: "",
       framework: "",
       baseUrl: "http://localhost:3000",
+      healthCheckUrl: null,
+      healthCheckHeaderTemplateId: null,
+      healthCheckCustomHeaders: [],
       active: true,
       endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
     });
@@ -166,7 +175,13 @@ describe("service view model", () => {
     expect(context.frameworkMenuOpen.value).toBe(false);
     expect(context.vm.editService("missing")).toBe(false);
     expect(context.vm.editService("service-1")).toBe(true);
-    expect(context.draft.value).toMatchObject({ name: "Orders", framework: "Spring Boot" });
+    expect(context.draft.value).toMatchObject({
+      name: "Orders",
+      framework: "Spring Boot",
+      healthCheckUrl: "/ready",
+      healthCheckHeaderTemplateId: "template-1",
+      healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
+    });
     expect(context.vm.openServiceEndpoint("endpoint-1")).toBe("service-1");
     expect(context.vm.openServiceEndpoint("missing")).toBeUndefined();
   });
@@ -199,6 +214,11 @@ describe("service view model", () => {
     await context.vm.saveService();
     expect(context.calls[1]?.url).toBe("/api/services/service-1");
     expect(context.calls[1]?.options.method).toBe("PUT");
+    expect(context.calls[1]?.options.body).toMatchObject({
+      healthCheckUrl: "/ready",
+      healthCheckHeaderTemplateId: "template-1",
+      healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
+    });
     expect(context.events).toEqual(["save-canvas", "close", "load-canvas", "save-canvas"]);
   });
 
@@ -228,6 +248,7 @@ describe("service view model", () => {
         draft: context.draft.value,
         frameworkMenuOpen: false,
         editingServiceId: "service-1",
+        headerTemplates: [],
       },
       global: { components: nuxtUiStubs },
     });
@@ -252,6 +273,7 @@ describe("service view model", () => {
         draft: context.draft.value,
         frameworkMenuOpen: false,
         editingServiceId: "service-1",
+        headerTemplates: [],
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
       global: { components: nuxtUiStubs },
@@ -300,6 +322,7 @@ describe("service view model", () => {
         draft: context.draft.value,
         frameworkMenuOpen: false,
         editingServiceId: "service-1",
+        headerTemplates: [],
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
       global: { components: nuxtUiStubs },
@@ -388,6 +411,7 @@ describe("service view model", () => {
         draft: context.draft.value,
         frameworkMenuOpen: false,
         editingServiceId: "service-1",
+        headerTemplates: [],
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
         onDiscard: () => context.closeSettings(),
       },

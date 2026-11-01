@@ -55,6 +55,11 @@ const dark = useCookie("cairn-dark-mode", {
   maxAge: 60 * 60 * 24 * 365,
   sameSite: "lax",
 });
+useHead({
+  htmlAttrs: {
+    class: computed(() => (dark.value ? "dark app--dark" : "")),
+  },
+});
 const loading = ref(true);
 const errorMessage = ref("");
 const importWarnings = ref<{ id: number; message: string }[]>([]);
@@ -375,14 +380,13 @@ onUnmounted(() => {
     :class="{ 'app--dark': dark }"
   >
     <AppToolbar
-      :service-count="services.length"
       :all-nodes-collapsed="allNodesCollapsed"
       :dark="dark"
       @toggle-all="toggleAllNodes"
       @toggle-theme="dark = !dark"
     />
 
-    <section class="absolute inset-0" @contextmenu="handleCanvasContextMenu">
+    <section class="absolute inset-0">
       <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">
         <GraphCanvas
           ref="graphCanvas"
@@ -391,6 +395,7 @@ onUnmounted(() => {
           :dark="dark"
           @connect="onConnect"
           @node-click="onNodeClick"
+          @pane-context-menu="handleCanvasContextMenu"
           @move-end="onMoveEnd"
           @node-drag-stop="saveCanvas"
           @toggle-service-endpoints="toggleServiceEndpoints"
@@ -439,6 +444,7 @@ onUnmounted(() => {
       v-model:draft="serviceDraft"
       v-model:framework-menu-open="frameworkMenuOpen"
       :editing-service-id="editingServiceId"
+      :header-templates="headerTemplates"
       @add-endpoint="addEndpoint"
       @remove-endpoint="removeEndpoint"
       @import-open-api="serviceViewModel.importOpenApiFile"
@@ -554,6 +560,7 @@ body {
   color: var(--text);
 }
 
+:root.app--dark,
 .app.app--dark {
   color-scheme: dark;
   --bg: #101214;

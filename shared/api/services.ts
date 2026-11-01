@@ -8,6 +8,7 @@ export {
 } from "./common";
 
 const methodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+const headerRowSchema = z.object({ name: z.string(), value: z.string() });
 const endpointInputSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(1).max(255),
@@ -26,6 +27,9 @@ export const serviceInputSchema = z.object({
   name: z.string().trim().min(1).max(255),
   framework: z.string().trim().min(1).max(100),
   baseUrl: z.string().trim().min(1).max(2048),
+  healthCheckUrl: z.string().trim().max(2048).nullable().optional().default(null),
+  healthCheckHeaderTemplateId: z.string().nullable().optional().default(null),
+  healthCheckCustomHeaders: z.array(headerRowSchema).optional().default([]),
   active: z.boolean().optional().default(true),
   endpoints: z.array(endpointInputSchema),
 });
@@ -42,6 +46,9 @@ export const serviceListResponseSchema = z.array(
     name: z.string(),
     framework: z.string(),
     baseUrl: z.string(),
+    healthCheckUrl: z.string().nullable(),
+    healthCheckHeaderTemplateId: z.string().nullable(),
+    healthCheckCustomHeaders: z.array(headerRowSchema),
     active: z.boolean(),
     positionX: z.number(),
     positionY: z.number(),

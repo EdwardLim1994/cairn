@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
-import { projects } from "../db/schema";
+import { environmentVariables, headerTemplates, projects } from "../db/schema";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
 const integration = describe.skipIf(!connectionString);
@@ -178,6 +178,46 @@ integration("service REST controllers with MySQL", () => {
     expect(fetchStub).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: "/actuator/health" }),
       expect.any(Object),
+    );
+  });
+
+  it("checks Other services with scoped templates and shared variables", async () => {
+    await getDb().insert(projects).values({ id: projectId });
+    await getDb()
+      .insert(headerTemplates)
+      .values({
+        id: "service-health-template",
+        projectId,
+        name: "Health auth",
+        headers: [{ name: "X-Health", value: "ready" }],
+      });
+    await getDb().insert(environmentVariables).values({
+      id: "service-health-variable",
+      projectId,
+      name: "apiKey",
+      value: "secret",
+    });
+    await createRoute({
+      context: {
+        body: {
+          name: "Custom",
+          framework: "Other",
+          baseUrl: "http://localhost:8082",
+          healthCheckUrl: "https://health.example/status",
+          healthCheckHeaderTemplateId: "service-health-template",
+          healthCheckCustomHeaders: [{ name: "X-API-Key", value: "{{apiKey}}" }],
+          endpoints: [],
+        },
+      },
+    } as never);
+    const health = await healthRoute({} as never);
+    expect(health).toHaveLength(1);
+    expect(fetchStub).toHaveBeenCalledWith(
+      "https://health.example/status",
+      expect.objectContaining({
+        method: "GET",
+        headers: { "X-Health": "ready", "X-API-Key": "secret" },
+      }),
     );
   });
 });

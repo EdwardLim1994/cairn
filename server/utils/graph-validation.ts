@@ -1,4 +1,5 @@
 import { createError } from "h3";
+import { validateHeaderRows } from "#shared/utils/headers";
 
 export type EndpointInput = {
   id?: string;
@@ -12,6 +13,9 @@ export type ServiceInput = {
   name: string;
   framework: string;
   baseUrl: string;
+  healthCheckUrl: string | null;
+  healthCheckHeaderTemplateId: string | null;
+  healthCheckCustomHeaders: Array<{ name: string; value: string }>;
   active: boolean;
   endpoints: EndpointInput[];
 };
@@ -87,10 +91,41 @@ export function serviceInput(value: unknown): ServiceInput {
   const input = record(value, "Service");
   if (!Array.isArray(input.endpoints))
     throw createError({ statusCode: 400, statusMessage: "Endpoints must be an array" });
+  let healthCheckUrl: string | null = null;
+  if (input.healthCheckUrl != null && input.healthCheckUrl !== "") {
+    const value = requiredText(input.healthCheckUrl, "Health-check URL", 2048);
+    if (/^https?:\/\//i.test(value)) healthCheckUrl = httpUrl(value, "Health-check URL");
+    else if (value.startsWith("/") && !value.startsWith("//")) healthCheckUrl = value;
+    else
+      throw createError({
+        statusCode: 400,
+        statusMessage: "Health-check URL must be an HTTP(S) URL or begin with /",
+      });
+  }
+  const healthCheckCustomHeaders = input.healthCheckCustomHeaders ?? [];
+  if (!Array.isArray(healthCheckCustomHeaders))
+    throw createError({ statusCode: 400, statusMessage: "Health-check headers must be an array" });
+  try {
+    validateHeaderRows(
+      healthCheckCustomHeaders as Array<{ name: string; value: string }>,
+      "Custom header",
+    );
+  } catch (error) {
+    throw createError({ statusCode: 400, statusMessage: (error as Error).message });
+  }
+  const templateId = input.healthCheckHeaderTemplateId;
+  if (templateId != null && typeof templateId !== "string")
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Health-check header template is invalid",
+    });
   return {
     name: requiredText(input.name, "Service name"),
     framework: requiredText(input.framework, "Framework", 100),
     baseUrl: httpUrl(input.baseUrl, "Base URL"),
+    healthCheckUrl,
+    healthCheckHeaderTemplateId: typeof templateId === "string" && templateId ? templateId : null,
+    healthCheckCustomHeaders: healthCheckCustomHeaders as Array<{ name: string; value: string }>,
     active: input.active === undefined ? true : Boolean(input.active),
     endpoints: input.endpoints.map(endpoint),
   };

@@ -5,7 +5,7 @@ import { defineComponent, h } from "vue";
 import ContextMenu from "./ContextMenu.vue";
 
 const UContextMenuStub = defineComponent({
-  props: { open: Boolean, items: Array, ui: Object },
+  props: { open: Boolean, items: Array, ui: Object, portal: Boolean },
   emits: ["update:open"],
   setup(props, { emit, slots }) {
     return () => {
@@ -53,6 +53,7 @@ describe("ContextMenu", () => {
       global: { components: { UContextMenu: UContextMenuStub } },
       slots: { default: "Graph canvas" },
     });
+    expect(wrapper.findComponent(UContextMenuStub).props("portal")).toBe(false);
     await wrapper.get("div").trigger("contextmenu");
     expect(wrapper.emitted("update:open")).toEqual([[true]]);
     await wrapper.get('[role="menuitem"]').trigger("click");

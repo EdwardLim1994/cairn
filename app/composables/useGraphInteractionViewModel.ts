@@ -23,23 +23,16 @@ export function useGraphInteractionViewModel(options: {
   editService: (id: string) => void;
 }) {
   function handleCanvasContextMenu(event: MouseEvent) {
-    if (options.contextMenu.value) {
-      options.contextMenu.value = null;
-      return;
-    }
-    if (!(event.target instanceof Element) || !event.target.closest(".app__graph-flow")) return;
-    event.preventDefault();
     const point = options.graphCanvas.value?.screenToFlowCoordinate({
       x: event.clientX,
       y: event.clientY,
     });
-    if (point)
-      options.contextMenu.value = {
-        x: event.clientX,
-        y: event.clientY,
-        flowX: point.x,
-        flowY: point.y,
-      };
+    options.contextMenu.value = {
+      x: event.clientX,
+      y: event.clientY,
+      flowX: point?.x ?? 160,
+      flowY: point?.y ?? 120,
+    };
   }
 
   function onNodeClick(nodeId: string) {

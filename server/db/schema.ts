@@ -34,6 +34,14 @@ export const services = mysqlTable(
     name: varchar("name", { length: 255 }).notNull(),
     framework: varchar("framework", { length: 100 }).notNull(),
     baseUrl: text("base_url").notNull(),
+    healthCheckUrl: text("health_check_url"),
+    healthCheckHeaderTemplateId: varchar("health_check_header_template_id", {
+      length: 36,
+    }).references(() => headerTemplates.id, { onDelete: "set null" }),
+    healthCheckCustomHeaders: json("health_check_custom_headers")
+      .$type<Array<{ name: string; value: string }>>()
+      .notNull()
+      .default([]),
     active: boolean("active").notNull().default(true),
     positionX: double("position_x").notNull().default(0),
     positionY: double("position_y").notNull().default(0),

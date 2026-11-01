@@ -15,12 +15,13 @@ const components = {
 };
 
 describe("AppToolbar", () => {
-  it("shows service count and emits graph and theme actions", async () => {
+  it("omits service status and emits graph and theme actions", async () => {
     const wrapper = mount(AppToolbar, {
-      props: { serviceCount: 3, allNodesCollapsed: false, dark: true },
+      props: { allNodesCollapsed: false, dark: true },
       global: { components },
     });
-    expect(wrapper.text()).toContain("3 services");
+    expect(wrapper.text()).not.toContain("services");
+    expect(wrapper.find('[class*="bg-[#15966f]"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Collapse all nodes"]').trigger("click");
     await wrapper.get('[aria-label="Use light theme"]').trigger("click");
     expect(wrapper.emitted("toggleAll")).toEqual([[]]);

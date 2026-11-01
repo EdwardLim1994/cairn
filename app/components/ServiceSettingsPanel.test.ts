@@ -141,7 +141,7 @@ const nuxtUiStubs = {
 
 function mountPanel(props: Record<string, unknown>) {
   return mount(ServiceSettingsPanel, {
-    props,
+    props: { headerTemplates: [], ...props },
     global: { components: nuxtUiStubs },
   });
 }
@@ -150,6 +150,9 @@ const draft = {
   name: "Orders",
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  healthCheckUrl: null,
+  healthCheckHeaderTemplateId: null,
+  healthCheckCustomHeaders: [],
   active: true,
   endpoints: [
     {
@@ -207,9 +210,30 @@ describe("ServiceSettingsPanel", () => {
     await framework.trigger("click");
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true]]);
     expect(wrapper.find('option[value=".NET"]').exists()).toBe(true);
+    expect(wrapper.find('option[value="Other"]').exists()).toBe(true);
     await framework.setValue(".NET");
     expect(panelDraft.framework).toBe(".NET");
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true], [false]]);
+  });
+
+  it("shows the GET-only health URL and reusable header controls for Other", async () => {
+    const panelDraft = {
+      ...structuredClone(draft),
+      healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
+    };
+    const wrapper = mountPanel({
+      draft: panelDraft,
+      frameworkMenuOpen: false,
+      editingServiceId: null,
+      headerTemplates: [{ id: "template-1", name: "Auth", headers: [] }],
+    });
+    await wrapper.get('[aria-label="Framework: Spring Boot"]').setValue("Other");
+    expect(wrapper.get('input[aria-label="Health-check header name"]').element).toBeTruthy();
+    expect(wrapper.text()).toContain("Only GET requests are allowed.");
+    expect(wrapper.find('option[value="template-1"]').exists()).toBe(true);
+    expect(
+      wrapper.find('input[placeholder="/health or https://service.example/health"]').exists(),
+    ).toBe(true);
   });
 
   it("emits save, discard, endpoint edit intents, and service deletion", async () => {

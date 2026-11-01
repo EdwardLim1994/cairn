@@ -4,7 +4,13 @@ import type { MockApiSettingsSaveRequest } from "#shared/api/mock-apis";
 import { getDb } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../db/schema";
-import { environmentVariables, headerTemplates, mockApis, serviceEndpoints } from "../db/schema";
+import {
+  environmentVariables,
+  headerTemplates,
+  mockApis,
+  serviceEndpoints,
+  services,
+} from "../db/schema";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 import { validateHeaderRows } from "#shared/utils/headers";
 
@@ -135,6 +141,15 @@ export async function saveMockApiSettings(
           and(
             eq(mockApis.projectId, projectId),
             inArray(mockApis.headerTemplateId, removedTemplateIds),
+          ),
+        );
+      await tx
+        .update(services)
+        .set({ healthCheckHeaderTemplateId: null })
+        .where(
+          and(
+            eq(services.projectId, projectId),
+            inArray(services.healthCheckHeaderTemplateId, removedTemplateIds),
           ),
         );
       await tx

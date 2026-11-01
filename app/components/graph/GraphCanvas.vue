@@ -13,6 +13,7 @@ const emit = defineEmits<{
   "update:edges": [edges: Edge[]];
   connect: [connection: Connection];
   nodeClick: [event: { node: { id: string } }];
+  paneContextMenu: [event: MouseEvent];
   moveEnd: [viewport: { x: number; y: number; zoom: number }];
   nodeDragStop: [];
   toggleServiceEndpoints: [serviceId: string];
@@ -47,6 +48,7 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     fit-view-on-init
     @connect="emit('connect', $event)"
     @node-click="emit('nodeClick', $event)"
+    @pane-context-menu="emit('paneContextMenu', $event)"
     @move-end="emit('moveEnd', $event.flowTransform)"
     @node-drag-stop="emit('nodeDragStop')"
   >

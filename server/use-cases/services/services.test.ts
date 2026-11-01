@@ -9,6 +9,9 @@ const serviceInput = {
   name: "Orders",
   framework: "Spring Boot",
   baseUrl: "http://localhost:8081",
+  healthCheckUrl: null,
+  healthCheckHeaderTemplateId: null,
+  healthCheckCustomHeaders: [],
   active: true,
   endpoints: [],
 };
@@ -76,5 +79,71 @@ describe("service endpoint use cases", () => {
       { id: "unknown", online: false },
     ]);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("checks Other services with GET and resolved headers", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    const useCase = createCheckServiceHealthUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      listHealthTargets: vi.fn().mockResolvedValue([
+        {
+          id: "custom",
+          framework: "Other",
+          baseUrl: "http://localhost:8080/api",
+          healthCheckUrl: "/health",
+          headerTemplateHeaders: [{ name: "X-Key", value: "template" }],
+          healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
+          variables: new Map([["apiKey", "secret"]]),
+        },
+      ]),
+      fetch,
+    });
+    await expect(useCase()).resolves.toEqual([{ id: "custom", online: true }]);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe("http://localhost:8080/health");
+    expect(fetch.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ method: "GET", headers: { "X-Key": "secret" } }),
+    );
+  });
+
+  it("reports missing URLs, unresolved headers, failed responses, and timeouts as offline", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false })
+      .mockRejectedValueOnce(new Error("timed out"));
+    const useCase = createCheckServiceHealthUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      listHealthTargets: vi.fn().mockResolvedValue([
+        { id: "missing-url", framework: "Other", baseUrl: "http://localhost:8080" },
+        {
+          id: "missing-variable",
+          framework: "Other",
+          baseUrl: "http://localhost:8080",
+          healthCheckUrl: "/health",
+          healthCheckCustomHeaders: [{ name: "X-Key", value: "{{missing}}" }],
+          variables: new Map(),
+        },
+        {
+          id: "failed-response",
+          framework: "Other",
+          baseUrl: "http://localhost:8080",
+          healthCheckUrl: "https://health.example/check",
+        },
+        {
+          id: "timeout",
+          framework: "Other",
+          baseUrl: "http://localhost:8080",
+          healthCheckUrl: "/health",
+        },
+      ]),
+      fetch,
+    });
+    await expect(useCase()).resolves.toEqual([
+      { id: "missing-url", online: false },
+      { id: "missing-variable", online: false },
+      { id: "failed-response", online: false },
+      { id: "timeout", online: false },
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe("https://health.example/check");
   });
 });

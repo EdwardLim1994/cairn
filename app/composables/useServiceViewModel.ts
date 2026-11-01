@@ -9,6 +9,9 @@ export type ServiceDraft = {
   name: string;
   framework: string;
   baseUrl: string;
+  healthCheckUrl: string | null;
+  healthCheckHeaderTemplateId: string | null;
+  healthCheckCustomHeaders: Array<{ name: string; value: string }>;
   active: boolean;
   endpoints: EndpointDraft[];
 };
@@ -35,6 +38,9 @@ function newServiceDraft(): ServiceDraft {
     name: "",
     framework: "",
     baseUrl: "http://localhost:3000",
+    healthCheckUrl: null,
+    healthCheckHeaderTemplateId: null,
+    healthCheckCustomHeaders: [],
     active: true,
     endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
   };
@@ -63,6 +69,9 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
       name: service.name,
       framework: options.frameworkLabel(service.framework),
       baseUrl: service.baseUrl,
+      healthCheckUrl: service.healthCheckUrl,
+      healthCheckHeaderTemplateId: service.healthCheckHeaderTemplateId,
+      healthCheckCustomHeaders: service.healthCheckCustomHeaders.map((header) => ({ ...header })),
       active: service.active,
       endpoints: service.endpoints.map((endpoint) => ({
         ...endpoint,

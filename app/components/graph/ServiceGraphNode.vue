@@ -35,7 +35,14 @@ const emit = defineEmits<{
           :src="'/icons/spring-boot.svg'"
           alt="Spring Boot"
         />
-        <img v-else :src="'/icons/dotnet.svg'" alt=".NET" />
+        <img
+          v-else-if="data.framework.toLowerCase().includes('.net')"
+          :src="'/icons/dotnet.svg'"
+          alt=".NET"
+        />
+        <span v-else class="text-[10px] font-semibold uppercase" aria-label="Other framework">
+          {{ data.name.slice(0, 2) }}
+        </span>
       </div>
       <div class="flex min-w-0 flex-1 flex-col">
         <div class="flex min-w-0 items-center gap-1.5">

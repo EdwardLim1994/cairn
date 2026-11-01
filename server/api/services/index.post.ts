@@ -3,6 +3,7 @@ import { createService } from "../../repositories/services";
 import { finiteNumber, record, serviceInput } from "../../utils/graph-validation";
 import { ensureProject } from "../../utils/project";
 import { createCreateServiceUseCase } from "../../use-cases/services/create-service";
+import { ServiceHeaderTemplateOwnershipError } from "../../repositories/services/errors";
 
 const createServiceUseCase = createCreateServiceUseCase({ ensureProject, createService });
 
@@ -13,5 +14,11 @@ export default defineEventHandler(async (event) => {
     positionX: finiteNumber(body.positionX, "Service x", 0),
     positionY: finiteNumber(body.positionY, "Service y", 0),
   });
-  return serviceCreateResponseSchema.parse(await createServiceUseCase(input));
+  try {
+    return serviceCreateResponseSchema.parse(await createServiceUseCase(input));
+  } catch (error) {
+    if (error instanceof ServiceHeaderTemplateOwnershipError)
+      throw createError({ statusCode: 400, statusMessage: error.message, cause: error });
+    throw error;
+  }
 });
