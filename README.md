@@ -1,4 +1,4 @@
-# Service Graph Editor
+# CAIRN - Service Graph Editor
 
 [![Unit tests](https://github.com/EdwardLim1994/cairn/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/unit-tests.yml)
 [![Integration tests](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml)
