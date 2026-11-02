@@ -25,8 +25,10 @@ describe("AppToolbar", () => {
     await wrapper.get('[aria-label="Collapse all nodes"]').trigger("click");
     await wrapper.get('[aria-label="Use light theme"]').trigger("click");
     await wrapper.get('[aria-label="Manage access tokens"]').trigger("click");
+    await wrapper.get('[aria-label="Mock API call history"]').trigger("click");
     expect(wrapper.emitted("toggleAll")).toEqual([[]]);
     expect(wrapper.emitted("toggleTheme")).toEqual([[]]);
     expect(wrapper.emitted("openAccessTokens")).toEqual([[]]);
+    expect(wrapper.emitted("openHistory")).toEqual([[]]);
   });
 });

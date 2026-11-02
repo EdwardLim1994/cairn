@@ -1,4 +1,5 @@
 import type { Ref } from "vue";
+import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
 import type { createApiClient } from "../models/api-client";
 import type { GraphService } from "../models/graph";
 import type { MockApiDraft } from "../models/mock-api";
@@ -28,6 +29,7 @@ export function useMockApiRunViewModel(options: {
     options.wait ??
     ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const now = options.now ?? Date.now;
+  let replayGeneration = 0;
 
   function setInitialObservations(entry: MockApiDraft, targetService?: GraphService) {
     options.graphStore.setObservations({
@@ -54,13 +56,13 @@ export function useMockApiRunViewModel(options: {
     await options.loadLogs();
   }
 
-  async function waitForFlow(runId: string) {
+  async function waitForFlow(runId: string, shouldContinue = () => true) {
     const deadline = now() + 11_000;
     async function poll(): Promise<Awaited<ReturnType<typeof options.apiClient.getRunFlow>>> {
       const flow = await options.apiClient.getRunFlow(runId);
-      if (flow.status === "complete") return flow;
+      if (flow.status === "complete" || !shouldContinue()) return flow;
       await wait(350);
-      return now() < deadline ? poll() : flow;
+      return shouldContinue() && now() < deadline ? poll() : flow;
     }
     return poll();
   }
@@ -126,5 +128,37 @@ export function useMockApiRunViewModel(options: {
     }
   }
 
-  return { runMock };
+  async function replayHistoryEntry(entry: MockApiCallHistoryEntry) {
+    const generation = ++replayGeneration;
+    const flow = await waitForFlow(entry.runId, () => generation === replayGeneration);
+    if (generation !== replayGeneration) return;
+    options.graphStore.setObservations({
+      mockApiId: entry.mockApiId,
+      errorServices: flow.errorServices,
+      edges: flow.edges.map(({ sourceService, targetService }) => ({
+        sourceService,
+        targetService,
+      })),
+      services: [
+        ...new Set(flow.edges.flatMap((edge) => [edge.sourceService, edge.targetService])),
+      ],
+    });
+    options.mockApiStore.setRunResult(entry.mockApiId, {
+      id: entry.runId,
+      traceId: entry.traceId,
+      status: entry.status,
+      responseStatus: entry.responseStatus,
+      responseBody: entry.responseBody,
+      error: entry.error,
+      flow,
+    });
+    options.graphViewModel.syncNodes();
+    return flow;
+  }
+
+  function stopReplay() {
+    replayGeneration++;
+  }
+
+  return { runMock, replayHistoryEntry, stopReplay };
 }

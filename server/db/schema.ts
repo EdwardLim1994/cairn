@@ -232,6 +232,31 @@ export const runs = mysqlTable(
   ],
 );
 
+export const mockApiCallHistory = mysqlTable(
+  "mock_api_call_history",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    runId: varchar("run_id", { length: 36 })
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    mockApiId: varchar("mock_api_id", { length: 36 }).notNull(),
+    mockApiName: varchar("mock_api_name", { length: 255 }).notNull(),
+    method: varchar("method", { length: 10 }).notNull(),
+    url: text("url").notNull(),
+    requestBody: json("request_body").$type<unknown>(),
+    traceId: varchar("trace_id", { length: 32 }).notNull(),
+    status: mysqlEnum("status", ["running", "completed", "failed"]).notNull().default("running"),
+    triggeredAt: timestamp("triggered_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("mock_api_call_history_run_unique").on(table.runId),
+    index("mock_api_call_history_project_triggered_idx").on(table.projectId, table.triggeredAt),
+  ],
+);
+
 export const spans = mysqlTable(
   "spans",
   {

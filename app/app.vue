@@ -9,7 +9,9 @@ import AppToolbar from "./components/AppToolbar.vue";
 import OtelAccessTokensDialog from "./components/OtelAccessTokensDialog.vue";
 import AppToastStack from "./components/AppToastStack.vue";
 import LatestRunDrawer from "./components/LatestRunDrawer.vue";
+import MockApiCallHistoryPanel from "./components/MockApiCallHistoryPanel.vue";
 import { createApiClient } from "./models/api-client";
+import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
 import { storeToRefs } from "pinia";
 import { useGraphStore } from "./stores/graph";
 import { useGraphViewModel } from "./composables/useGraphViewModel";
@@ -94,6 +96,10 @@ const registeredMockApisOpen = ref(true);
 const sharedEnvironmentVariablesOpen = ref(true);
 const environmentVariablesLoading = ref(false);
 const accessTokensOpen = ref(false);
+const historyOpen = ref(false);
+const historyReplayEntryId = ref<string | null>(null);
+const historyEntries = ref<MockApiCallHistoryEntry[]>([]);
+const historyLoading = ref(false);
 const editingEnvironmentVariableId = ref<string | null>(null);
 const environmentCardDraft = ref({ name: "", value: "" });
 let healthTimer: ReturnType<typeof setInterval> | undefined;
@@ -174,6 +180,53 @@ const addEnvironmentVariable = mockApiViewModel.addEnvironmentVariable;
 const deleteEnvironmentVariable = mockApiViewModel.deleteEnvironmentVariable;
 const loadLogs = observabilityViewModel.loadLogs;
 
+async function loadMockApiCallHistory() {
+  historyLoading.value = true;
+  try {
+    historyEntries.value = await apiClient.listMockApiCallHistory();
+  } catch (cause) {
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not load call history";
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+async function removeMockApiCallHistoryEntry(id: string) {
+  try {
+    await apiClient.deleteMockApiCallHistory(id);
+    historyEntries.value = historyEntries.value.filter((entry) => entry.id !== id);
+  } catch (cause) {
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not remove call history";
+  }
+}
+
+async function clearMockApiCallHistory() {
+  try {
+    await apiClient.clearMockApiCallHistory();
+    historyEntries.value = [];
+  } catch (cause) {
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not clear call history";
+  }
+}
+
+async function replayMockApiCallHistory(entry: MockApiCallHistoryEntry) {
+  errorMessage.value = "";
+  historyReplayEntryId.value = entry.id;
+  try {
+    await mockApiRunViewModel.replayHistoryEntry(entry);
+  } catch (cause) {
+    historyReplayEntryId.value = null;
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not replay saved trace";
+  }
+}
+
+function stopMockApiCallHistoryReplay() {
+  mockApiRunViewModel.stopReplay();
+  historyReplayEntryId.value = null;
+  graphStore.setObservations({ mockApiId: null, services: [], errorServices: [], edges: [] });
+  graphViewModel.syncNodes();
+}
+
 let logTimer: ReturnType<typeof setTimeout>;
 watch([logSearch, () => logService.value.join("\0"), () => logSeverity.value.join("\0")], () => {
   clearTimeout(logTimer);
@@ -181,6 +234,9 @@ watch([logSearch, () => logService.value.join("\0"), () => logSeverity.value.joi
 });
 watch(logsOpen, (open) => {
   if (open) void loadLogs();
+});
+watch(historyOpen, (open) => {
+  if (open) void loadMockApiCallHistory();
 });
 
 function beginAddService() {
@@ -336,8 +392,10 @@ function addHeaderTemplate() {
   mockApiViewModel.addHeaderTemplate();
 }
 
-function runMock(entry: MockApi) {
-  return mockApiRunViewModel.runMock(entry);
+async function runMock(entry: MockApi) {
+  const result = await mockApiRunViewModel.runMock(entry);
+  if (historyOpen.value) await loadMockApiCallHistory();
+  return result;
 }
 
 function prettyResponse(value: string | null) {
@@ -402,6 +460,7 @@ onUnmounted(() => {
       @toggle-all="toggleAllNodes"
       @toggle-theme="dark = !dark"
       @open-access-tokens="accessTokensOpen = true"
+      @open-history="historyOpen = true"
     />
 
     <OtelAccessTokensDialog v-model:open="accessTokensOpen" />
@@ -511,6 +570,16 @@ onUnmounted(() => {
       :result="latestRunResult"
       :running="Boolean(runningMockId)"
       @close="mockApiStore.clearRunResults"
+    />
+    <MockApiCallHistoryPanel
+      v-model:open="historyOpen"
+      :entries="historyEntries"
+      :loading="historyLoading"
+      :replaying="Boolean(historyReplayEntryId)"
+      @remove-entry="removeMockApiCallHistoryEntry"
+      @clear-history="clearMockApiCallHistory"
+      @replay-entry="replayMockApiCallHistory"
+      @stop-replay="stopMockApiCallHistoryReplay"
     />
   </main>
 </template>

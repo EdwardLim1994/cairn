@@ -30,6 +30,13 @@ import {
   mockApiSettingsSaveResponseSchema,
 } from "#shared/api/mock-apis";
 import {
+  mockApiCallHistoryClearResponseSchema,
+  mockApiCallHistoryDeleteResponseSchema,
+  mockApiCallHistoryIdRequestSchema,
+  mockApiCallHistoryListRequestSchema,
+  mockApiCallHistoryListResponseSchema,
+} from "#shared/api/mock-api-call-history";
+import {
   logListRequestSchema,
   logListResponseSchema,
   runFlowRequestSchema,
@@ -159,6 +166,32 @@ export function createApiClient(transport: ApiTransport) {
         mockApiRunResponseSchema,
       );
     },
+    listMockApiCallHistory: () =>
+      send(
+        "/api/mock-api-call-history",
+        "GET",
+        undefined,
+        mockApiCallHistoryListRequestSchema,
+        mockApiCallHistoryListResponseSchema,
+      ),
+    deleteMockApiCallHistory: (rawId: string) => {
+      const { id } = mockApiCallHistoryIdRequestSchema.parse({ id: rawId });
+      return send(
+        `/api/mock-api-call-history/${encodeURIComponent(id)}`,
+        "DELETE",
+        undefined,
+        z.void(),
+        mockApiCallHistoryDeleteResponseSchema,
+      );
+    },
+    clearMockApiCallHistory: () =>
+      send(
+        "/api/mock-api-call-history",
+        "DELETE",
+        undefined,
+        z.void(),
+        mockApiCallHistoryClearResponseSchema,
+      ),
     listEnvironmentVariables: () =>
       send(
         "/api/environment-variables",

@@ -29,6 +29,10 @@ These Zod schemas describe the existing REST and OTLP transport contracts. Reque
 
 OTLP payloads retain their collector-defined nested attributes. The shared schema validates the top-level resource collection while the ingestion workflow validates and normalizes nested records.
 
+## Mock API call history
+
+`GET /api/mock-api-call-history` returns project-scoped history entries newest first, including request snapshots and linked run responses. `DELETE /api/mock-api-call-history/:id` removes one history entry, and `DELETE /api/mock-api-call-history` clears the current project's history without deleting linked runs or telemetry.
+
 ## Mock API settings
 
 `PUT /api/mock-api-settings` saves staged environment variables, header templates, and mock APIs in one project-scoped transaction. The request carries the complete staged lists; omitted saved rows are deleted. The response returns `idMap` entries from client draft IDs to persisted IDs. Invalid foreign or stale references reject the transaction without partial writes.

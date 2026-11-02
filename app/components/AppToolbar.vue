@@ -1,6 +1,11 @@
 <script setup lang="ts">
 defineProps<{ allNodesCollapsed: boolean; dark: boolean }>();
-const emit = defineEmits<{ toggleAll: []; toggleTheme: []; openAccessTokens: [] }>();
+const emit = defineEmits<{
+  toggleAll: [];
+  toggleTheme: [];
+  openAccessTokens: [];
+  openHistory: [];
+}>();
 </script>
 
 <template>
@@ -19,6 +24,17 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: []; openAccessTokens: [] 
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
+        aria-label="Mock API call history"
+        title="Mock API call history"
+        @click.stop="emit('openHistory')"
+      >
+        <UIcon name="i-lucide-history" class="size-4" aria-hidden="true" />
+      </UButton>
       <UButton
         type="button"
         color="neutral"

@@ -45,6 +45,8 @@ function responseFor(url: string, options: ApiTransportOptions): unknown {
   if (url === "/api/services/health") return [];
   if (url === "/api/mock-apis" && options.method === "GET") return [];
   if (url === "/api/environment-variables" && options.method === "GET") return [];
+  if (url === "/api/mock-api-call-history" && options.method === "GET") return [];
+  if (url === "/api/mock-api-call-history" && options.method === "DELETE") return { deleted: 0 };
   if (url === "/api/logs") return [];
   if (url.endsWith("/runs/run-1/flow")) return flow;
   if (url.endsWith("/runs")) return run;
@@ -79,6 +81,9 @@ describe("typed API client", () => {
     await client.updateMockApi("mock-1", mockApiBody);
     await client.deleteMockApi("mock-1");
     await client.runMockApi("mock-1");
+    await client.listMockApiCallHistory();
+    await client.deleteMockApiCallHistory("history-1");
+    await client.clearMockApiCallHistory();
     await client.listEnvironmentVariables();
     await client.createEnvironmentVariable({ name: "API_KEY", value: "secret" });
     await client.updateEnvironmentVariable("variable-1", { name: "API_KEY", value: "secret" });
@@ -86,7 +91,7 @@ describe("typed API client", () => {
     await client.listLogs({ service: ["Orders", "Inventory"], severity: ["ERROR"] });
     await client.getRunFlow("run-1");
 
-    expect(requests).toHaveLength(18);
+    expect(requests).toHaveLength(21);
     expect(
       requests.find(({ url, options }) => url === "/api/canvas" && options.method === "PUT")
         ?.options,
@@ -99,6 +104,7 @@ describe("typed API client", () => {
       severity: ["ERROR"],
     });
     expect(requests.some(({ url }) => url === "/api/services/service%2F1")).toBe(true);
+    expect(requests.some(({ url }) => url === "/api/mock-api-call-history/history-1")).toBe(true);
   });
 
   it("defaults missing persisted canvas viewport fields for existing projects", async () => {

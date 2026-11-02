@@ -1,8 +1,9 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
   headerTemplates,
   authorizationTemplates,
+  mockApiCallHistory,
   mockApis,
   runs,
   serviceEndpoints,
@@ -79,8 +80,32 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
   );
 }
 
-export async function createRun(projectId: string, mockApiId: string, id: string, traceId: string) {
-  await getDb().insert(runs).values({ id, projectId, mockApiId, traceId, status: "running" });
+export async function createRun(
+  projectId: string,
+  mockApiId: string,
+  id: string,
+  traceId: string,
+  mockApiName: string,
+  method: string,
+  url: string,
+  requestBody: unknown,
+) {
+  const db = getDb();
+  await db.transaction(async (transaction) => {
+    await transaction.insert(runs).values({ id, projectId, mockApiId, traceId, status: "running" });
+    await transaction.insert(mockApiCallHistory).values({
+      id,
+      projectId,
+      runId: id,
+      mockApiId,
+      mockApiName,
+      method,
+      url,
+      requestBody,
+      traceId,
+      status: "running",
+    });
+  });
 }
 
 export async function finishRun(
@@ -93,10 +118,17 @@ export async function finishRun(
     error: string | null;
   },
 ) {
-  await getDb()
-    .update(runs)
-    .set({ ...result, finishedAt: new Date() })
-    .where(eq(runs.id, id));
+  const db = getDb();
+  await db.transaction(async (transaction) => {
+    await transaction
+      .update(runs)
+      .set({ ...result, finishedAt: new Date() })
+      .where(eq(runs.id, id));
+    await transaction
+      .update(mockApiCallHistory)
+      .set({ status: result.status })
+      .where(eq(mockApiCallHistory.runId, id));
+  });
 }
 
 export async function findRun(projectId: string, id: string) {
@@ -141,4 +173,35 @@ export async function getRunFlowData(projectId: string, id: string) {
     failedTargetService = target?.name;
   }
   return { run, spans: records, registeredServices, failedTargetService };
+}
+
+export async function listMockApiCallHistory(projectId: string) {
+  const rows = await getDb()
+    .select({ history: mockApiCallHistory, run: runs })
+    .from(mockApiCallHistory)
+    .innerJoin(runs, eq(mockApiCallHistory.runId, runs.id))
+    .where(eq(mockApiCallHistory.projectId, projectId))
+    .orderBy(desc(mockApiCallHistory.triggeredAt), desc(mockApiCallHistory.id));
+  return rows.map(({ history, run }) => ({
+    ...history,
+    triggeredAt: history.triggeredAt.toISOString(),
+    responseStatus: run.responseStatus,
+    responseHeaders: run.responseHeaders,
+    responseBody: run.responseBody,
+    error: run.error,
+  }));
+}
+
+export async function deleteMockApiCallHistory(projectId: string, id: string): Promise<boolean> {
+  const result = await getDb()
+    .delete(mockApiCallHistory)
+    .where(and(eq(mockApiCallHistory.projectId, projectId), eq(mockApiCallHistory.id, id)));
+  return Boolean(result[0]?.affectedRows);
+}
+
+export async function clearMockApiCallHistory(projectId: string): Promise<number> {
+  const result = await getDb()
+    .delete(mockApiCallHistory)
+    .where(eq(mockApiCallHistory.projectId, projectId));
+  return result[0]?.affectedRows ?? 0;
 }

@@ -12,6 +12,7 @@ import { parsePostmanEnvironment } from "../../app/utils/postman-environment-imp
 import {
   environmentVariables,
   logs,
+  mockApiCallHistory,
   mockApis,
   projects,
   runs,
@@ -111,6 +112,28 @@ integration("mock API run controller with MySQL and deterministic service stubs"
     ).resolves.toMatchObject([
       { id: result.id, status: "completed", responseStatus: 201, responseBody: "created" },
     ]);
+    await expect(
+      getDb().select().from(mockApiCallHistory).where(eq(mockApiCallHistory.projectId, projectId)),
+    ).resolves.toMatchObject([
+      {
+        runId: result.id,
+        mockApiId: "mock-run-api",
+        mockApiName: "Create order",
+        method: "POST",
+        url: "http://localhost:8081/orders",
+        requestBody: { token: "test-token" },
+        status: "completed",
+      },
+    ]);
+    await getDb()
+      .update(mockApis)
+      .set({ name: "Renamed order", requestJson: { token: "changed-token" } })
+      .where(eq(mockApis.id, "mock-run-api"));
+    await expect(
+      getDb().select().from(mockApiCallHistory).where(eq(mockApiCallHistory.projectId, projectId)),
+    ).resolves.toMatchObject([
+      { mockApiName: "Create order", requestBody: { token: "test-token" } },
+    ]);
     await expect(getDb().select().from(logs).where(eq(logs.projectId, projectId))).resolves.toEqual(
       [],
     );
@@ -128,6 +151,15 @@ integration("mock API run controller with MySQL and deterministic service stubs"
       status: "failed",
       error: 'Target returned HTTP 400: {"error":"bad order"}',
     });
+    await expect(
+      getDb().select().from(mockApiCallHistory).where(eq(mockApiCallHistory.projectId, projectId)),
+    ).resolves.toMatchObject([
+      {
+        runId: result.id,
+        requestBody: { token: "test-token" },
+        status: "failed",
+      },
+    ]);
     await expect(
       getDb().select().from(logs).where(eq(logs.projectId, projectId)),
     ).resolves.toMatchObject([

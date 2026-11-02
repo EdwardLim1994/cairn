@@ -74,8 +74,7 @@ function responseError(status: number, body: string) {
 
 function createFetchOptions(
   method: string,
-  requestJson: unknown,
-  variables: Map<string, string>,
+  requestBody: unknown,
   headers: Headers,
   signal: AbortSignal,
 ): RequestInit {
@@ -84,7 +83,7 @@ function createFetchOptions(
   return {
     method,
     headers,
-    body: JSON.stringify(resolveJsonVariables(requestJson, variables)),
+    body: JSON.stringify(requestBody),
     signal,
   };
 }
@@ -93,7 +92,16 @@ export function createRunMockApiUseCase(dependencies: {
   ensureProject: () => Promise<string>;
   getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
   getVariables: (projectId: string) => Promise<Array<{ name: string; value: string }>>;
-  createRun: (projectId: string, mockApiId: string, id: string, traceId: string) => Promise<void>;
+  createRun: (
+    projectId: string,
+    mockApiId: string,
+    id: string,
+    traceId: string,
+    mockApiName: string,
+    method: string,
+    url: string,
+    requestBody: unknown,
+  ) => Promise<void>;
   finishRun: (
     id: string,
     result: {
@@ -183,10 +191,21 @@ export function createRunMockApiUseCase(dependencies: {
     try {
       const resolvedPath = resolveEndpointPath(target.url, target.pathParameters ?? {}, variables);
       targetUrl = getOutboundUrl(resolvedPath, target.baseUrl).toString();
+      const requestBody =
+        target.method === "GET" ? null : resolveJsonVariables(target.requestJson, variables);
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
-      await dependencies.createRun(projectId, id, runId, traceId);
+      await dependencies.createRun(
+        projectId,
+        id,
+        runId,
+        traceId,
+        target.mockApiName,
+        target.method,
+        targetUrl,
+        requestBody,
+      );
       const authorization = await authorizationHeader(
         target,
         projectId,
@@ -200,13 +219,7 @@ export function createRunMockApiUseCase(dependencies: {
       timeout = setTimeout(() => controller.abort(), timeoutMs);
       const response = await dependencies.fetch(
         targetUrl,
-        createFetchOptions(
-          target.method,
-          target.requestJson,
-          variables,
-          headers,
-          controller.signal,
-        ),
+        createFetchOptions(target.method, requestBody, headers, controller.signal),
       );
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());

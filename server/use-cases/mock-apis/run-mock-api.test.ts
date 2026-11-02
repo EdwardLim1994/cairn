@@ -61,7 +61,16 @@ describe("mock API run use case", () => {
       responseBody: "ok",
       error: null,
     });
-    expect(deps.createRun).toHaveBeenCalledWith("project-1", "mock-1", "run-1", "a".repeat(32));
+    expect(deps.createRun).toHaveBeenCalledWith(
+      "project-1",
+      "mock-1",
+      "run-1",
+      "a".repeat(32),
+      "Create order",
+      "POST",
+      "http://localhost:8081/orders/42",
+      { token: "abc", enabled: true },
+    );
     expect(deps.fetch).toHaveBeenCalledWith(
       "http://localhost:8081/orders/42",
       expect.objectContaining({
@@ -90,6 +99,7 @@ describe("mock API run use case", () => {
     expect(request.method).toBe("GET");
     expect(request.body).toBeUndefined();
     expect(new Headers(request.headers).has("content-type")).toBe(false);
+    expect(vi.mocked(deps.createRun).mock.calls[0]?.[7]).toBeNull();
   });
 
   it("records detailed HTTP failures and their logs", async () => {
@@ -105,6 +115,10 @@ describe("mock API run use case", () => {
       "run-1",
       expect.objectContaining({ status: "failed" }),
     );
+    expect(vi.mocked(deps.createRun).mock.calls[0]?.[7]).toEqual({
+      token: "abc",
+      enabled: true,
+    });
     expect(deps.addFailureLog).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project-1",

@@ -81,7 +81,10 @@ describe("observability view model", () => {
   it("formats log timestamps for display", () => {
     const context = setup();
     expect(context.vm.formatTime("2025-01-01T12:34:56.000Z")).toBe(
-      new Date("2025-01-01T12:34:56.000Z").toLocaleTimeString([], {
+      new Date("2025-01-01T12:34:56.000Z").toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
