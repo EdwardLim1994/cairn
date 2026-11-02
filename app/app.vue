@@ -1,6 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import GraphCanvas from "./components/graph/GraphCanvas.vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import ContextMenu from "./components/ContextMenu.vue";
 import ServiceSettingsPanel from "./components/ServiceSettingsPanel.vue";
 import MockApiSettingsPanel from "./components/MockApiSettingsPanel.vue";
@@ -28,6 +27,8 @@ import type { MockApiDraft } from "./models/mock-api";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
+
+const GraphCanvas = defineAsyncComponent(() => import("./components/graph/GraphCanvas.vue"));
 
 const mockApiStore = useMockApiStore();
 const {

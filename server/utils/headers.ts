@@ -1,1 +1,1 @@
-export * from "#shared/utils/headers";
+export * from "../../shared/utils/headers";

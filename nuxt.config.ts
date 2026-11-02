@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@pinia/nuxt", "@nuxt/ui"],
   vite: {
+    build: { chunkSizeWarningLimit: 700 },
     plugins: [tailwindcss()],
   },
 });
