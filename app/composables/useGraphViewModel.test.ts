@@ -59,6 +59,7 @@ describe("graph view model", () => {
       edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
       mockApis: apis,
       headerTemplates: [],
+      authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 560, y: 160 },
     });

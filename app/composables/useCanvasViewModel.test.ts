@@ -58,6 +58,7 @@ const canvas = {
   edges: [],
   mockApis: [mockApi],
   headerTemplates: [],
+  authorizationTemplates: [],
 };
 
 describe("canvas view model", () => {

@@ -91,6 +91,7 @@ describe("mock API run view model", () => {
       edges: [],
       mockApis: [mock],
       headerTemplates: [],
+      authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 500, y: 100 },
     });

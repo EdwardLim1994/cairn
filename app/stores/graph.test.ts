@@ -38,6 +38,7 @@ describe("graph store", () => {
       edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
       mockApis: [],
       headerTemplates: [],
+      authorizationTemplates: [],
       viewport: { x: 10, y: 20, zoom: 1.2 },
       mockNode: { x: 300, y: 400 },
     };
@@ -65,6 +66,7 @@ describe("graph store", () => {
       edges: [],
       mockApis: [],
       headerTemplates: [],
+      authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 560, y: 160 },
     });
