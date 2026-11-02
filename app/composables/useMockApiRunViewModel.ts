@@ -56,13 +56,13 @@ export function useMockApiRunViewModel(options: {
 
   async function waitForFlow(runId: string) {
     const deadline = now() + 11_000;
-    let flow: Awaited<ReturnType<typeof options.apiClient.getRunFlow>> | undefined;
-    do {
-      flow = await options.apiClient.getRunFlow(runId);
-      if (flow.status === "complete") break;
+    async function poll(): Promise<Awaited<ReturnType<typeof options.apiClient.getRunFlow>>> {
+      const flow = await options.apiClient.getRunFlow(runId);
+      if (flow.status === "complete") return flow;
       await wait(350);
-    } while (now() < deadline);
-    return flow;
+      return now() < deadline ? poll() : flow;
+    }
+    return poll();
   }
 
   function applyFlow(

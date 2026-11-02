@@ -34,6 +34,19 @@ export function validateEndpointPathParameters(
     throw createError({ statusCode: 400, statusMessage: `Unknown path parameter: ${unknown}` });
 }
 
+function isCustomHeaderList(value: unknown): value is { name: string; value: string }[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (header) =>
+        Boolean(header) &&
+        typeof header === "object" &&
+        typeof header.name === "string" &&
+        typeof header.value === "string",
+    )
+  );
+}
+
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
   const targetEndpointId = input.targetEndpointId ?? null;
@@ -53,16 +66,7 @@ export function mockApiInput(value: unknown) {
     throw createError({ statusCode: 400, statusMessage: "Mock API request must be valid JSON" });
   }
   const customHeaders = input.customHeaders ?? [];
-  if (
-    !Array.isArray(customHeaders) ||
-    customHeaders.some(
-      (header) =>
-        !header ||
-        typeof header !== "object" ||
-        typeof header.name !== "string" ||
-        typeof header.value !== "string",
-    )
-  )
+  if (!isCustomHeaderList(customHeaders))
     throw createError({
       statusCode: 400,
       statusMessage: "Custom headers must contain text names and values",

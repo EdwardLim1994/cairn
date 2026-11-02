@@ -68,19 +68,24 @@ export async function insertOtlpSpans(records: (typeof spans.$inferInsert)[]) {
   if (!records.length) return;
   const db = getDb();
   await db.transaction(async (tx) => {
-    for (const span of records)
-      await tx
-        .insert(spans)
-        .values(span)
-        .onDuplicateKeyUpdate({
-          set: {
-            serviceName: span.serviceName,
-            operationName: span.operationName,
-            endTime: span.endTime,
-            statusCode: span.statusCode,
-            attributes: span.attributes,
-          },
-        });
+    await records.reduce<Promise<unknown>>(
+      (pending, span) =>
+        pending.then(() =>
+          tx
+            .insert(spans)
+            .values(span)
+            .onDuplicateKeyUpdate({
+              set: {
+                serviceName: span.serviceName,
+                operationName: span.operationName,
+                endTime: span.endTime,
+                statusCode: span.statusCode,
+                attributes: span.attributes,
+              },
+            }),
+        ),
+      Promise.resolve(),
+    );
   });
   const traceIds = [...new Set(records.map((span) => span.traceId))];
   await db

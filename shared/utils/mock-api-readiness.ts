@@ -20,6 +20,102 @@ export type MockApiReadinessInput = {
   matchUrl?: string | null;
 };
 
+function addMissingVariables(
+  value: unknown,
+  context: string,
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  for (const name of new Set(findVariableReferences(value)))
+    if (!variables.has(name))
+      reasons.push({
+        code: "variable-missing",
+        message: `${context} uses missing variable {{${name}}}`,
+      });
+}
+
+function addPathParameterReasons(
+  api: MockApiReadinessInput,
+  endpointUrl: string,
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  const route = endpointUrl.split(/[?#]/, 1)[0] ?? endpointUrl;
+  const names = [...route.matchAll(/\{([A-Za-z_][\w-]*)(?::[^{}]+)?\}|:([A-Za-z_][\w-]*)/g)].map(
+    (match) => match[1] ?? match[2]!,
+  );
+  for (const name of names) {
+    const value = api.pathParameters[name];
+    if (!value)
+      reasons.push({
+        code: "path-value-missing",
+        message: `Enter a value for path parameter ${name}`,
+      });
+    else addMissingVariables(value, `Path parameter ${name}`, variables, reasons);
+  }
+}
+
+function addAuthorizationReasons(
+  template: NonNullable<MockApiReadinessInput["authorizationTemplate"]>,
+  templateHeaders: HeaderRow[],
+  customHeaders: HeaderRow[],
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  const { type, config } = template;
+  const headerName = type === "api-key" ? (config.headerName ?? "") : "Authorization";
+  if (
+    headerName &&
+    [...templateHeaders, ...customHeaders].some(
+      (header) => header.name.toLowerCase() === headerName.toLowerCase(),
+    )
+  )
+    reasons.push({
+      code: "authorization-header-conflict",
+      message: `Header ${headerName} conflicts with selected authorization`,
+    });
+
+  let values: (string | undefined)[];
+  switch (type) {
+    case "bearer":
+      values = [config.token];
+      break;
+    case "basic":
+      values = [config.username, config.password];
+      break;
+    case "api-key":
+      values = [config.value];
+      break;
+    case "oauth-client-credentials":
+      values = [config.tokenUrl, config.clientId, config.clientSecret, config.scope];
+  }
+  addMissingVariables(values, "Authorization", variables, reasons);
+}
+
+function addHeaderReasons(
+  templateHeaders: HeaderRow[],
+  customHeaders: HeaderRow[],
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  try {
+    const headers = mergeHeaderRows(templateHeaders, customHeaders);
+    addMissingVariables(
+      headers.map(({ value }) => value),
+      "Header",
+      variables,
+      reasons,
+    );
+    if (!reasons.some(({ code }) => code === "variable-missing"))
+      resolveHeaderRows(templateHeaders, customHeaders, variables);
+  } catch (error) {
+    reasons.push({
+      code: "header-invalid",
+      message: error instanceof Error ? error.message : "Header is invalid",
+    });
+  }
+}
+
 export function evaluateMockApiReadiness(
   api: MockApiReadinessInput,
   endpointUrl: string | null,
@@ -27,31 +123,10 @@ export function evaluateMockApiReadiness(
   variables: Map<string, string>,
 ) {
   const reasons: ReadinessReason[] = [];
-  const addMissing = (value: unknown, context: string) => {
-    for (const name of new Set(findVariableReferences(value)))
-      if (!variables.has(name))
-        reasons.push({
-          code: "variable-missing",
-          message: `${context} uses missing variable {{${name}}}`,
-        });
-  };
-
   if (!endpointUrl) {
     reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
   } else {
-    const route = endpointUrl.split(/[?#]/, 1)[0] ?? endpointUrl;
-    const names = [...route.matchAll(/\{([A-Za-z_][\w-]*)(?::[^{}]+)?\}|:([A-Za-z_][\w-]*)/g)].map(
-      (match) => match[1] ?? match[2]!,
-    );
-    for (const name of names) {
-      const value = api.pathParameters[name];
-      if (!value)
-        reasons.push({
-          code: "path-value-missing",
-          message: `Enter a value for path parameter ${name}`,
-        });
-      else addMissing(value, `Path parameter ${name}`);
-    }
+    addPathParameterReasons(api, endpointUrl, variables, reasons);
   }
   if (api.headerTemplateId && api.headerTemplateExists === false)
     reasons.push({
@@ -63,52 +138,22 @@ export function evaluateMockApiReadiness(
       code: "authorization-template-missing",
       message: "Selected authorization template is unavailable",
     });
-  if (api.authorizationTemplate) {
-    const { type, config } = api.authorizationTemplate;
-    const generatedNames = type === "api-key" ? [config.headerName ?? ""] : ["Authorization"];
-    for (const headerName of generatedNames) {
-      if (
-        headerName &&
-        [...templateHeaders, ...api.customHeaders].some(
-          (header) => header.name.toLowerCase() === headerName.toLowerCase(),
-        )
-      )
-        reasons.push({
-          code: "authorization-header-conflict",
-          message: `Header ${headerName} conflicts with selected authorization`,
-        });
-    }
-    const variableValues =
-      type === "bearer"
-        ? [config.token]
-        : type === "basic"
-          ? [config.username, config.password]
-          : type === "api-key"
-            ? [config.value]
-            : [config.tokenUrl, config.clientId, config.clientSecret, config.scope];
-    addMissing(variableValues, "Authorization");
-  }
-
-  addMissing(api.requestJson, "Request body");
-  if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
-    addMissing(api.matchUrl ?? api.importUrl, "Imported URL");
-  try {
-    const headers = mergeHeaderRows(templateHeaders, api.customHeaders);
-    addMissing(
-      headers.map(({ value }) => value),
-      "Header",
+  if (api.authorizationTemplate)
+    addAuthorizationReasons(
+      api.authorizationTemplate,
+      templateHeaders,
+      api.customHeaders,
+      variables,
+      reasons,
     );
-    if (!reasons.some(({ code }) => code === "variable-missing"))
-      resolveHeaderRows(templateHeaders, api.customHeaders, variables);
-  } catch (error) {
-    reasons.push({
-      code: "header-invalid",
-      message: error instanceof Error ? error.message : "Header is invalid",
-    });
-  }
 
-  return {
-    status: reasons.length ? "draft" : api.active ? "ready" : "inactive",
-    reasons,
-  } as const;
+  addMissingVariables(api.requestJson, "Request body", variables, reasons);
+  if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
+    addMissingVariables(api.matchUrl ?? api.importUrl, "Imported URL", variables, reasons);
+  addHeaderReasons(templateHeaders, api.customHeaders, variables, reasons);
+
+  let status: "draft" | "ready" | "inactive" = "inactive";
+  if (reasons.length) status = "draft";
+  else if (api.active) status = "ready";
+  return { status, reasons };
 }

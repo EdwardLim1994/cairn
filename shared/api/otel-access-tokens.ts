@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { idParamsSchema, isoDateTimeSchema } from "./common";
+import { isoDateTimeSchema } from "./common";
+export { idParamsSchema as otelAccessTokenIdRequestSchema } from "./common";
 
 export const otelAccessTokenCreateRequestSchema = z
   .object({
@@ -15,7 +16,6 @@ export const otelAccessTokenCreateRequestSchema = z
       });
     }
   });
-export const otelAccessTokenIdRequestSchema = idParamsSchema;
 export const otelAccessTokenDeleteResponseSchema = z.object({ deleted: z.literal(true) });
 export const otelAccessTokenCreateResponseSchema = z.object({
   id: z.string(),

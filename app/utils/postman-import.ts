@@ -246,6 +246,28 @@ function readRequestBody(body: unknown) {
   }
 }
 
+function readHeaders(value: unknown) {
+  const headers: { name: string; value: string }[] = [];
+  const unsupportedFeatures: string[] = [];
+  if (!Array.isArray(value)) return { headers, unsupportedFeatures };
+
+  for (const rawHeader of value) {
+    if (!isRecord(rawHeader) || rawHeader.disabled === true) continue;
+    if (typeof rawHeader.key !== "string" || typeof rawHeader.value !== "string") {
+      unsupportedFeatures.push("invalid or protected header (unsupported value)");
+      continue;
+    }
+    const header = { name: rawHeader.key, value: rawHeader.value };
+    try {
+      validateHeaderRows([...headers, header], "Imported header");
+      headers.push(header);
+    } catch {
+      unsupportedFeatures.push(`invalid or protected header ${header.name || "(blank)"}`);
+    }
+  }
+  return { headers, unsupportedFeatures };
+}
+
 function readRequest(
   item: RecordValue,
   variables: Map<string, string>,
@@ -259,27 +281,10 @@ function readRequest(
     (token, key: string) => variables.get(key) ?? token,
   );
   const name = typeof item.name === "string" && item.name.trim() ? item.name : originalUrl;
-  const headers: { name: string; value: string }[] = [];
-  const unsupportedFeatures = [...inheritedUnsupported];
+  const { headers, unsupportedFeatures: headerWarnings } = readHeaders(request.header);
+  const unsupportedFeatures = [...inheritedUnsupported, ...headerWarnings];
   if (isRecord(request.auth) && request.auth.type !== "noauth")
     unsupportedFeatures.push("request authorization");
-  if (Array.isArray(request.header)) {
-    for (const rawHeader of request.header) {
-      if (!isRecord(rawHeader) || rawHeader.disabled === true) continue;
-      if (typeof rawHeader.key !== "string" || typeof rawHeader.value !== "string") {
-        unsupportedFeatures.push("invalid or protected header (unsupported value)");
-        continue;
-      }
-      const header = { name: rawHeader.key, value: rawHeader.value };
-      try {
-        // Validate each row so one invalid import does not discard its valid siblings.
-        validateHeaderRows([...headers, header], "Imported header");
-        headers.push(header);
-      } catch {
-        unsupportedFeatures.push(`invalid or protected header ${header.name || "(blank)"}`);
-      }
-    }
-  }
   return {
     name,
     method: postmanText(request.method || "GET").toUpperCase(),
@@ -352,11 +357,9 @@ function matchRequest(
   );
   for (const name of missingVariables) warnings.push(`Uses missing variable {{${name}}}.`);
   if (!matched) {
-    const reason = !urlMatches.length
-      ? "URL did not match a registered REST endpoint"
-      : !restMatches.length
-        ? "matching endpoint is not REST"
-        : `HTTP method ${request.method} did not match the endpoint`;
+    let reason = `HTTP method ${request.method} did not match the endpoint`;
+    if (!urlMatches.length) reason = "URL did not match a registered REST endpoint";
+    else if (!restMatches.length) reason = "matching endpoint is not REST";
     warnings.push(`${reason}.`);
   }
   return {

@@ -93,12 +93,13 @@ async function requestToken(
       body,
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error();
+    if (!response.ok) throw new Error("OAuth token endpoint rejected the request");
     const result: unknown = await response.json();
-    if (!result || typeof result !== "object") throw new Error();
+    if (!result || typeof result !== "object") throw new Error("OAuth response must be an object");
     const token = (result as { access_token?: unknown }).access_token;
     const expires = (result as { expires_in?: unknown }).expires_in;
-    if (typeof token !== "string" || !token.trim()) throw new Error();
+    if (typeof token !== "string" || !token.trim())
+      throw new Error("OAuth response is missing an access token");
     return {
       token,
       expiresIn:

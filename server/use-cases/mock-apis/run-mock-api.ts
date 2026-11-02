@@ -34,6 +34,44 @@ type ExecutionTarget = {
   serviceName: string | null;
 };
 
+async function authorizationHeader(
+  target: ExecutionTarget,
+  projectId: string,
+  variables: Map<string, string>,
+  fetch: typeof globalThis.fetch,
+  timeoutMs: number,
+) {
+  if (target.authorizationTemplate?.type === "oauth-client-credentials") {
+    const token = await getOAuthAccessToken({
+      projectId,
+      templateId: target.authorizationTemplateId!,
+      config: {
+        tokenUrl: target.authorizationTemplate.config.tokenUrl!,
+        clientId: target.authorizationTemplate.config.clientId!,
+        clientSecret: target.authorizationTemplate.config.clientSecret!,
+        scope: target.authorizationTemplate.config.scope,
+      },
+      variables,
+      fetch,
+      timeoutMs,
+    });
+    return `Bearer ${token}`;
+  }
+  return resolveStaticAuthorizationHeaders(target.authorizationTemplate, variables).map(
+    ({ name, value }) => [name, value] as const,
+  );
+}
+
+function failureMessage(cause: unknown, aborted: boolean, timeoutMs: number) {
+  if (aborted) return `Target request timed out after ${timeoutMs} ms`;
+  return cause instanceof Error ? cause.message : "Target connection failed";
+}
+
+function responseError(status: number, body: string) {
+  if (!body.trim()) return `Target returned HTTP ${status}`;
+  return `Target returned HTTP ${status}: ${body.trim()}`;
+}
+
 export function createRunMockApiUseCase(dependencies: {
   ensureProject: () => Promise<string>;
   getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
@@ -136,28 +174,15 @@ export function createRunMockApiUseCase(dependencies: {
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
       await dependencies.createRun(projectId, id, runId, traceId);
-      if (target.authorizationTemplate?.type === "oauth-client-credentials") {
-        const token = await getOAuthAccessToken({
-          projectId,
-          templateId: target.authorizationTemplateId!,
-          config: {
-            tokenUrl: target.authorizationTemplate.config.tokenUrl!,
-            clientId: target.authorizationTemplate.config.clientId!,
-            clientSecret: target.authorizationTemplate.config.clientSecret!,
-            scope: target.authorizationTemplate.config.scope,
-          },
-          variables,
-          fetch: dependencies.fetch,
-          timeoutMs,
-        });
-        headers.set("Authorization", `Bearer ${token}`);
-      } else {
-        for (const header of resolveStaticAuthorizationHeaders(
-          target.authorizationTemplate,
-          variables,
-        ))
-          headers.set(header.name, header.value);
-      }
+      const authorization = await authorizationHeader(
+        target,
+        projectId,
+        variables,
+        dependencies.fetch,
+        timeoutMs,
+      );
+      if (typeof authorization === "string") headers.set("Authorization", authorization);
+      else for (const [name, value] of authorization) headers.set(name, value);
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       if (!isGet && !headers.has("content-type")) headers.set("content-type", "application/json");
       timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -170,13 +195,7 @@ export function createRunMockApiUseCase(dependencies: {
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());
       const status = response.ok ? "completed" : "failed";
-      const bodyError = responseBody.trim();
-      const errorPrefix = `Target returned HTTP ${response.status}`;
-      let error: string | null = null;
-      if (!response.ok) {
-        error = errorPrefix;
-        if (bodyError) error = `${errorPrefix}: ${bodyError}`;
-      }
+      const error = response.ok ? null : responseError(response.status, responseBody);
       await dependencies.finishRun(runId, {
         status,
         responseStatus: response.status,
@@ -195,9 +214,7 @@ export function createRunMockApiUseCase(dependencies: {
         error,
       };
     } catch (cause) {
-      let message = "Target connection failed";
-      if (controller.signal.aborted) message = `Target request timed out after ${timeoutMs} ms`;
-      else if (cause instanceof Error) message = cause.message;
+      const message = failureMessage(cause, controller.signal.aborted, timeoutMs);
       await dependencies.finishRun(runId, { status: "failed", error: message });
       await logFailure(message, null);
       return {

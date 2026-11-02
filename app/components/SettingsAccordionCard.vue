@@ -70,6 +70,7 @@ function updateOpen(value: string | string[] | undefined) {
       class="absolute right-2 z-[2] flex items-center gap-1.5"
       :class="props.compact ? 'top-3.5' : 'top-4'"
       @click.stop
+      @keydown.stop
     >
       <slot name="actions" />
       <UButton

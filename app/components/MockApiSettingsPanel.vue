@@ -107,23 +107,29 @@ function setAuthorizationType(template: AuthorizationTemplateDraft, value: unkno
   const name = template.name;
   const pendingCreate = template.pendingCreate;
   const type = value as AuthorizationTemplateDraft["type"];
-  const next: AuthorizationTemplateDraft =
-    type === "basic"
-      ? { id, name, type, username: "", password: "", pendingCreate }
-      : type === "api-key"
-        ? { id, name, type, headerName: "", value: "", pendingCreate }
-        : type === "oauth-client-credentials"
-          ? {
-              id,
-              name,
-              type,
-              tokenUrl: "",
-              clientId: "",
-              clientSecret: "",
-              scope: "",
-              pendingCreate,
-            }
-          : { id, name, type: "bearer", token: "", pendingCreate };
+  let next: AuthorizationTemplateDraft;
+  switch (type) {
+    case "basic":
+      next = { id, name, type, username: "", password: "", pendingCreate };
+      break;
+    case "api-key":
+      next = { id, name, type, headerName: "", value: "", pendingCreate };
+      break;
+    case "oauth-client-credentials":
+      next = {
+        id,
+        name,
+        type,
+        tokenUrl: "",
+        clientId: "",
+        clientSecret: "",
+        scope: "",
+        pendingCreate,
+      };
+      break;
+    default:
+      next = { id, name, type: "bearer", token: "", pendingCreate };
+  }
   const index = authorizationTemplates.value.findIndex((item) => item.id === id);
   if (index >= 0) authorizationTemplates.value[index] = next;
 }
@@ -424,22 +430,30 @@ watchEffect(() => {
             </label>
           </template>
           <template v-else-if="template.type === 'basic'">
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Username</span>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-username-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Username
+              </label>
               <UInput
+                :id="`authorization-username-${template.id}`"
                 v-model="template.username"
                 aria-label="Basic username"
                 placeholder="Username or {{variable}}"
               />
-            </label>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Password</span>
+            </div>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-password-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Password
+              </label>
               <div class="flex gap-2">
                 <UInput
+                  :id="`authorization-password-${template.id}`"
                   v-model="template.password"
                   :type="secretVisible(template, 'password') ? 'text' : 'password'"
                   aria-label="Basic password"
@@ -451,25 +465,33 @@ watchEffect(() => {
                   >{{ secretVisible(template, "password") ? "Hide" : "Show" }}</UButton
                 >
               </div>
-            </label>
+            </div>
           </template>
           <template v-else-if="template.type === 'api-key'">
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Header name</span>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-header-name-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Header name
+              </label>
               <UInput
+                :id="`authorization-header-name-${template.id}`"
                 v-model="template.headerName"
                 aria-label="API key header name"
                 placeholder="X-API-Key"
               />
-            </label>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Value</span>
+            </div>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-value-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Value
+              </label>
               <div class="flex gap-2">
                 <UInput
+                  :id="`authorization-value-${template.id}`"
                   v-model="template.value"
                   :type="secretVisible(template, 'value') ? 'text' : 'password'"
                   aria-label="API key value"
@@ -481,31 +503,46 @@ watchEffect(() => {
                   >{{ secretVisible(template, "value") ? "Hide" : "Show" }}</UButton
                 >
               </div>
-            </label>
+            </div>
           </template>
           <template v-else>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Token URL</span>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-token-url-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Token URL
+              </label>
               <UInput
+                :id="`authorization-token-url-${template.id}`"
                 v-model="template.tokenUrl"
                 aria-label="OAuth token URL"
                 placeholder="https://auth.example.com/token"
               />
-            </label>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Client ID</span>
-              <UInput v-model="template.clientId" aria-label="OAuth client ID" />
-            </label>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Client secret</span>
+            </div>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-client-id-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Client ID
+              </label>
+              <UInput
+                :id="`authorization-client-id-${template.id}`"
+                v-model="template.clientId"
+                aria-label="OAuth client ID"
+              />
+            </div>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-client-secret-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Client secret
+              </label>
               <div class="flex gap-2">
                 <UInput
+                  :id="`authorization-client-secret-${template.id}`"
                   v-model="template.clientSecret"
                   :type="secretVisible(template, 'clientSecret') ? 'text' : 'password'"
                   aria-label="OAuth client secret"
@@ -517,13 +554,20 @@ watchEffect(() => {
                   >{{ secretVisible(template, "clientSecret") ? "Hide" : "Show" }}</UButton
                 >
               </div>
-            </label>
-            <label
-              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-            >
-              <span>Scope (optional)</span>
-              <UInput v-model="template.scope" aria-label="OAuth scope" />
-            </label>
+            </div>
+            <div class="min-w-0 flex flex-1 flex-col gap-1">
+              <label
+                :for="`authorization-scope-${template.id}`"
+                class="text-[10px] font-medium text-[var(--muted)]"
+              >
+                Scope (optional)
+              </label>
+              <UInput
+                :id="`authorization-scope-${template.id}`"
+                v-model="template.scope"
+                aria-label="OAuth scope"
+              />
+            </div>
           </template>
         </SettingsAccordionCard>
       </section>
@@ -710,7 +754,7 @@ watchEffect(() => {
                   @delete="emit('removeMockApi', index)"
                 >
                   <template #actions>
-                    <div class="flex items-center" @click.stop>
+                    <div class="flex items-center" @click.stop @keydown.stop>
                       <USwitch
                         v-model="entry.active"
                         :aria-label="`${entry.active ? 'Deactivate' : 'Activate'} ${entry.name || `Mock API ${index + 1}`}`"

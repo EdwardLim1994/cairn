@@ -126,22 +126,24 @@ export async function updateService(
       .filter((endpointId) => !retainedIds.includes(endpointId));
     if (removedIds.length)
       await tx.delete(serviceEndpoints).where(inArray(serviceEndpoints.id, removedIds));
-    for (const endpoint of input.endpoints) {
-      const values = {
-        projectId,
-        serviceId: id,
-        name: endpoint.name,
-        apiType: endpoint.apiType,
-        method: endpoint.method,
-        url: endpoint.url,
-      };
-      if (endpoint.id)
-        await tx
-          .update(serviceEndpoints)
-          .set(values)
-          .where(and(eq(serviceEndpoints.id, endpoint.id), eq(serviceEndpoints.serviceId, id)));
-      else await tx.insert(serviceEndpoints).values({ id: randomUUID(), ...values });
-    }
+    await Promise.all(
+      input.endpoints.map(async (endpoint) => {
+        const values = {
+          projectId,
+          serviceId: id,
+          name: endpoint.name,
+          apiType: endpoint.apiType,
+          method: endpoint.method,
+          url: endpoint.url,
+        };
+        if (endpoint.id)
+          await tx
+            .update(serviceEndpoints)
+            .set(values)
+            .where(and(eq(serviceEndpoints.id, endpoint.id), eq(serviceEndpoints.serviceId, id)));
+        else await tx.insert(serviceEndpoints).values({ id: randomUUID(), ...values });
+      }),
+    );
     await deactivateInvalidMockApis(tx, projectId);
   });
   return "updated" as const;

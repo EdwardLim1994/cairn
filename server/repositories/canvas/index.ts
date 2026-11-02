@@ -84,11 +84,14 @@ export async function saveCanvas(
         .where(and(eq(services.projectId, projectId), inArray(services.id, serviceIds)));
       if (owned.length !== new Set(serviceIds).size)
         throw new CanvasConstraintError("Canvas contains an unknown or duplicate service");
-      for (const position of canvas.services)
-        await tx
-          .update(services)
-          .set({ positionX: position.x, positionY: position.y })
-          .where(eq(services.id, position.id));
+      await Promise.all(
+        canvas.services.map((position) =>
+          tx
+            .update(services)
+            .set({ positionX: position.x, positionY: position.y })
+            .where(eq(services.id, position.id)),
+        ),
+      );
     }
     if (canvas.edges.length) {
       const sourceIds = [...new Set(canvas.edges.map(({ sourceServiceId }) => sourceServiceId))];

@@ -18,6 +18,69 @@ import { validateHeaderRows } from "#shared/utils/headers";
 type Database = MySql2Database<typeof schema>;
 const draftId = (id: string | undefined) => Boolean(id?.startsWith("draft-"));
 
+function validateVariables(
+  variables: MockApiSettingsSaveRequest["environmentVariables"],
+  oldIds: Set<string>,
+) {
+  const names = new Set<string>();
+  for (const variable of variables) {
+    if (names.has(variable.name))
+      throw new Error(`Duplicate environment variable: ${variable.name}`);
+    names.add(variable.name);
+    if (variable.id && !oldIds.has(variable.id) && !draftId(variable.id))
+      throw new Error("Environment variable changed in another session; reload and retry");
+  }
+}
+
+function createTemplateIds(
+  templates: { id?: string; name: string }[],
+  oldIds: Set<string>,
+  category: "Header" | "Authorization",
+) {
+  const names = new Set<string>();
+  const ids = new Map<string, string>();
+  for (const template of templates) {
+    const key = template.name.toLowerCase();
+    if (names.has(key))
+      throw new Error(`Duplicate ${category.toLowerCase()} template: ${template.name}`);
+    names.add(key);
+    if (category === "Header")
+      validateHeaderRows(
+        (template as MockApiSettingsSaveRequest["headerTemplates"][number]).headers,
+        "Template header",
+      );
+    if (template.id && !oldIds.has(template.id) && !draftId(template.id))
+      throw new Error(`${category} template changed in another session; reload and retry`);
+    ids.set(
+      template.id ?? `new:${template.name}`,
+      template.id && oldIds.has(template.id) ? template.id : randomUUID(),
+    );
+  }
+  return ids;
+}
+
+function validateApiEntries(
+  apis: MockApiSettingsSaveRequest["mockApis"],
+  oldIds: Set<string>,
+  templateIds: Map<string, string>,
+  authorizationIds: Map<string, string>,
+) {
+  const ids = new Set<string>();
+  return apis.map((api) => {
+    if (api.id && !oldIds.has(api.id) && !draftId(api.id))
+      throw new Error("Mock API changed in another session; reload and retry");
+    const id = api.id && oldIds.has(api.id) ? api.id : randomUUID();
+    if (ids.has(id)) throw new Error("Duplicate mock API ID");
+    ids.add(id);
+    if (api.headerTemplateId && !templateIds.has(api.headerTemplateId))
+      throw new Error(`Selected header template is unavailable for ${api.name}`);
+    if (api.authorizationTemplateId && !authorizationIds.has(api.authorizationTemplateId))
+      throw new Error(`Selected authorization template is unavailable for ${api.name}`);
+    validateHeaderRows(api.customHeaders, "Custom header");
+    return { api, id };
+  });
+}
+
 export async function saveMockApiSettings(
   projectId: string,
   input: MockApiSettingsSaveRequest,
@@ -43,44 +106,13 @@ export async function saveMockApiSettings(
     const oldTemplateIds = new Set(oldTemplates.map(({ id }) => id));
     const oldAuthTemplateIds = new Set(oldAuthTemplates.map(({ id }) => id));
     const oldApiIds = new Set(oldApis.map(({ id }) => id));
-    const seenNames = new Set<string>();
-    for (const variable of input.environmentVariables) {
-      if (seenNames.has(variable.name))
-        throw new Error(`Duplicate environment variable: ${variable.name}`);
-      seenNames.add(variable.name);
-      if (variable.id && !oldVariableIds.has(variable.id) && !draftId(variable.id))
-        throw new Error("Environment variable changed in another session; reload and retry");
-    }
-
-    const templateNames = new Set<string>();
-    const templateIds = new Map<string, string>();
-    for (const template of input.headerTemplates) {
-      const key = template.name.toLowerCase();
-      if (templateNames.has(key)) throw new Error(`Duplicate header template: ${template.name}`);
-      templateNames.add(key);
-      validateHeaderRows(template.headers, "Template header");
-      if (template.id && !oldTemplateIds.has(template.id) && !draftId(template.id))
-        throw new Error("Header template changed in another session; reload and retry");
-      templateIds.set(
-        template.id ?? `new:${template.name}`,
-        template.id && oldTemplateIds.has(template.id) ? template.id : randomUUID(),
-      );
-    }
-
-    const authTemplateNames = new Set<string>();
-    const authTemplateIds = new Map<string, string>();
-    for (const template of input.authorizationTemplates) {
-      const key = template.name.toLowerCase();
-      if (authTemplateNames.has(key))
-        throw new Error(`Duplicate authorization template: ${template.name}`);
-      authTemplateNames.add(key);
-      if (template.id && !oldAuthTemplateIds.has(template.id) && !draftId(template.id))
-        throw new Error("Authorization template changed in another session; reload and retry");
-      authTemplateIds.set(
-        template.id ?? `new:${template.name}`,
-        template.id && oldAuthTemplateIds.has(template.id) ? template.id : randomUUID(),
-      );
-    }
+    validateVariables(input.environmentVariables, oldVariableIds);
+    const templateIds = createTemplateIds(input.headerTemplates, oldTemplateIds, "Header");
+    const authTemplateIds = createTemplateIds(
+      input.authorizationTemplates,
+      oldAuthTemplateIds,
+      "Authorization",
+    );
 
     const endpoints = input.mockApis.flatMap(({ targetEndpointId }) =>
       targetEndpointId ? [targetEndpointId] : [],
@@ -95,84 +127,82 @@ export async function saveMockApiSettings(
       : [];
     if (ownedEndpoints.length !== new Set(endpoints).size)
       throw new Error("One or more selected endpoints are not in this project");
-    const apiIds = new Set<string>();
-    const apiEntries = input.mockApis.map((api) => {
-      if (api.id && !oldApiIds.has(api.id) && !draftId(api.id))
-        throw new Error("Mock API changed in another session; reload and retry");
-      const id = api.id && oldApiIds.has(api.id) ? api.id : randomUUID();
-      if (apiIds.has(id)) throw new Error("Duplicate mock API ID");
-      apiIds.add(id);
-      if (api.headerTemplateId && !templateIds.has(api.headerTemplateId))
-        throw new Error(`Selected header template is unavailable for ${api.name}`);
-      if (api.authorizationTemplateId && !authTemplateIds.has(api.authorizationTemplateId))
-        throw new Error(`Selected authorization template is unavailable for ${api.name}`);
-      validateHeaderRows(api.customHeaders, "Custom header");
-      return { api, id };
-    });
+    const apiEntries = validateApiEntries(input.mockApis, oldApiIds, templateIds, authTemplateIds);
+    const apiIds = new Set(apiEntries.map(({ id }) => id));
 
     const newVariableIds = new Set<string>();
-    for (const variable of input.environmentVariables) {
-      const id = variable.id && oldVariableIds.has(variable.id) ? variable.id : randomUUID();
-      if (variable.id) idMap.environmentVariables[variable.id] = id;
-      newVariableIds.add(id);
-      const { name, value } = variable;
-      if (variable.id && oldVariableIds.has(variable.id))
-        await tx
-          .update(environmentVariables)
-          .set({ name, value })
-          .where(eq(environmentVariables.id, id));
-      else await tx.insert(environmentVariables).values({ id, projectId, name, value });
-    }
+    await Promise.all(
+      input.environmentVariables.map(async (variable) => {
+        const id = variable.id && oldVariableIds.has(variable.id) ? variable.id : randomUUID();
+        if (variable.id) idMap.environmentVariables[variable.id] = id;
+        newVariableIds.add(id);
+        const { name, value } = variable;
+        if (variable.id && oldVariableIds.has(variable.id))
+          await tx
+            .update(environmentVariables)
+            .set({ name, value })
+            .where(eq(environmentVariables.id, id));
+        else await tx.insert(environmentVariables).values({ id, projectId, name, value });
+      }),
+    );
     const variables = new Map(input.environmentVariables.map(({ name, value }) => [name, value]));
 
     const newTemplateIds = new Set<string>();
-    for (const template of input.headerTemplates) {
-      const id = templateIds.get(template.id ?? `new:${template.name}`)!;
-      if (template.id) idMap.headerTemplates[template.id] = id;
-      newTemplateIds.add(id);
-      const { name, headers } = template;
-      if (oldTemplateIds.has(id))
-        await tx.update(headerTemplates).set({ name, headers }).where(eq(headerTemplates.id, id));
-      else await tx.insert(headerTemplates).values({ id, projectId, name, headers });
-    }
+    await Promise.all(
+      input.headerTemplates.map(async (template) => {
+        const id = templateIds.get(template.id ?? `new:${template.name}`)!;
+        if (template.id) idMap.headerTemplates[template.id] = id;
+        newTemplateIds.add(id);
+        const { name, headers } = template;
+        if (oldTemplateIds.has(id))
+          await tx.update(headerTemplates).set({ name, headers }).where(eq(headerTemplates.id, id));
+        else await tx.insert(headerTemplates).values({ id, projectId, name, headers });
+      }),
+    );
 
     const newAuthTemplateIds = new Set<string>();
-    for (const template of input.authorizationTemplates) {
-      const id = authTemplateIds.get(template.id ?? `new:${template.name}`)!;
-      if (template.id) idMap.authorizationTemplates[template.id] = id;
-      newAuthTemplateIds.add(id);
-      const { id: _draftId, name, type, ...fields } = template;
-      const config = Object.fromEntries(Object.entries(fields)) as Record<string, string>;
-      if (oldAuthTemplateIds.has(id))
-        await tx
-          .update(authorizationTemplates)
-          .set({ name, type, config })
-          .where(eq(authorizationTemplates.id, id));
-      else await tx.insert(authorizationTemplates).values({ id, projectId, name, type, config });
-    }
+    await Promise.all(
+      input.authorizationTemplates.map(async (template) => {
+        const id = authTemplateIds.get(template.id ?? `new:${template.name}`)!;
+        if (template.id) idMap.authorizationTemplates[template.id] = id;
+        newAuthTemplateIds.add(id);
+        const { id: _draftId, name, type, ...fields } = template;
+        const config = Object.fromEntries(Object.entries(fields)) as Record<string, string>;
+        if (oldAuthTemplateIds.has(id))
+          await tx
+            .update(authorizationTemplates)
+            .set({ name, type, config })
+            .where(eq(authorizationTemplates.id, id));
+        else await tx.insert(authorizationTemplates).values({ id, projectId, name, type, config });
+      }),
+    );
 
-    for (const { api, id } of apiEntries) {
-      if (api.id) idMap.mockApis[api.id] = id;
-      const headerTemplateId = api.headerTemplateId ? templateIds.get(api.headerTemplateId)! : null;
-      const row = {
-        name: api.name,
-        targetEndpointId: api.targetEndpointId,
-        headerTemplateId,
-        authorizationTemplateId: api.authorizationTemplateId
-          ? authTemplateIds.get(api.authorizationTemplateId)!
-          : null,
-        customHeaders: api.customHeaders,
-        active: api.active,
-        pathParameters: api.pathParameters,
-        requestJson: api.requestJson,
-        description: api.description,
-        importMethod: api.importMethod,
-        importUrl: api.importUrl,
-        matchUrl: api.matchUrl,
-      };
-      if (oldApiIds.has(id)) await tx.update(mockApis).set(row).where(eq(mockApis.id, id));
-      else await tx.insert(mockApis).values({ id, projectId, ...row });
-    }
+    await Promise.all(
+      apiEntries.map(async ({ api, id }) => {
+        if (api.id) idMap.mockApis[api.id] = id;
+        const headerTemplateId = api.headerTemplateId
+          ? templateIds.get(api.headerTemplateId)!
+          : null;
+        const row = {
+          name: api.name,
+          targetEndpointId: api.targetEndpointId,
+          headerTemplateId,
+          authorizationTemplateId: api.authorizationTemplateId
+            ? authTemplateIds.get(api.authorizationTemplateId)!
+            : null,
+          customHeaders: api.customHeaders,
+          active: api.active,
+          pathParameters: api.pathParameters,
+          requestJson: api.requestJson,
+          description: api.description,
+          importMethod: api.importMethod,
+          importUrl: api.importUrl,
+          matchUrl: api.matchUrl,
+        };
+        if (oldApiIds.has(id)) await tx.update(mockApis).set(row).where(eq(mockApis.id, id));
+        else await tx.insert(mockApis).values({ id, projectId, ...row });
+      }),
+    );
     const removedAuthTemplateIds = [...oldAuthTemplateIds].filter(
       (id) => !newAuthTemplateIds.has(id),
     );
@@ -257,47 +287,52 @@ export async function saveMockApiSettings(
           )
       : [];
     const endpointUrls = new Map(endpointRows.map(({ id, url }) => [id, url]));
-    for (const api of savedApis) {
-      const [template, authTemplate] = await Promise.all([
-        api.headerTemplateId
-          ? tx
-              .select()
-              .from(headerTemplates)
-              .where(
-                and(
-                  eq(headerTemplates.id, api.headerTemplateId),
-                  eq(headerTemplates.projectId, projectId),
-                ),
-              )
-          : Promise.resolve([]),
-        api.authorizationTemplateId
-          ? tx
-              .select()
-              .from(authorizationTemplates)
-              .where(
-                and(
-                  eq(authorizationTemplates.id, api.authorizationTemplateId),
-                  eq(authorizationTemplates.projectId, projectId),
-                ),
-              )
-          : Promise.resolve([]),
-      ]);
-      const readiness = evaluateMockApiReadiness(
-        {
-          ...api,
-          headerTemplateExists: !api.headerTemplateId || template.length > 0,
-          authorizationTemplateExists: !api.authorizationTemplateId || authTemplate.length > 0,
-          authorizationTemplate: authTemplate[0]
-            ? { type: authTemplate[0].type, config: authTemplate[0].config }
-            : null,
-        },
-        api.targetEndpointId ? (endpointUrls.get(api.targetEndpointId) ?? null) : null,
-        template[0]?.headers ?? [],
-        variables,
-      );
-      if (api.active && readiness.status === "draft")
-        await tx.update(mockApis).set({ active: false }).where(eq(mockApis.id, api.id));
-    }
+    const deactivatedIds = (
+      await Promise.all(
+        savedApis.map(async (api) => {
+          const [template, authTemplate] = await Promise.all([
+            api.headerTemplateId
+              ? tx
+                  .select()
+                  .from(headerTemplates)
+                  .where(
+                    and(
+                      eq(headerTemplates.id, api.headerTemplateId),
+                      eq(headerTemplates.projectId, projectId),
+                    ),
+                  )
+              : Promise.resolve([]),
+            api.authorizationTemplateId
+              ? tx
+                  .select()
+                  .from(authorizationTemplates)
+                  .where(
+                    and(
+                      eq(authorizationTemplates.id, api.authorizationTemplateId),
+                      eq(authorizationTemplates.projectId, projectId),
+                    ),
+                  )
+              : Promise.resolve([]),
+          ]);
+          const readiness = evaluateMockApiReadiness(
+            {
+              ...api,
+              headerTemplateExists: !api.headerTemplateId || template.length > 0,
+              authorizationTemplateExists: !api.authorizationTemplateId || authTemplate.length > 0,
+              authorizationTemplate: authTemplate[0]
+                ? { type: authTemplate[0].type, config: authTemplate[0].config }
+                : null,
+            },
+            api.targetEndpointId ? (endpointUrls.get(api.targetEndpointId) ?? null) : null,
+            template[0]?.headers ?? [],
+            variables,
+          );
+          return api.active && readiness.status === "draft" ? api.id : null;
+        }),
+      )
+    ).filter((id): id is string => id !== null);
+    if (deactivatedIds.length)
+      await tx.update(mockApis).set({ active: false }).where(inArray(mockApis.id, deactivatedIds));
     return { saved: true as const, idMap };
   });
 }

@@ -22,10 +22,11 @@ export function resolveStaticAuthorizationHeaders(
     case "basic": {
       const username = resolveStringVariables(config.username!, variables);
       const password = resolveStringVariables(config.password!, variables);
+      const credentials = [username, password].join(":");
       return [
         {
           name: "Authorization",
-          value: `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`,
+          value: `Basic ${Buffer.from(credentials).toString("base64")}`,
         },
       ];
     }

@@ -2,8 +2,11 @@ import { watch, type Ref } from "vue";
 import type { createApiClient } from "../models/api-client";
 import type { useMockApiStore } from "../stores/mockApis";
 import type { GraphService } from "../models/graph";
-import type { EnvironmentVariable, MockApiDraft } from "../models/mock-api";
-import type { AuthorizationTemplateDraft } from "../models/mock-api";
+import type {
+  AuthorizationTemplateDraft,
+  EnvironmentVariable,
+  MockApiDraft,
+} from "../models/mock-api";
 import { parsePostmanCollection, retryUnmatchedPostmanDrafts } from "../utils/postman-import";
 import { parsePostmanEnvironment } from "../utils/postman-environment-import";
 
