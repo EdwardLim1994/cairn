@@ -87,6 +87,7 @@ export function useCanvasViewModel(options: {
       options.graphStore.applyCanvas(canvas);
       options.mockApiStore.setMockApis(canvas.mockApis);
       options.mockApiStore.setHeaderTemplates(canvas.headerTemplates);
+      options.mockApiStore.setAuthorizationTemplates(canvas.authorizationTemplates);
       syncNodes();
       if (
         options.graphStore.viewport.zoom !== 1 ||

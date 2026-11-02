@@ -7,6 +7,7 @@ import type {
   MockApiDraft,
   MockApiRunResult,
   HeaderTemplateDraft,
+  AuthorizationTemplateDraft,
 } from "../models/mock-api";
 
 export const useMockApiStore = defineStore("mockApis", () => {
@@ -15,6 +16,8 @@ export const useMockApiStore = defineStore("mockApis", () => {
   const environmentVariables = ref<EnvironmentVariable[]>([]);
   const headerTemplates = ref<HeaderTemplateDraft[]>([]);
   const savedHeaderTemplates = ref<HeaderTemplateDraft[]>([]);
+  const authorizationTemplates = ref<AuthorizationTemplateDraft[]>([]);
+  const savedAuthorizationTemplates = ref<AuthorizationTemplateDraft[]>([]);
   const savedEnvironmentVariableIds = ref<string[]>([]);
   const savedEnvironmentVariableValues = ref<EnvironmentVariableValues>({});
   const runningMockId = ref<string | null>(null);
@@ -40,6 +43,13 @@ export const useMockApiStore = defineStore("mockApis", () => {
       ...item,
       headers: item.headers.map((row) => ({ ...row })),
     }));
+  }
+  function setAuthorizationTemplates(value: AuthorizationTemplateDraft[]) {
+    authorizationTemplates.value = value.map((item) => ({ ...item }));
+    savedAuthorizationTemplates.value = value.map((item) => ({ ...item }));
+  }
+  function restoreAuthorizationTemplates() {
+    authorizationTemplates.value = savedAuthorizationTemplates.value.map((item) => ({ ...item }));
   }
   function setSavedEnvironmentVariableIds(value: string[]) {
     savedEnvironmentVariableIds.value = value;
@@ -73,6 +83,8 @@ export const useMockApiStore = defineStore("mockApis", () => {
     environmentVariables,
     headerTemplates,
     savedHeaderTemplates,
+    authorizationTemplates,
+    savedAuthorizationTemplates,
     savedEnvironmentVariableIds,
     savedEnvironmentVariableValues,
     runningMockId,
@@ -82,6 +94,8 @@ export const useMockApiStore = defineStore("mockApis", () => {
     setEnvironmentVariables,
     setHeaderTemplates,
     restoreHeaderTemplates,
+    setAuthorizationTemplates,
+    restoreAuthorizationTemplates,
     setSavedEnvironmentVariableIds,
     setSavedEnvironmentVariableValues,
     addMockDraft,

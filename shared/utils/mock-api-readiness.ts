@@ -6,6 +6,12 @@ export type MockApiReadinessInput = {
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
   headerTemplateExists?: boolean;
+  authorizationTemplateId?: string | null;
+  authorizationTemplateExists?: boolean;
+  authorizationTemplate?: {
+    type: "bearer" | "basic" | "api-key" | "oauth-client-credentials";
+    config: Record<string, string>;
+  } | null;
   pathParameters: Record<string, string>;
   requestJson: unknown;
   customHeaders: HeaderRow[];
@@ -52,6 +58,36 @@ export function evaluateMockApiReadiness(
       code: "header-template-missing",
       message: "Selected header template is unavailable",
     });
+  if (api.authorizationTemplateId && api.authorizationTemplateExists === false)
+    reasons.push({
+      code: "authorization-template-missing",
+      message: "Selected authorization template is unavailable",
+    });
+  if (api.authorizationTemplate) {
+    const { type, config } = api.authorizationTemplate;
+    const generatedNames = type === "api-key" ? [config.headerName ?? ""] : ["Authorization"];
+    for (const headerName of generatedNames) {
+      if (
+        headerName &&
+        [...templateHeaders, ...api.customHeaders].some(
+          (header) => header.name.toLowerCase() === headerName.toLowerCase(),
+        )
+      )
+        reasons.push({
+          code: "authorization-header-conflict",
+          message: `Header ${headerName} conflicts with selected authorization`,
+        });
+    }
+    const variableValues =
+      type === "bearer"
+        ? [config.token]
+        : type === "basic"
+          ? [config.username, config.password]
+          : type === "api-key"
+            ? [config.value]
+            : [config.tokenUrl, config.clientId, config.clientSecret, config.scope];
+    addMissing(variableValues, "Authorization");
+  }
 
   addMissing(api.requestJson, "Request body");
   if (!api.targetEndpointId && (api.matchUrl || api.importUrl))

@@ -1,8 +1,11 @@
+import type { AuthorizationTemplateInput } from "#shared/api/mock-apis";
+
 export type MockApiDraft = {
   id?: string;
   name: string;
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
+  authorizationTemplateId?: string | null;
   customHeaders?: Array<{ name: string; value: string }>;
   active?: boolean;
   status?: "draft" | "inactive" | "ready";
@@ -28,6 +31,11 @@ export type HeaderTemplateDraft = {
   id: string;
   name: string;
   headers: Array<{ name: string; value: string }>;
+  pendingCreate?: boolean;
+};
+
+export type AuthorizationTemplateDraft = AuthorizationTemplateInput & {
+  id: string;
   pendingCreate?: boolean;
 };
 

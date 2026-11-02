@@ -3,6 +3,7 @@ import type { createApiClient } from "../models/api-client";
 import type { useMockApiStore } from "../stores/mockApis";
 import type { GraphService } from "../models/graph";
 import type { EnvironmentVariable, MockApiDraft } from "../models/mock-api";
+import type { AuthorizationTemplateDraft } from "../models/mock-api";
 import { parsePostmanCollection, retryUnmatchedPostmanDrafts } from "../utils/postman-import";
 import { parsePostmanEnvironment } from "../utils/postman-environment-import";
 
@@ -196,8 +197,39 @@ export function useMockApiViewModel(options: {
     return true;
   }
 
+  function addAuthorizationTemplate() {
+    const template: AuthorizationTemplateDraft = {
+      id: `draft-${crypto.randomUUID()}`,
+      name: "",
+      type: "bearer",
+      token: "",
+      pendingCreate: true,
+    };
+    options.store.authorizationTemplates.push(template);
+    return template;
+  }
+
+  function removeAuthorizationTemplate(
+    template: AuthorizationTemplateDraft,
+    confirmDelete: (message: string) => boolean,
+  ) {
+    const affected = options.store.mockDraft.filter(
+      (api) => api.authorizationTemplateId === template.id,
+    );
+    const names = affected.map(({ name }) => name || "Untitled API");
+    const detail = names.length ? ` It is used by: ${names.join(", ")}.` : "";
+    if (!confirmDelete(`Delete authorization template ${template.name || "Untitled"}?${detail}`))
+      return false;
+    for (const api of affected) api.authorizationTemplateId = null;
+    options.store.authorizationTemplates = options.store.authorizationTemplates.filter(
+      ({ id }) => id !== template.id,
+    );
+    return true;
+  }
+
   function discardMockSettings() {
     options.store.restoreHeaderTemplates();
+    options.store.restoreAuthorizationTemplates();
     options.store.setEnvironmentVariables(
       options.store.savedEnvironmentVariableIds.flatMap((id) => {
         const saved = options.store.savedEnvironmentVariableValues[id];
@@ -329,6 +361,7 @@ export function useMockApiViewModel(options: {
         return;
       const entries = parseMockDrafts();
       const templates = options.store.headerTemplates;
+      const authTemplates = options.store.authorizationTemplates;
       const variables = options.store.environmentVariables.map(({ id, name, value }) => ({
         id,
         name,
@@ -337,6 +370,9 @@ export function useMockApiViewModel(options: {
       const result = await options.apiClient.saveMockApiSettings({
         environmentVariables: variables,
         headerTemplates: templates.map(({ id, name, headers }) => ({ id, name, headers })),
+        authorizationTemplates: authTemplates.map(
+          ({ pendingCreate: _pending, ...template }) => template,
+        ),
         mockApis: entries.map((entry) => ({
           ...entry,
           headerTemplateId: entry.headerTemplateId ?? null,
@@ -352,6 +388,10 @@ export function useMockApiViewModel(options: {
         if (entry.headerTemplateId)
           entry.headerTemplateId =
             result.idMap.headerTemplates[entry.headerTemplateId] ?? entry.headerTemplateId;
+        if (entry.authorizationTemplateId)
+          entry.authorizationTemplateId =
+            result.idMap.authorizationTemplates[entry.authorizationTemplateId] ??
+            entry.authorizationTemplateId;
       }
       for (const variable of options.store.environmentVariables) {
         variable.id = result.idMap.environmentVariables[variable.id] ?? variable.id;
@@ -367,6 +407,13 @@ export function useMockApiViewModel(options: {
         templates.map((template) => ({
           ...template,
           id: result.idMap.headerTemplates[template.id] ?? template.id,
+          pendingCreate: false,
+        })),
+      );
+      options.store.setAuthorizationTemplates(
+        authTemplates.map((template) => ({
+          ...template,
+          id: result.idMap.authorizationTemplates[template.id] ?? template.id,
           pendingCreate: false,
         })),
       );
@@ -388,6 +435,8 @@ export function useMockApiViewModel(options: {
     removeMockDraft,
     addHeaderTemplate,
     removeHeaderTemplate,
+    addAuthorizationTemplate,
+    removeAuthorizationTemplate,
     discardMockSettings,
     openPanel,
     editEnvironmentVariable,

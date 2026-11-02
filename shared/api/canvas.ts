@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { isoDateTimeSchema } from "./common";
-import { headerTemplateSchema, readinessReasonSchema } from "./mock-apis";
+import {
+  authorizationTemplateSchema,
+  headerTemplateSchema,
+  readinessReasonSchema,
+} from "./mock-apis";
 
 const pointSchema = z.object({ x: z.number(), y: z.number() });
 const canvasViewportSchema = z
@@ -53,6 +57,7 @@ export const canvasGetResponseSchema = z.object({
       name: z.string(),
       targetEndpointId: z.string().nullable(),
       headerTemplateId: z.string().nullable(),
+      authorizationTemplateId: z.string().nullable().optional(),
       customHeaders: z.array(z.object({ name: z.string(), value: z.string() })),
       active: z.boolean(),
       status: z.enum(["draft", "inactive", "ready"]),
@@ -67,6 +72,7 @@ export const canvasGetResponseSchema = z.object({
     }),
   ),
   headerTemplates: z.array(headerTemplateSchema),
+  authorizationTemplates: z.array(authorizationTemplateSchema).default([]),
 });
 
 export const canvasPutRequestSchema = z.object({

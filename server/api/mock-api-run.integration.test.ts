@@ -203,6 +203,7 @@ integration("mock API run controller with MySQL and deterministic service stubs"
     const firstSave = await saveMockApiSettings(projectId, {
       environmentVariables: [],
       headerTemplates: [],
+      authorizationTemplates: [],
       mockApis: [
         {
           ...imported.drafts[0]!,
@@ -235,6 +236,7 @@ integration("mock API run controller with MySQL and deterministic service stubs"
           headers: [{ name: "X-Tenant", value: "{{TENANT}}" }],
         },
       ],
+      authorizationTemplates: [],
       mockApis: [
         {
           ...retried[0]!,

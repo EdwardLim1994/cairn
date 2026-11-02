@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { MockApiNotFoundError, MockApiNotReadyError } from "../../repositories/mock-apis/errors";
 import { createRunMockApiUseCase } from "./run-mock-api";
 
+function requestUrl(input: RequestInfo | URL): string {
+  return input instanceof URL ? input.href : typeof input === "string" ? input : input.url;
+}
+
 const target = {
   mockApiId: "mock-1",
   endpointId: "endpoint-1",
@@ -14,7 +18,10 @@ const target = {
   active: true,
   headerTemplateId: null,
   headerTemplateExists: true,
+  authorizationTemplateId: null,
+  authorizationTemplateExists: true,
   headerTemplateHeaders: [],
+  authorizationTemplate: null,
   customHeaders: [],
   mockApiName: "Create order",
   baseUrl: "http://localhost:8081",
@@ -171,4 +178,113 @@ describe("mock API run use case", () => {
     expect(headers.get("x-tenant")).toBe("abc");
     expect(headers.get("content-type")).toBe("application/custom");
   });
+
+  it("adds generated static authorization headers to the outbound request", async () => {
+    const { deps, run } = setup({
+      getTarget: vi.fn().mockResolvedValue({
+        ...target,
+        authorizationTemplate: { type: "bearer", config: { token: "{{TOKEN}}" } },
+      }),
+    });
+    await run("mock-1");
+    const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
+    expect(new Headers(request.headers).get("authorization")).toBe("Bearer abc");
+  });
+
+  it("rejects raw header conflicts before creating a run or sending credentials", async () => {
+    const { deps, run } = setup({
+      getTarget: vi.fn().mockResolvedValue({
+        ...target,
+        customHeaders: [{ name: "AUTHORIZATION", value: "raw-secret" }],
+        authorizationTemplateId: "auth-1",
+        authorizationTemplate: { type: "bearer", config: { token: "{{TOKEN}}" } },
+      }),
+    });
+    await expect(run("mock-1")).rejects.toThrow(
+      "Header Authorization conflicts with selected authorization",
+    );
+    expect(deps.createRun).not.toHaveBeenCalled();
+    expect(deps.fetch).not.toHaveBeenCalled();
+    expect(deps.addFailureLog).not.toHaveBeenCalled();
+  });
+
+  it("uses OAuth access tokens for the target request", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+      requestUrl(input).includes("auth.example.com")
+        ? tokenResponse()
+        : new Response("ok", { status: 200 }),
+    );
+    const { deps, run } = setup({
+      fetch,
+      getTarget: vi.fn().mockResolvedValue({
+        ...target,
+        authorizationTemplateId: "oauth-template",
+        authorizationTemplate: {
+          type: "oauth-client-credentials",
+          config: {
+            tokenUrl: "https://auth.example.com/token",
+            clientId: "client",
+            clientSecret: "secret",
+            scope: "read",
+          },
+        },
+      }),
+    });
+    await expect(run("mock-1")).resolves.toMatchObject({ status: "completed" });
+    const targetRequest = fetch.mock.calls.find(([url]) =>
+      requestUrl(url).includes("localhost:8081"),
+    );
+    expect(targetRequest).toBeDefined();
+    expect(new Headers(targetRequest![1]?.headers).get("authorization")).toBe(
+      "Bearer access-token",
+    );
+    expect(deps.finishRun).toHaveBeenCalledWith(
+      "run-1",
+      expect.objectContaining({ status: "completed" }),
+    );
+  });
+
+  it("fails OAuth acquisition without sending the target request or logging secrets", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+      requestUrl(input).includes("auth.example.com")
+        ? new Response("private-client-secret", { status: 401 })
+        : new Response("target reached", { status: 200 }),
+    );
+    const { deps, run } = setup({
+      fetch,
+      getTarget: vi.fn().mockResolvedValue({
+        ...target,
+        authorizationTemplateId: "oauth-failure-template",
+        authorizationTemplate: {
+          type: "oauth-client-credentials",
+          config: {
+            tokenUrl: "https://auth.example.com/token",
+            clientId: "client",
+            clientSecret: "private-client-secret",
+          },
+        },
+      }),
+    });
+    await expect(run("mock-1")).resolves.toMatchObject({
+      status: "failed",
+      error: "OAuth token request failed",
+    });
+    expect(fetch.mock.calls.some(([url]) => requestUrl(url).includes("localhost:8081"))).toBe(
+      false,
+    );
+    expect(deps.finishRun).toHaveBeenCalledWith(
+      "run-1",
+      expect.objectContaining({ status: "failed", error: "OAuth token request failed" }),
+    );
+    expect(JSON.stringify(vi.mocked(deps.addFailureLog).mock.calls)).not.toContain(
+      "private-client-secret",
+    );
+  });
 });
+
+function tokenResponse() {
+  return new Response(JSON.stringify({ access_token: "access-token", expires_in: 3600 }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}

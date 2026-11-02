@@ -3,7 +3,12 @@ import { ref, watch, watchEffect } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import RequestJsonEditor from "./RequestJsonEditor.vue";
 import HeaderRowsEditor from "./HeaderRowsEditor.vue";
-import type { EnvironmentVariable, HeaderTemplateDraft, MockApiDraft } from "../models/mock-api";
+import type {
+  AuthorizationTemplateDraft,
+  EnvironmentVariable,
+  HeaderTemplateDraft,
+  MockApiDraft,
+} from "../models/mock-api";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 
 const mockDraft = defineModel<MockApiDraft[]>("mockDraft", { required: true });
@@ -11,6 +16,9 @@ const environmentVariables = defineModel<EnvironmentVariable[]>("environmentVari
   required: true,
 });
 const headerTemplates = defineModel<HeaderTemplateDraft[]>("headerTemplates", { required: true });
+const authorizationTemplates = defineModel<AuthorizationTemplateDraft[]>("authorizationTemplates", {
+  default: () => [],
+});
 const variablesOpen = defineModel<boolean>("variablesOpen", { required: true });
 const apisOpen = defineModel<boolean>("apisOpen", { required: true });
 const variableDraft = defineModel<{ name: string; value: string }>("variableDraft", {
@@ -36,6 +44,8 @@ const emit = defineEmits<{
   importEnvironment: [event: Event];
   addHeaderTemplate: [];
   deleteHeaderTemplate: [template: HeaderTemplateDraft];
+  addAuthorizationTemplate: [];
+  deleteAuthorizationTemplate: [template: AuthorizationTemplateDraft];
   addMockApi: [];
   removeMockApi: [index: number];
   setMockEndpoint: [entry: MockApiDraft];
@@ -46,6 +56,13 @@ const environmentFileInput = ref<HTMLInputElement | null>(null);
 const variableSectionItems = [{ value: "variables", label: "Shared environment variables" }];
 const mockApiSectionItems = [{ value: "apis", label: "Registered mock APIs" }];
 const expandedCardId = ref<string | null>(null);
+const visibleSecrets = ref(new Set<string>());
+const authorizationTypeOptions = [
+  { label: "Bearer token", value: "bearer" },
+  { label: "Basic Auth", value: "basic" },
+  { label: "API key", value: "api-key" },
+  { label: "OAuth 2.0 Client Credentials", value: "oauth-client-credentials" },
+];
 
 function expandCard(id: string) {
   const expandedVariableId = props.expandedEnvironmentVariableId;
@@ -78,6 +95,51 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => authorizationTemplates.value.find(({ pendingCreate }) => pendingCreate)?.id,
+  (id) => {
+    if (id) expandedCardId.value = `authorization:${id}`;
+  },
+);
+
+function setAuthorizationType(template: AuthorizationTemplateDraft, value: unknown) {
+  const id = template.id;
+  const name = template.name;
+  const pendingCreate = template.pendingCreate;
+  const type = value as AuthorizationTemplateDraft["type"];
+  const next: AuthorizationTemplateDraft =
+    type === "basic"
+      ? { id, name, type, username: "", password: "", pendingCreate }
+      : type === "api-key"
+        ? { id, name, type, headerName: "", value: "", pendingCreate }
+        : type === "oauth-client-credentials"
+          ? {
+              id,
+              name,
+              type,
+              tokenUrl: "",
+              clientId: "",
+              clientSecret: "",
+              scope: "",
+              pendingCreate,
+            }
+          : { id, name, type: "bearer", token: "", pendingCreate };
+  const index = authorizationTemplates.value.findIndex((item) => item.id === id);
+  if (index >= 0) authorizationTemplates.value[index] = next;
+}
+
+function secretVisible(template: AuthorizationTemplateDraft, field: string) {
+  return visibleSecrets.value.has(`${template.id}:${field}`);
+}
+
+function toggleSecret(template: AuthorizationTemplateDraft, field: string) {
+  const key = `${template.id}:${field}`;
+  const next = new Set(visibleSecrets.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  visibleSecrets.value = next;
+}
+
 function endpointOptions() {
   return [
     { label: "Select endpoint", value: "" },
@@ -93,6 +155,57 @@ function templateOptions() {
       value: id,
     })),
   ];
+}
+
+function authorizationOptions() {
+  return [
+    { label: "No Auth", value: "" },
+    ...authorizationTemplates.value.map(({ id, name, type }) => ({
+      label: `${name || "Untitled template"} (${authorizationTypeLabel(type)})`,
+      value: id,
+    })),
+  ];
+}
+
+function authorizationTypeLabel(type: AuthorizationTemplateDraft["type"]) {
+  return authorizationTypeOptions.find((option) => option.value === type)?.label ?? type;
+}
+
+function authorizationSummary(entry: MockApiDraft) {
+  const template = authorizationTemplates.value.find(
+    ({ id }) => id === entry.authorizationTemplateId,
+  );
+  return template
+    ? `${template.name || "Untitled template"} (${authorizationTypeLabel(template.type)})`
+    : "No Auth";
+}
+
+function readinessAuthorizationTemplate(template: AuthorizationTemplateDraft | undefined) {
+  if (!template) return null;
+  switch (template.type) {
+    case "bearer":
+      return { type: template.type, config: { token: template.token } };
+    case "basic":
+      return {
+        type: template.type,
+        config: { username: template.username, password: template.password },
+      };
+    case "api-key":
+      return {
+        type: template.type,
+        config: { headerName: template.headerName, value: template.value },
+      };
+    case "oauth-client-credentials":
+      return {
+        type: template.type,
+        config: {
+          tokenUrl: template.tokenUrl,
+          clientId: template.clientId,
+          clientSecret: template.clientSecret,
+          scope: template.scope ?? "",
+        },
+      };
+  }
 }
 
 function addHeaderRow(rows: { name: string; value: string }[]) {
@@ -115,12 +228,18 @@ watchEffect(() => {
   const variables = new Map(environmentVariables.value.map(({ name, value }) => [name, value]));
   for (const entry of mockDraft.value) {
     const template = headerTemplates.value.find(({ id }) => id === entry.headerTemplateId);
+    const authTemplate = authorizationTemplates.value.find(
+      ({ id }) => id === entry.authorizationTemplateId,
+    );
     const endpointUrl =
       props.endpointDetails.find(({ id }) => id === entry.targetEndpointId)?.url ?? null;
     const readiness = evaluateMockApiReadiness(
       {
         ...entry,
         headerTemplateExists: !entry.headerTemplateId || Boolean(template),
+        authorizationTemplateId: entry.authorizationTemplateId,
+        authorizationTemplateExists: !entry.authorizationTemplateId || Boolean(authTemplate),
+        authorizationTemplate: readinessAuthorizationTemplate(authTemplate),
         customHeaders: entry.customHeaders ?? [],
         active: entry.active ?? false,
       },
@@ -226,6 +345,186 @@ watchEffect(() => {
             @click="addHeaderRow(template.headers)"
             >Add header</UButton
           >
+        </SettingsAccordionCard>
+      </section>
+      <section id="authorization-templates" class="mt-5">
+        <div class="mt-1 flex items-center justify-between gap-2">
+          <strong>Shareable authorization templates</strong>
+          <UButton
+            type="button"
+            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+            @click="emit('addAuthorizationTemplate')"
+            >New template</UButton
+          >
+        </div>
+        <SettingsAccordionCard
+          v-for="template in authorizationTemplates"
+          :key="template.id"
+          :id="`authorization-template-${template.id}`"
+          :title="template.name || 'New authorization template'"
+          :delete-label="`Delete ${template.name || 'authorization template'}`"
+          :open="expandedCardId === `authorization:${template.id}`"
+          @toggle="setCardOpen(`authorization:${template.id}`, $event)"
+          @delete="emit('deleteAuthorizationTemplate', template)"
+        >
+          <label
+            :for="`authorization-template-name-${template.id}`"
+            class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+          >
+            <span>Name</span>
+            <UInput
+              :id="`authorization-template-name-${template.id}`"
+              v-model="template.name"
+              aria-label="Authorization template name"
+              :ui="{
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              }"
+            />
+          </label>
+          <label
+            :for="`authorization-template-type-${template.id}`"
+            class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+          >
+            <span>Authorization type</span>
+            <USelect
+              :id="`authorization-template-type-${template.id}`"
+              :model-value="template.type"
+              :items="authorizationTypeOptions"
+              aria-label="Authorization type"
+              :ui="{
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              }"
+              @update:model-value="setAuthorizationType(template, $event)"
+            />
+          </label>
+          <template v-if="template.type === 'bearer'">
+            <label
+              :for="`authorization-token-${template.id}`"
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Token</span>
+              <div class="flex gap-2">
+                <UInput
+                  :id="`authorization-token-${template.id}`"
+                  v-model="template.token"
+                  :type="secretVisible(template, 'token') ? 'text' : 'password'"
+                  aria-label="Bearer token"
+                  placeholder="Token or {{variable}}"
+                  :ui="{
+                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px]',
+                  }"
+                />
+                <UButton
+                  type="button"
+                  :aria-label="`${secretVisible(template, 'token') ? 'Hide' : 'Show'} Bearer token`"
+                  @click="toggleSecret(template, 'token')"
+                  >{{ secretVisible(template, "token") ? "Hide" : "Show" }}</UButton
+                >
+              </div>
+            </label>
+          </template>
+          <template v-else-if="template.type === 'basic'">
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Username</span>
+              <UInput
+                v-model="template.username"
+                aria-label="Basic username"
+                placeholder="Username or {{variable}}"
+              />
+            </label>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Password</span>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="template.password"
+                  :type="secretVisible(template, 'password') ? 'text' : 'password'"
+                  aria-label="Basic password"
+                />
+                <UButton
+                  type="button"
+                  :aria-label="`${secretVisible(template, 'password') ? 'Hide' : 'Show'} Basic password`"
+                  @click="toggleSecret(template, 'password')"
+                  >{{ secretVisible(template, "password") ? "Hide" : "Show" }}</UButton
+                >
+              </div>
+            </label>
+          </template>
+          <template v-else-if="template.type === 'api-key'">
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Header name</span>
+              <UInput
+                v-model="template.headerName"
+                aria-label="API key header name"
+                placeholder="X-API-Key"
+              />
+            </label>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Value</span>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="template.value"
+                  :type="secretVisible(template, 'value') ? 'text' : 'password'"
+                  aria-label="API key value"
+                />
+                <UButton
+                  type="button"
+                  :aria-label="`${secretVisible(template, 'value') ? 'Hide' : 'Show'} API key value`"
+                  @click="toggleSecret(template, 'value')"
+                  >{{ secretVisible(template, "value") ? "Hide" : "Show" }}</UButton
+                >
+              </div>
+            </label>
+          </template>
+          <template v-else>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Token URL</span>
+              <UInput
+                v-model="template.tokenUrl"
+                aria-label="OAuth token URL"
+                placeholder="https://auth.example.com/token"
+              />
+            </label>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Client ID</span>
+              <UInput v-model="template.clientId" aria-label="OAuth client ID" />
+            </label>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Client secret</span>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="template.clientSecret"
+                  :type="secretVisible(template, 'clientSecret') ? 'text' : 'password'"
+                  aria-label="OAuth client secret"
+                />
+                <UButton
+                  type="button"
+                  :aria-label="`${secretVisible(template, 'clientSecret') ? 'Hide' : 'Show'} OAuth client secret`"
+                  @click="toggleSecret(template, 'clientSecret')"
+                  >{{ secretVisible(template, "clientSecret") ? "Hide" : "Show" }}</UButton
+                >
+              </div>
+            </label>
+            <label
+              class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+            >
+              <span>Scope (optional)</span>
+              <UInput v-model="template.scope" aria-label="OAuth scope" />
+            </label>
+          </template>
         </SettingsAccordionCard>
       </section>
       <section class="mt-5">
@@ -479,6 +778,46 @@ watchEffect(() => {
                       }"
                     />
                   </label>
+                  <UAccordion
+                    :id="`mock-api-authorization-${entry.id || index}`"
+                    class="w-full min-w-0"
+                    :items="[{ value: 'authorization', label: 'Authorization' }]"
+                    type="single"
+                    collapsible
+                    :unmount-on-hide="false"
+                    :ui="{
+                      root: 'w-full min-w-0',
+                      item: 'border-0',
+                      trigger:
+                        'flex w-full items-center justify-between gap-2 border-0 bg-transparent p-0 text-left text-inherit',
+                      trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+                      content: 'pt-2',
+                      body: 'flex flex-col gap-2',
+                    }"
+                  >
+                    <template #default><strong>Authorization</strong></template>
+                    <template #body>
+                      <label
+                        :for="`mock-api-authorization-select-${entry.id || index}`"
+                        class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+                      >
+                        <span>Authorization</span>
+                        <USelect
+                          :id="`mock-api-authorization-select-${entry.id || index}`"
+                          :model-value="entry.authorizationTemplateId ?? ''"
+                          :items="authorizationOptions()"
+                          :aria-label="`Authorization for ${entry.name || `Mock API ${index + 1}`}`"
+                          :ui="{
+                            base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                          }"
+                          @update:model-value="entry.authorizationTemplateId = $event || null"
+                        />
+                      </label>
+                      <p class="text-[10px] text-[var(--muted)]">
+                        Selected method: {{ authorizationSummary(entry) }}
+                      </p>
+                    </template>
+                  </UAccordion>
                   <HeaderRowsEditor v-model="entry.customHeaders" />
                   <div
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"

@@ -27,8 +27,15 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
 const mockApiStore = useMockApiStore();
-const { mockApis, mockDraft, environmentVariables, headerTemplates, runningMockId, runResults } =
-  storeToRefs(mockApiStore);
+const {
+  mockApis,
+  mockDraft,
+  environmentVariables,
+  headerTemplates,
+  authorizationTemplates,
+  runningMockId,
+  runResults,
+} = storeToRefs(mockApiStore);
 const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
@@ -307,6 +314,14 @@ function deleteHeaderTemplate(template: (typeof headerTemplates.value)[number]) 
   mockApiViewModel.removeHeaderTemplate(template, (message) => window.confirm(message));
 }
 
+function addAuthorizationTemplate() {
+  mockApiViewModel.addAuthorizationTemplate();
+}
+
+function deleteAuthorizationTemplate(template: (typeof authorizationTemplates.value)[number]) {
+  mockApiViewModel.removeAuthorizationTemplate(template, (message) => window.confirm(message));
+}
+
 function saveMockDraft() {
   return mockApiViewModel.saveMockDraft();
 }
@@ -458,6 +473,7 @@ onUnmounted(() => {
       v-model:mock-draft="mockDraft"
       v-model:environment-variables="environmentVariables"
       v-model:header-templates="headerTemplates"
+      v-model:authorization-templates="authorizationTemplates"
       v-model:variables-open="sharedEnvironmentVariablesOpen"
       v-model:apis-open="registeredMockApisOpen"
       v-model:variable-draft="environmentCardDraft"
@@ -482,6 +498,8 @@ onUnmounted(() => {
       @format-request="formatRequestJson"
       @add-header-template="addHeaderTemplate"
       @delete-header-template="deleteHeaderTemplate"
+      @add-authorization-template="addAuthorizationTemplate"
+      @delete-authorization-template="deleteAuthorizationTemplate"
     />
 
     <LatestRunDrawer

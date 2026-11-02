@@ -326,6 +326,154 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.get("fieldset legend").text()).toBe("Request (JSON)");
   });
 
+  it("shows type-specific authorization fields and supports template type edits", async () => {
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [],
+        environmentVariables: [],
+        headerTemplates: [],
+        authorizationTemplates: [
+          { id: "bearer", name: "Bearer", type: "bearer", token: "token" },
+          { id: "basic", name: "Basic", type: "basic", username: "user", password: "pass" },
+          { id: "key", name: "Key", type: "api-key", headerName: "X-Key", value: "secret" },
+          {
+            id: "oauth",
+            name: "OAuth",
+            type: "oauth-client-credentials",
+            tokenUrl: "https://auth.example.com/token",
+            clientId: "client",
+            clientSecret: "secret",
+            scope: "read",
+          },
+        ],
+        variablesOpen: false,
+        apisOpen: false,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [],
+        endpointDetails: [],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    for (const [id, labels] of [
+      ["bearer", ["Bearer token"]],
+      ["basic", ["Basic username", "Basic password"]],
+      ["key", ["API key header name", "API key value"]],
+      ["oauth", ["OAuth token URL", "OAuth client ID", "OAuth client secret", "OAuth scope"]],
+    ] as const) {
+      const card = wrapper.get(`#authorization-template-${id}`);
+      await card.get('[aria-expanded="false"]').trigger("click");
+      for (const label of labels) expect(card.find(`[aria-label="${label}"]`).exists()).toBe(true);
+    }
+
+    const bearer = wrapper.get("#authorization-template-bearer");
+    await bearer.get('[aria-label="Authorization type"]').setValue("basic");
+    expect(bearer.find('[aria-label="Basic username"]').exists()).toBe(true);
+    expect(bearer.find('[aria-label="Bearer token"]').exists()).toBe(false);
+  });
+
+  it("opens new authorization templates and masks secrets until revealed", async () => {
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [],
+        environmentVariables: [],
+        headerTemplates: [],
+        authorizationTemplates: [],
+        variablesOpen: false,
+        apisOpen: false,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [],
+        endpointDetails: [],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    await wrapper
+      .get("#authorization-templates")
+      .findAll("button")
+      .find((button) => button.text() === "New template")!
+      .trigger("click");
+    expect(wrapper.emitted("addAuthorizationTemplate")).toEqual([[]]);
+    await wrapper.setProps({
+      authorizationTemplates: [
+        {
+          id: "draft-auth",
+          name: "New auth",
+          type: "bearer",
+          token: "secret",
+          pendingCreate: true,
+        },
+      ],
+    } as never);
+    const card = wrapper.get("#authorization-template-draft-auth");
+    expect(card.find('[aria-expanded="true"]').exists()).toBe(true);
+    const token = card.get('[aria-label="Bearer token"]');
+    expect(token.attributes("type")).toBe("password");
+    await card.get('[aria-label="Show Bearer token"]').trigger("click");
+    expect(card.get('[aria-label="Bearer token"]').attributes("type")).toBe("text");
+  });
+
+  it("stages per-API authorization assignment and no-auth selection", async () => {
+    const api = {
+      id: "api-1",
+      name: "Fetch orders",
+      targetEndpointId: "endpoint-1",
+      authorizationTemplateId: "auth-1",
+      description: "",
+      requestJson: "{}",
+      pathParameters: {},
+    };
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [api],
+        environmentVariables: [],
+        headerTemplates: [],
+        authorizationTemplates: [{ id: "auth-1", name: "Bearer", type: "bearer", token: "secret" }],
+        variablesOpen: false,
+        apisOpen: true,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
+        endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    const apiCard = wrapper.get("#mock-api-api-1");
+    await apiCard.get('[aria-expanded="false"]').trigger("click");
+    const authorization = apiCard.get("#mock-api-authorization-api-1");
+    await authorization.get('[aria-expanded="false"]').trigger("click");
+    const select = authorization.get('[aria-label="Authorization for Fetch orders"]');
+    expect((select.element as HTMLSelectElement).value).toBe("auth-1");
+    await select.setValue("");
+    expect(api.authorizationTemplateId).toBeNull();
+    await select.setValue("auth-1");
+    expect(api.authorizationTemplateId).toBe("auth-1");
+    expect(authorization.text()).toContain("Bearer (Bearer token)");
+
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Save")!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Discard")!
+      .trigger("click");
+    expect(wrapper.emitted("save")).toEqual([[]]);
+    expect(wrapper.emitted("discard")).toEqual([[]]);
+  });
+
   it("emits variable, import, mock API, save, and discard interactions", async () => {
     const wrapper = mount(MockApiSettingsPanel, {
       props: {

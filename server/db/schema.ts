@@ -2,6 +2,7 @@ import {
   boolean,
   datetime,
   double,
+  foreignKey,
   index,
   int,
   json,
@@ -85,6 +86,7 @@ export const mockApis = mysqlTable(
       () => headerTemplates.id,
       { onDelete: "set null" },
     ),
+    authorizationTemplateId: varchar("authorization_template_id", { length: 36 }),
     customHeaders: json("custom_headers")
       .$type<Array<{ name: string; value: string }>>()
       .notNull()
@@ -98,7 +100,14 @@ export const mockApis = mysqlTable(
     description: text("description").notNull().default(""),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("mock_apis_project_idx").on(table.projectId)],
+  (table) => [
+    index("mock_apis_project_idx").on(table.projectId),
+    foreignKey({
+      columns: [table.authorizationTemplateId],
+      foreignColumns: [authorizationTemplates.id],
+      name: "mock_apis_auth_template_fk",
+    }).onDelete("set null"),
+  ],
 );
 
 export const headerTemplates = mysqlTable(
@@ -116,6 +125,25 @@ export const headerTemplates = mysqlTable(
   (table) => [
     uniqueIndex("header_templates_project_name_unique").on(table.projectId, table.name),
     index("header_templates_project_idx").on(table.projectId),
+  ],
+);
+
+export const authorizationTemplates = mysqlTable(
+  "authorization_templates",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: mysqlEnum("type", ["bearer", "basic", "api-key", "oauth-client-credentials"]).notNull(),
+    config: json("config").$type<Record<string, string>>().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("authorization_templates_project_name_unique").on(table.projectId, table.name),
+    index("authorization_templates_project_idx").on(table.projectId),
   ],
 );
 

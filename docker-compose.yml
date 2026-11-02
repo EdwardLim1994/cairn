@@ -37,7 +37,7 @@ services:
   adminer:
     image: adminer:latest
     ports:
-      - 8888:8080
+      - "${ADMINER_PORT:-8888}:8080"
 
 volumes:
   mysql_data:

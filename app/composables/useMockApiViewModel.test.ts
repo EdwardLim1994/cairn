@@ -59,6 +59,7 @@ describe("mock API view model", () => {
         const body = options.body as {
           environmentVariables: { id?: string }[];
           headerTemplates: { id?: string }[];
+          authorizationTemplates: { id?: string }[];
           mockApis: { id?: string }[];
         };
         const mapped = (rows: { id?: string }[]) =>
@@ -70,6 +71,7 @@ describe("mock API view model", () => {
           idMap: {
             environmentVariables: mapped(body.environmentVariables),
             headerTemplates: mapped(body.headerTemplates),
+            authorizationTemplates: mapped(body.authorizationTemplates),
             mockApis: mapped(body.mockApis),
           },
         };
@@ -300,6 +302,32 @@ describe("mock API view model", () => {
     });
   });
 
+  it("maps staged authorization templates and their API assignments after Save", async () => {
+    const context = setup();
+    context.store.authorizationTemplates = [
+      {
+        id: "draft-auth",
+        name: "Bearer auth",
+        type: "bearer",
+        token: "secret",
+        pendingCreate: true,
+      },
+    ];
+    const api = context.viewModel.addMockDraft();
+    api.name = "Authenticated API";
+    api.targetEndpointId = "endpoint-1";
+    api.authorizationTemplateId = "draft-auth";
+
+    await context.viewModel.saveMockDraft();
+
+    expect(context.store.authorizationTemplates).toMatchObject([
+      { id: "created-id", name: "Bearer auth", type: "bearer", token: "secret" },
+    ]);
+    expect(context.store.authorizationTemplates[0]?.pendingCreate).toBe(false);
+    expect(context.store.mockDraft[0]?.authorizationTemplateId).toBe("created-id");
+    expect(context.errors).toEqual([]);
+  });
+
   it("restores staged API, variable, and template changes on Discard", () => {
     const context = setup();
     context.store.setMockApis([
@@ -331,6 +359,19 @@ describe("mock API view model", () => {
       { id: "draft-variable", name: "NEW", value: "value", pendingCreate: true },
     ]);
     context.store.headerTemplates = [{ id: "draft-template", name: "New", headers: [] }];
+    context.store.setAuthorizationTemplates([
+      { id: "saved-auth", name: "Saved auth", type: "bearer", token: "saved" },
+    ]);
+    const savedAuth = context.store.authorizationTemplates[0]!;
+    if (savedAuth.type === "bearer") savedAuth.token = "edited";
+    context.store.authorizationTemplates.push({
+      id: "draft-auth",
+      name: "New auth",
+      type: "api-key",
+      headerName: "X-Key",
+      value: "secret",
+      pendingCreate: true,
+    });
     context.store.setMockDraft([
       {
         name: "Unsaved",
@@ -346,6 +387,9 @@ describe("mock API view model", () => {
       { id: "saved-variable", name: "TOKEN", value: "saved" },
     ]);
     expect(context.store.headerTemplates).toEqual([]);
+    expect(context.store.authorizationTemplates).toEqual([
+      { id: "saved-auth", name: "Saved auth", type: "bearer", token: "saved" },
+    ]);
     expect(context.store.mockDraft).toMatchObject([{ name: "Saved", active: false }]);
     expect(context.operations).toEqual(["close"]);
   });

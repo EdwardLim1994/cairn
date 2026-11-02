@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
   headerTemplates,
+  authorizationTemplates,
   mockApis,
   runs,
   serviceEndpoints,
@@ -18,6 +19,10 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
       active: mockApis.active,
       targetEndpointId: mockApis.targetEndpointId,
       headerTemplateId: mockApis.headerTemplateId,
+      authorizationTemplateId: mockApis.authorizationTemplateId,
+      authorizationTemplateType: authorizationTemplates.type,
+      authorizationTemplateConfig: authorizationTemplates.config,
+      authorizationTemplateExists: authorizationTemplates.id,
       headerTemplateHeaders: headerTemplates.headers,
       headerTemplateExists: headerTemplates.id,
       customHeaders: mockApis.customHeaders,
@@ -50,8 +55,28 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
         eq(headerTemplates.projectId, projectId),
       ),
     )
+    .leftJoin(
+      authorizationTemplates,
+      and(
+        eq(mockApis.authorizationTemplateId, authorizationTemplates.id),
+        eq(authorizationTemplates.projectId, projectId),
+      ),
+    )
     .where(and(eq(mockApis.id, id), eq(mockApis.projectId, projectId)));
-  return target && { ...target, headerTemplateExists: target.headerTemplateExists !== null };
+  return (
+    target && {
+      ...target,
+      headerTemplateExists: target.headerTemplateExists !== null,
+      authorizationTemplateExists: target.authorizationTemplateExists !== null,
+      authorizationTemplate:
+        target.authorizationTemplateType && target.authorizationTemplateConfig
+          ? {
+              type: target.authorizationTemplateType,
+              config: target.authorizationTemplateConfig,
+            }
+          : null,
+    }
+  );
 }
 
 export async function createRun(projectId: string, mockApiId: string, id: string, traceId: string) {

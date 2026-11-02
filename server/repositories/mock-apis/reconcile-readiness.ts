@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../../db/schema";
-import { environmentVariables, headerTemplates, mockApis, serviceEndpoints } from "../../db/schema";
+import {
+  authorizationTemplates,
+  environmentVariables,
+  headerTemplates,
+  mockApis,
+  serviceEndpoints,
+} from "../../db/schema";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 
 type Database = MySql2Database<typeof schema>;
@@ -16,6 +22,9 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
         endpointUrl: serviceEndpoints.url,
         templateHeaders: headerTemplates.headers,
         templateId: headerTemplates.id,
+        authorizationTemplateType: authorizationTemplates.type,
+        authorizationTemplateConfig: authorizationTemplates.config,
+        authorizationTemplateExists: authorizationTemplates.id,
       })
       .from(mockApis)
       .leftJoin(
@@ -32,6 +41,13 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
           eq(headerTemplates.projectId, projectId),
         ),
       )
+      .leftJoin(
+        authorizationTemplates,
+        and(
+          eq(mockApis.authorizationTemplateId, authorizationTemplates.id),
+          eq(authorizationTemplates.projectId, projectId),
+        ),
+      )
       .where(and(eq(mockApis.projectId, projectId), eq(mockApis.active, true))),
     tx
       .select({ name: environmentVariables.name, value: environmentVariables.value })
@@ -39,9 +55,27 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
       .where(eq(environmentVariables.projectId, projectId)),
   ]);
   const values = new Map(variables.map(({ name, value }) => [name, value]));
-  for (const { api, endpointUrl, templateHeaders, templateId } of apis) {
+  for (const {
+    api,
+    endpointUrl,
+    templateHeaders,
+    templateId,
+    authorizationTemplateType,
+    authorizationTemplateConfig,
+    authorizationTemplateExists,
+  } of apis) {
+    const authorizationTemplate =
+      authorizationTemplateType && authorizationTemplateConfig
+        ? { type: authorizationTemplateType, config: authorizationTemplateConfig }
+        : null;
     const readiness = evaluateMockApiReadiness(
-      { ...api, headerTemplateExists: !api.headerTemplateId || Boolean(templateId) },
+      {
+        ...api,
+        headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
+        authorizationTemplateExists:
+          !api.authorizationTemplateId || Boolean(authorizationTemplateExists),
+        authorizationTemplate,
+      },
       endpointUrl ?? null,
       templateHeaders ?? [],
       values,

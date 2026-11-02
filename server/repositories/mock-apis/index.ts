@@ -3,6 +3,7 @@ import { getDb } from "../../db";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../../db/schema";
 import {
+  authorizationTemplates,
   environmentVariables,
   headerTemplates,
   mockApis,
@@ -87,6 +88,9 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
           endpointUrl: serviceEndpoints.url,
           templateId: headerTemplates.id,
           templateHeaders: headerTemplates.headers,
+          authorizationTemplateType: authorizationTemplates.type,
+          authorizationTemplateConfig: authorizationTemplates.config,
+          authorizationTemplateExists: authorizationTemplates.id,
         })
         .from(mockApis)
         .leftJoin(
@@ -103,6 +107,13 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
             eq(headerTemplates.projectId, projectId),
           ),
         )
+        .leftJoin(
+          authorizationTemplates,
+          and(
+            eq(mockApis.authorizationTemplateId, authorizationTemplates.id),
+            eq(authorizationTemplates.projectId, projectId),
+          ),
+        )
         .where(eq(mockApis.projectId, projectId))
         .orderBy(asc(mockApis.createdAt)),
       tx
@@ -112,39 +123,57 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
     ]);
     const variables = new Map(variableRows.map(({ name, value }) => [name, value]));
     return Promise.all(
-      rows.map(async ({ api, endpointUrl, templateId, templateHeaders }) => {
-        const readinessInput = {
-          targetEndpointId: api.targetEndpointId,
-          headerTemplateId: api.headerTemplateId,
-          headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
-          pathParameters: api.pathParameters,
-          requestJson: api.requestJson,
-          customHeaders: api.customHeaders,
-          active: api.active,
-        };
-        let readiness = evaluateMockApiReadiness(
-          readinessInput,
+      rows.map(
+        async ({
+          api,
           endpointUrl,
-          templateHeaders ?? [],
-          variables,
-        );
-        if (api.active && readiness.status === "draft") {
-          await tx.update(mockApis).set({ active: false }).where(eq(mockApis.id, api.id));
-          readiness = evaluateMockApiReadiness(
-            { ...readinessInput, active: false },
+          templateId,
+          templateHeaders,
+          authorizationTemplateType,
+          authorizationTemplateConfig,
+          authorizationTemplateExists,
+        }) => {
+          const authorizationTemplate =
+            authorizationTemplateType && authorizationTemplateConfig
+              ? { type: authorizationTemplateType, config: authorizationTemplateConfig }
+              : null;
+          const readinessInput = {
+            targetEndpointId: api.targetEndpointId,
+            headerTemplateId: api.headerTemplateId,
+            headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
+            authorizationTemplateId: api.authorizationTemplateId,
+            authorizationTemplateExists:
+              !api.authorizationTemplateId || Boolean(authorizationTemplateExists),
+            authorizationTemplate,
+            pathParameters: api.pathParameters,
+            requestJson: api.requestJson,
+            customHeaders: api.customHeaders,
+            active: api.active,
+          };
+          let readiness = evaluateMockApiReadiness(
+            readinessInput,
             endpointUrl,
             templateHeaders ?? [],
             variables,
           );
-        }
-        return {
-          ...api,
-          active: api.active && readiness.status !== "draft",
-          status: readiness.status,
-          readinessReasons: readiness.reasons,
-          createdAt: api.createdAt.toISOString(),
-        };
-      }),
+          if (api.active && readiness.status === "draft") {
+            await tx.update(mockApis).set({ active: false }).where(eq(mockApis.id, api.id));
+            readiness = evaluateMockApiReadiness(
+              { ...readinessInput, active: false },
+              endpointUrl,
+              templateHeaders ?? [],
+              variables,
+            );
+          }
+          return {
+            ...api,
+            active: api.active && readiness.status !== "draft",
+            status: readiness.status,
+            readinessReasons: readiness.reasons,
+            createdAt: api.createdAt.toISOString(),
+          };
+        },
+      ),
     );
   });
 }

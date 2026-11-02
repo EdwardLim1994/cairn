@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { spawnSync } from "node:child_process";

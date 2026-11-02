@@ -5,6 +5,7 @@ import { getDb } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../db/schema";
 import {
+  authorizationTemplates,
   environmentVariables,
   headerTemplates,
   mockApis,
@@ -26,15 +27,21 @@ export async function saveMockApiSettings(
     const idMap = {
       environmentVariables: {} as Record<string, string>,
       headerTemplates: {} as Record<string, string>,
+      authorizationTemplates: {} as Record<string, string>,
       mockApis: {} as Record<string, string>,
     };
-    const [oldVariables, oldTemplates, oldApis] = await Promise.all([
+    const [oldVariables, oldTemplates, oldAuthTemplates, oldApis] = await Promise.all([
       tx.select().from(environmentVariables).where(eq(environmentVariables.projectId, projectId)),
       tx.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
+      tx
+        .select()
+        .from(authorizationTemplates)
+        .where(eq(authorizationTemplates.projectId, projectId)),
       tx.select().from(mockApis).where(eq(mockApis.projectId, projectId)),
     ]);
     const oldVariableIds = new Set(oldVariables.map(({ id }) => id));
     const oldTemplateIds = new Set(oldTemplates.map(({ id }) => id));
+    const oldAuthTemplateIds = new Set(oldAuthTemplates.map(({ id }) => id));
     const oldApiIds = new Set(oldApis.map(({ id }) => id));
     const seenNames = new Set<string>();
     for (const variable of input.environmentVariables) {
@@ -60,6 +67,21 @@ export async function saveMockApiSettings(
       );
     }
 
+    const authTemplateNames = new Set<string>();
+    const authTemplateIds = new Map<string, string>();
+    for (const template of input.authorizationTemplates) {
+      const key = template.name.toLowerCase();
+      if (authTemplateNames.has(key))
+        throw new Error(`Duplicate authorization template: ${template.name}`);
+      authTemplateNames.add(key);
+      if (template.id && !oldAuthTemplateIds.has(template.id) && !draftId(template.id))
+        throw new Error("Authorization template changed in another session; reload and retry");
+      authTemplateIds.set(
+        template.id ?? `new:${template.name}`,
+        template.id && oldAuthTemplateIds.has(template.id) ? template.id : randomUUID(),
+      );
+    }
+
     const endpoints = input.mockApis.flatMap(({ targetEndpointId }) =>
       targetEndpointId ? [targetEndpointId] : [],
     );
@@ -82,6 +104,8 @@ export async function saveMockApiSettings(
       apiIds.add(id);
       if (api.headerTemplateId && !templateIds.has(api.headerTemplateId))
         throw new Error(`Selected header template is unavailable for ${api.name}`);
+      if (api.authorizationTemplateId && !authTemplateIds.has(api.authorizationTemplateId))
+        throw new Error(`Selected authorization template is unavailable for ${api.name}`);
       validateHeaderRows(api.customHeaders, "Custom header");
       return { api, id };
     });
@@ -112,6 +136,21 @@ export async function saveMockApiSettings(
       else await tx.insert(headerTemplates).values({ id, projectId, name, headers });
     }
 
+    const newAuthTemplateIds = new Set<string>();
+    for (const template of input.authorizationTemplates) {
+      const id = authTemplateIds.get(template.id ?? `new:${template.name}`)!;
+      if (template.id) idMap.authorizationTemplates[template.id] = id;
+      newAuthTemplateIds.add(id);
+      const { id: _draftId, name, type, ...fields } = template;
+      const config = Object.fromEntries(Object.entries(fields)) as Record<string, string>;
+      if (oldAuthTemplateIds.has(id))
+        await tx
+          .update(authorizationTemplates)
+          .set({ name, type, config })
+          .where(eq(authorizationTemplates.id, id));
+      else await tx.insert(authorizationTemplates).values({ id, projectId, name, type, config });
+    }
+
     for (const { api, id } of apiEntries) {
       if (api.id) idMap.mockApis[api.id] = id;
       const headerTemplateId = api.headerTemplateId ? templateIds.get(api.headerTemplateId)! : null;
@@ -119,6 +158,9 @@ export async function saveMockApiSettings(
         name: api.name,
         targetEndpointId: api.targetEndpointId,
         headerTemplateId,
+        authorizationTemplateId: api.authorizationTemplateId
+          ? authTemplateIds.get(api.authorizationTemplateId)!
+          : null,
         customHeaders: api.customHeaders,
         active: api.active,
         pathParameters: api.pathParameters,
@@ -130,6 +172,28 @@ export async function saveMockApiSettings(
       };
       if (oldApiIds.has(id)) await tx.update(mockApis).set(row).where(eq(mockApis.id, id));
       else await tx.insert(mockApis).values({ id, projectId, ...row });
+    }
+    const removedAuthTemplateIds = [...oldAuthTemplateIds].filter(
+      (id) => !newAuthTemplateIds.has(id),
+    );
+    if (removedAuthTemplateIds.length) {
+      await tx
+        .update(mockApis)
+        .set({ authorizationTemplateId: null })
+        .where(
+          and(
+            eq(mockApis.projectId, projectId),
+            inArray(mockApis.authorizationTemplateId, removedAuthTemplateIds),
+          ),
+        );
+      await tx
+        .delete(authorizationTemplates)
+        .where(
+          and(
+            eq(authorizationTemplates.projectId, projectId),
+            inArray(authorizationTemplates.id, removedAuthTemplateIds),
+          ),
+        );
     }
 
     const removedTemplateIds = [...oldTemplateIds].filter((id) => !newTemplateIds.has(id));
@@ -194,19 +258,39 @@ export async function saveMockApiSettings(
       : [];
     const endpointUrls = new Map(endpointRows.map(({ id, url }) => [id, url]));
     for (const api of savedApis) {
-      const template = api.headerTemplateId
-        ? await tx
-            .select()
-            .from(headerTemplates)
-            .where(
-              and(
-                eq(headerTemplates.id, api.headerTemplateId),
-                eq(headerTemplates.projectId, projectId),
-              ),
-            )
-        : [];
+      const [template, authTemplate] = await Promise.all([
+        api.headerTemplateId
+          ? tx
+              .select()
+              .from(headerTemplates)
+              .where(
+                and(
+                  eq(headerTemplates.id, api.headerTemplateId),
+                  eq(headerTemplates.projectId, projectId),
+                ),
+              )
+          : Promise.resolve([]),
+        api.authorizationTemplateId
+          ? tx
+              .select()
+              .from(authorizationTemplates)
+              .where(
+                and(
+                  eq(authorizationTemplates.id, api.authorizationTemplateId),
+                  eq(authorizationTemplates.projectId, projectId),
+                ),
+              )
+          : Promise.resolve([]),
+      ]);
       const readiness = evaluateMockApiReadiness(
-        { ...api, headerTemplateExists: !api.headerTemplateId || template.length > 0 },
+        {
+          ...api,
+          headerTemplateExists: !api.headerTemplateId || template.length > 0,
+          authorizationTemplateExists: !api.authorizationTemplateId || authTemplate.length > 0,
+          authorizationTemplate: authTemplate[0]
+            ? { type: authTemplate[0].type, config: authTemplate[0].config }
+            : null,
+        },
         api.targetEndpointId ? (endpointUrls.get(api.targetEndpointId) ?? null) : null,
         template[0]?.headers ?? [],
         variables,

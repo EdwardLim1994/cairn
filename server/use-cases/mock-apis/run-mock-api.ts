@@ -6,6 +6,8 @@ import { resolveEndpointPath } from "../../utils/mock-api-paths";
 import { getOutboundUrl } from "../../utils/outbound-url";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 import { resolveHeaderRows } from "../../utils/headers";
+import { resolveStaticAuthorizationHeaders } from "../../utils/authorization";
+import { getOAuthAccessToken } from "../../utils/oauth-client";
 
 type ExecutionTarget = {
   mockApiId: string;
@@ -20,6 +22,12 @@ type ExecutionTarget = {
   headerTemplateId: string | null;
   headerTemplateExists: boolean;
   headerTemplateHeaders: Array<{ name: string; value: string }> | null;
+  authorizationTemplateId: string | null;
+  authorizationTemplateExists: boolean;
+  authorizationTemplate: {
+    type: "bearer" | "basic" | "api-key" | "oauth-client-credentials";
+    config: Record<string, string>;
+  } | null;
   customHeaders: Array<{ name: string; value: string }>;
   mockApiName: string;
   baseUrl: string | null;
@@ -72,6 +80,9 @@ export function createRunMockApiUseCase(dependencies: {
         targetEndpointId: target.targetEndpointId,
         headerTemplateId: target.headerTemplateId,
         headerTemplateExists: target.headerTemplateExists,
+        authorizationTemplateId: target.authorizationTemplateId,
+        authorizationTemplateExists: target.authorizationTemplateExists,
+        authorizationTemplate: target.authorizationTemplate,
         pathParameters: target.pathParameters ?? {},
         requestJson: target.requestJson,
         customHeaders: target.customHeaders,
@@ -93,7 +104,7 @@ export function createRunMockApiUseCase(dependencies: {
     };
     const timeoutMs = dependencies.timeoutMs();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     let targetUrl = getOutboundUrl(target.url, target.baseUrl).toString();
     const logFailure = async (message: string, responseStatus: number | null) => {
       try {
@@ -124,9 +135,32 @@ export function createRunMockApiUseCase(dependencies: {
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
+      await dependencies.createRun(projectId, id, runId, traceId);
+      if (target.authorizationTemplate?.type === "oauth-client-credentials") {
+        const token = await getOAuthAccessToken({
+          projectId,
+          templateId: target.authorizationTemplateId!,
+          config: {
+            tokenUrl: target.authorizationTemplate.config.tokenUrl!,
+            clientId: target.authorizationTemplate.config.clientId!,
+            clientSecret: target.authorizationTemplate.config.clientSecret!,
+            scope: target.authorizationTemplate.config.scope,
+          },
+          variables,
+          fetch: dependencies.fetch,
+          timeoutMs,
+        });
+        headers.set("Authorization", `Bearer ${token}`);
+      } else {
+        for (const header of resolveStaticAuthorizationHeaders(
+          target.authorizationTemplate,
+          variables,
+        ))
+          headers.set(header.name, header.value);
+      }
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       if (!isGet && !headers.has("content-type")) headers.set("content-type", "application/json");
-      await dependencies.createRun(projectId, id, runId, traceId);
+      timeout = setTimeout(() => controller.abort(), timeoutMs);
       const response = await dependencies.fetch(targetUrl, {
         method: target.method,
         headers,
@@ -176,7 +210,7 @@ export function createRunMockApiUseCase(dependencies: {
         error: message,
       };
     } finally {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
     }
   };
 }

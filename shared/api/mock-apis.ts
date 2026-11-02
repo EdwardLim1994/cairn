@@ -19,6 +19,7 @@ const mockApiInputFields = z.object({
   pathParameters: z.record(z.string(), z.string()).optional().default({}),
   requestJson: z.unknown().optional().default({}),
   headerTemplateId: z.string().min(1).nullable().optional().default(null),
+  authorizationTemplateId: z.string().min(1).nullable().optional(),
   customHeaders: z.array(headerSchema).optional().default([]),
   active: z.boolean().optional().default(true),
   importMethod: z.string().max(10).nullable().optional().default(null),
@@ -48,6 +49,7 @@ export const mockApiListResponseSchema = z.array(
     name: z.string(),
     targetEndpointId: z.string().nullable(),
     headerTemplateId: z.string().nullable(),
+    authorizationTemplateId: z.string().nullable().optional(),
     customHeaders: z.array(headerSchema),
     active: z.boolean(),
     status: z.enum(["draft", "inactive", "ready"]),
@@ -82,6 +84,76 @@ export const headerTemplateInputSchema = z.object({
   name: z.string().trim().min(1).max(255),
   headers: z.array(headerSchema),
 });
+export const authorizationTemplateInputSchema = z.discriminatedUnion("type", [
+  z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(255),
+    type: z.literal("bearer"),
+    token: z.string(),
+  }),
+  z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(255),
+    type: z.literal("basic"),
+    username: z.string(),
+    password: z.string(),
+  }),
+  z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(255),
+    type: z.literal("api-key"),
+    headerName: z.string(),
+    value: z.string(),
+  }),
+  z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(255),
+    type: z.literal("oauth-client-credentials"),
+    tokenUrl: z.string().url(),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    scope: z.string().optional(),
+  }),
+]);
+export const authorizationTemplateSchema = z.discriminatedUnion("type", [
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal("bearer"),
+    token: z.string(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+  }),
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal("basic"),
+    username: z.string(),
+    password: z.string(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+  }),
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal("api-key"),
+    headerName: z.string(),
+    value: z.string(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+  }),
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal("oauth-client-credentials"),
+    tokenUrl: z.string().url(),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    scope: z.string().optional(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+  }),
+]);
 export const mockApiSettingsSaveRequestSchema = z.object({
   environmentVariables: z.array(
     z.object({
@@ -91,6 +163,7 @@ export const mockApiSettingsSaveRequestSchema = z.object({
     }),
   ),
   headerTemplates: z.array(headerTemplateInputSchema.extend({ id: z.string().optional() })),
+  authorizationTemplates: z.array(authorizationTemplateInputSchema).default([]),
   mockApis: z.array(
     validateMockApiActivation(mockApiInputFields.extend({ id: z.string().optional() })),
   ),
@@ -100,11 +173,14 @@ export const mockApiSettingsSaveResponseSchema = z.object({
   idMap: z.object({
     environmentVariables: z.record(z.string(), z.string()),
     headerTemplates: z.record(z.string(), z.string()),
+    authorizationTemplates: z.record(z.string(), z.string()).default({}),
     mockApis: z.record(z.string(), z.string()),
   }),
 });
 export type MockApiSettingsSaveRequest = z.infer<typeof mockApiSettingsSaveRequestSchema>;
 export type HeaderTemplate = z.infer<typeof headerTemplateSchema>;
+export type AuthorizationTemplateInput = z.infer<typeof authorizationTemplateInputSchema>;
+export type AuthorizationTemplate = z.infer<typeof authorizationTemplateSchema>;
 export type HeaderInput = z.infer<typeof headerSchema>;
 
 export type MockApiInput = z.infer<typeof mockApiCreateRequestSchema>;

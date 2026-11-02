@@ -53,4 +53,51 @@ describe("mock API readiness", () => {
     );
     expect(result.reasons.map(({ code }) => code)).toContain("header-template-missing");
   });
+
+  it("rejects Authorization conflicts without including header values", () => {
+    const result = evaluateMockApiReadiness(
+      {
+        ...base,
+        customHeaders: [{ name: "authorization", value: "sensitive-raw-value" }],
+        authorizationTemplateId: "auth-1",
+        authorizationTemplateExists: true,
+        authorizationTemplate: { type: "bearer", config: { token: "sensitive-token" } },
+        requestJson: {},
+      },
+      "/orders",
+      [],
+      new Map(),
+    );
+    expect(result.status).toBe("draft");
+    expect(result.reasons).toContainEqual({
+      code: "authorization-header-conflict",
+      message: "Header Authorization conflicts with selected authorization",
+    });
+    expect(JSON.stringify(result)).not.toContain("sensitive");
+  });
+
+  it("rejects API key conflicts against raw header templates case-insensitively", () => {
+    const result = evaluateMockApiReadiness(
+      {
+        ...base,
+        customHeaders: [],
+        authorizationTemplateId: "api-key-1",
+        authorizationTemplateExists: true,
+        authorizationTemplate: {
+          type: "api-key",
+          config: { headerName: "X-API-Key", value: "secret" },
+        },
+        requestJson: {},
+      },
+      "/orders",
+      [{ name: "x-api-key", value: "raw-value" }],
+      new Map(),
+    );
+    expect(result.status).toBe("draft");
+    expect(result.reasons.map(({ message }) => message)).toContain(
+      "Header X-API-Key conflicts with selected authorization",
+    );
+    expect(JSON.stringify(result)).not.toContain("secret");
+    expect(JSON.stringify(result)).not.toContain("raw-value");
+  });
 });

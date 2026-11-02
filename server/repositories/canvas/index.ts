@@ -1,10 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { CanvasGetResponse, CanvasPutRequest } from "#shared/api/canvas";
+import type { AuthorizationTemplate } from "#shared/api/mock-apis";
 import { getDb } from "../../db";
 import { listMockApis } from "../mock-apis";
 import {
   headerTemplates,
+  authorizationTemplates,
   projects,
   serviceEdges,
   serviceEndpoints,
@@ -19,14 +21,19 @@ export async function getCanvas(
   projectId: string,
   db: Database = getDb(),
 ): Promise<CanvasGetResponse> {
-  const [[project], serviceRows, endpoints, edges, mockApiRows, templateRows] = await Promise.all([
-    db.select().from(projects).where(eq(projects.id, projectId)),
-    db.select().from(services).where(eq(services.projectId, projectId)),
-    db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
-    db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
-    listMockApis(projectId, db),
-    db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
-  ]);
+  const [[project], serviceRows, endpoints, edges, mockApiRows, templateRows, authTemplateRows] =
+    await Promise.all([
+      db.select().from(projects).where(eq(projects.id, projectId)),
+      db.select().from(services).where(eq(services.projectId, projectId)),
+      db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
+      db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
+      listMockApis(projectId, db),
+      db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
+      db
+        .select()
+        .from(authorizationTemplates)
+        .where(eq(authorizationTemplates.projectId, projectId)),
+    ]);
   if (!project) throw new Error("Project canvas could not be initialized");
   return {
     viewport: { x: project.viewportX, y: project.viewportY, zoom: project.viewportZoom },
@@ -49,6 +56,17 @@ export async function getCanvas(
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
     })),
+    authorizationTemplates: authTemplateRows.map(
+      (template) =>
+        ({
+          id: template.id,
+          name: template.name,
+          type: template.type,
+          ...template.config,
+          createdAt: template.createdAt.toISOString(),
+          updatedAt: template.updatedAt.toISOString(),
+        }) as AuthorizationTemplate,
+    ),
   };
 }
 
