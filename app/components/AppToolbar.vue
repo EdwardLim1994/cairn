@@ -3,6 +3,7 @@ defineProps<{ allNodesCollapsed: boolean; dark: boolean }>();
 const emit = defineEmits<{
   toggleAll: [];
   toggleTheme: [];
+  openMockApis: [];
   openAccessTokens: [];
   openHistory: [];
 }>();
@@ -24,6 +25,18 @@ const emit = defineEmits<{
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
+        aria-label="Mock APIs"
+        title="Mock APIs"
+        @click.stop="emit('openMockApis')"
+      >
+        <UIcon name="i-lucide-play" class="size-3.5" aria-hidden="true" />
+        Mock APIs
+      </UButton>
       <UButton
         type="button"
         color="neutral"

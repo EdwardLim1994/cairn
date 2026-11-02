@@ -4,8 +4,9 @@ import { VueFlow, useVueFlow, type Connection, type Edge, type Node } from "@vue
 import { Background, BackgroundVariant } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
-import MockApiGraphNode, { type MockApiGraphEntry } from "./MockApiGraphNode.vue";
+import MockApiTriggerNode from "./MockApiTriggerNode.vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
+import type { GraphMockApi } from "../../models/graph";
 
 const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean }>();
 const emit = defineEmits<{
@@ -18,9 +19,7 @@ const emit = defineEmits<{
   nodeDragStop: [];
   toggleServiceEndpoints: [serviceId: string];
   openServiceEndpoint: [endpointId: string | undefined];
-  toggleMockConnections: [];
-  openMockApi: [id: string];
-  runMockApi: [entry: MockApiGraphEntry];
+  runMockApi: [entry: GraphMockApi];
 }>();
 
 const modelNodes = computed({
@@ -69,15 +68,8 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
         @open-endpoint="emit('openServiceEndpoint', $event)"
       />
     </template>
-    <template #node-mockApis="{ data }">
-      <MockApiGraphNode
-        :entries="data.entries"
-        :collapsed="data.collapsed"
-        :running-mock-id="data.runningMockId"
-        @toggle-connections="emit('toggleMockConnections')"
-        @open="emit('openMockApi', $event)"
-        @run="emit('runMockApi', $event)"
-      />
+    <template #node-mockApiTrigger="{ data }">
+      <MockApiTriggerNode :data="data" @trigger="emit('runMockApi', data.entry)" />
     </template>
   </VueFlow>
 </template>

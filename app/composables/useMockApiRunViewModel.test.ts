@@ -134,7 +134,6 @@ describe("mock API run view model", () => {
     const graphViewModel = useGraphViewModel({
       store: graphStore,
       mockApis: () => [mock],
-      runResults: () => mockApiStore.runResults,
       runningMockId: () => mockApiStore.runningMockId,
     });
     const logService = ref<string[]>([]);
@@ -172,7 +171,11 @@ describe("mock API run view model", () => {
     expect(context.mockApiStore.runResults["mock-1"]?.status).toBe("completed");
     expect(context.mockApiStore.runningMockId).toBeNull();
     expect(context.graphStore.observedServices).toEqual(["Orders", "Inventory"]);
-    expect(context.graphStore.edges.some((edge) => edge.id === "observed-0")).toBe(true);
+    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
+    expect(edges.some((edge) => edge.id === "observed-0")).toBe(true);
+    expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
+    const nodes = context.graphStore.nodes as unknown as { id: string; class?: string }[];
+    expect(nodes.find((node) => node.id === "orders")?.class).toContain("service-observed");
     expect(context.logsOpen.value).toBe(false);
     expect(context.calls.saveCanvas).toBe(2);
   });
@@ -193,7 +196,7 @@ describe("mock API run view model", () => {
   });
 
   it("replays a saved trace without triggering a mock API request", async () => {
-    const context = setup("completed");
+    const context = setup("failed");
     const historyEntry: MockApiCallHistoryEntry = {
       id: "history-1",
       projectId: "p",
@@ -204,9 +207,9 @@ describe("mock API run view model", () => {
       url: "http://orders/orders",
       requestBody: { old: true },
       traceId: "trace-1",
-      status: "completed",
+      status: "failed",
       triggeredAt: "2026-11-02T08:00:00.000Z",
-      responseStatus: 201,
+      responseStatus: 500,
       responseHeaders: {},
       responseBody: "{}",
       error: null,
@@ -215,15 +218,19 @@ describe("mock API run view model", () => {
     await context.viewModel.replayHistoryEntry(historyEntry);
 
     expect(context.apiCalls).toEqual(["/api/runs/run-1/flow"]);
-    expect(context.graphStore.observedMockApiId).toBe("deleted-mock-api");
     expect(context.graphStore.observedServices).toEqual(["Orders", "Inventory"]);
     expect(context.graphStore.observedEdges).toEqual([
       { sourceService: "Orders", targetService: "Inventory" },
     ]);
+    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
+    expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
+    const nodes = context.graphStore.nodes as unknown as { id: string; class?: string }[];
+    expect(nodes.find((node) => node.id === "inventory")?.class).toContain("service-observed");
+    expect(nodes.find((node) => node.id === "inventory")?.class).toContain("service-error");
     expect(context.mockApiStore.runResults["deleted-mock-api"]).toMatchObject({
       id: "run-1",
-      status: "completed",
-      responseStatus: 201,
+      status: "failed",
+      responseStatus: 500,
       traceId: "trace-1",
     });
     expect(context.calls.saveCanvas).toBe(0);
@@ -252,7 +259,6 @@ describe("mock API run view model", () => {
     context.viewModel.stopReplay();
     await pendingReplay;
 
-    expect(context.graphStore.observedMockApiId).toBeNull();
     expect(context.mockApiStore.runResults["mock-1"]).toBeUndefined();
   });
 });

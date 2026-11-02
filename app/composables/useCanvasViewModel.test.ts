@@ -81,7 +81,6 @@ describe("canvas view model", () => {
     const graphViewModel = useGraphViewModel({
       store: graphStore,
       mockApis: () => mockApiStore.mockApis,
-      runResults: () => ({}),
       runningMockId: () => null,
     });
     const canvasElement = {
@@ -125,7 +124,7 @@ describe("canvas view model", () => {
     const nodeIds = (context.graphStore as unknown as { nodes: Array<{ id: string }> }).nodes.map(
       (node) => node.id,
     );
-    expect(nodeIds).toEqual(["service-1", "mock-apis"]);
+    expect(nodeIds).toEqual(["service-1", "mock-api-mock-1"]);
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
     expect(context.graphStore.serviceHealth).toEqual({ "service-1": true });
     expect(context.canvasElement.setViewportCalls).toEqual([canvas.viewport]);
@@ -158,35 +157,42 @@ describe("canvas view model", () => {
     ).toBe(true);
   });
 
-  it("connects services, avoids self-connections, and updates mock API targets", async () => {
+  it("ignores non-service graph connections because targets are selected in the panel", async () => {
     const context = setup();
     context.graphStore.applyCanvas(canvas);
     context.mockApiStore.setMockApis([mockApi]);
+    const paymentsService = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      positionX: 400,
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+        name: "Create payment",
+      })),
+    };
+    context.graphStore.services = [...context.graphStore.services, paymentsService];
     await context.model.onConnect({
       source: "service-1",
-      target: "other",
+      target: "service-2",
       sourceHandle: null,
-      targetHandle: "endpoint-1",
+      targetHandle: "endpoint-2",
     });
     expect(context.graphStore.serviceEdges).toHaveLength(1);
     await context.model.onConnect({
-      source: "service-1",
+      source: "mock-api-mock-1",
       target: "service-1",
-      sourceHandle: null,
+      sourceHandle: "trigger-out",
       targetHandle: "endpoint-1",
     });
     expect(context.graphStore.serviceEdges).toHaveLength(1);
-    await context.model.onConnect({
-      source: "mock-apis",
-      target: "service-1",
-      sourceHandle: "mock-1",
-      targetHandle: "endpoint-1",
-    });
     expect(
       context.requests.some(
         ({ url, options }) => url === "/api/mock-apis/mock-1" && options.method === "PUT",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
   });
 
@@ -196,12 +202,7 @@ describe("canvas view model", () => {
     await context.model.toggleAllNodes();
     expect(context.graphStore.allNodesCollapsed).toBe(true);
     await context.model.toggleServiceEndpoints("service-1");
-    await context.model.toggleMockConnections();
     expect(context.graphStore.allNodesCollapsed).toBe(false);
-    expect(context.canvasElement.updateCalls).toEqual([
-      ["service-1", "mock-apis"],
-      ["service-1"],
-      ["mock-apis"],
-    ]);
+    expect(context.canvasElement.updateCalls).toEqual([["service-1"], ["service-1"]]);
   });
 });

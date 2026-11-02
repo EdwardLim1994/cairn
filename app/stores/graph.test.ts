@@ -31,7 +31,7 @@ const service = {
 describe("graph store", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("loads canvas data and updates graph nodes, edges, health, and viewport", () => {
+  it("loads canvas data and preserves the legacy mock node coordinate", () => {
     const store = useGraphStore();
     const canvas = {
       services: [service],
@@ -45,7 +45,7 @@ describe("graph store", () => {
 
     store.applyCanvas(canvas);
     store.setNodes([{ id: "service-1", position: { x: 10, y: 20 } }]);
-    store.setEdges([{ id: "edge-2", source: "service-1", target: "mock-apis" }]);
+    store.setEdges([{ id: "edge-2", source: "service-1", target: "service-1" }]);
     store.setServiceHealth({ "service-1": true });
     store.setViewport({ x: 1, y: 2, zoom: 2 });
     store.setServiceEdges([]);
@@ -74,30 +74,25 @@ describe("graph store", () => {
     expect(store.collapsedServiceEndpoints["service-1"]).toBe(true);
     store.setAllNodesCollapsed(true);
     expect(store.allNodesCollapsed).toBe(true);
-    store.toggleMockConnections();
-    expect(store.mockConnectionsCollapsed).toBe(false);
-    store.setAllNodesCollapsed(true);
     store.setObservations({
-      mockApiId: "mock-1",
       services: ["Orders"],
       errorServices: ["Orders"],
       edges: [{ sourceService: "Orders", targetService: "Payments" }],
     });
     store.setNodes([
       { id: "service-1", position: { x: 12, y: 34 } },
-      { id: "mock-apis", position: { x: 56, y: 78 } },
+      { id: "mock-api-mock-1", position: { x: 56, y: 78 } },
     ]);
     store.setSelection("service-1");
     store.syncSavedPositions();
 
     expect(store.selectedNodeId).toBe("service-1");
-    expect(store.observedMockApiId).toBe("mock-1");
     expect(store.observedServices).toEqual(["Orders"]);
     expect(store.observedErrorServices).toEqual(["Orders"]);
     expect(store.observedEdges).toEqual([{ sourceService: "Orders", targetService: "Payments" }]);
     expect(store.services[0]?.positionX).toBe(12);
     expect(store.services[0]?.positionY).toBe(34);
-    expect(store.mockNodePosition).toEqual({ x: 56, y: 78 });
+    expect(store.mockNodePosition).toEqual({ x: 560, y: 160 });
     store.setSelection(null);
     expect(store.selectedNodeId).toBeNull();
   });

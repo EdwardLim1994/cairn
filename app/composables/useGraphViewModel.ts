@@ -1,42 +1,30 @@
 import type { Edge, Node } from "@vue-flow/core";
-import type { GraphMockApi, GraphRunResult, GraphService } from "../models/graph";
+import type { GraphMockApi, GraphService } from "../models/graph";
 import type { useGraphStore } from "../stores/graph";
 
 type Store = ReturnType<typeof useGraphStore>;
 type ViewModelOptions = {
   store: Store;
   mockApis: () => GraphMockApi[];
-  runResults: () => Record<string, GraphRunResult>;
   runningMockId: () => string | null;
+  runResults?: () => Record<string, { status: string }>;
 };
 
 function frameworkLabel(framework: string) {
   return framework.toLowerCase().includes(".net") ? ".NET" : framework;
 }
 
-function mockEdgeClass(entryId: string, runningId: string | null, observedId: string | null) {
-  if (entryId === runningId) return "app__flow-edge app__flow-edge--running";
-  if (entryId === observedId) return "app__flow-edge app__flow-edge--observed";
-  return "";
-}
-
 export function useGraphViewModel({
   store,
   mockApis,
-  runResults,
   runningMockId,
+  runResults,
 }: ViewModelOptions) {
   function endpointTarget(endpointId: string) {
     for (const service of store.services) {
       if (service.endpoints.some((endpoint) => endpoint.id === endpointId)) return service.id;
     }
     return undefined;
-  }
-
-  function mockEndpoint(entry: GraphMockApi) {
-    return store.services
-      .flatMap((service) => service.endpoints)
-      .find((endpoint) => endpoint.id === entry.targetEndpointId);
   }
 
   function endpointHandle(endpointId: string) {
@@ -83,30 +71,40 @@ export function useGraphViewModel({
     };
   }
 
-  function mockNode(): Node {
-    return {
-      id: "mock-apis",
-      type: "mockApis",
-      position: store.mockNodePosition,
-      data: {
-        entries: mockApis().map((entry) => ({
-          ...entry,
-          endpoint: mockEndpoint(entry),
-          status: runResults()[entry.id]?.status,
-          readinessStatus: entry.status,
+  function mockApiNodes(): Node[] {
+    const entriesByService = new Map<string, GraphMockApi[]>();
+    for (const entry of mockApis()) {
+      if (!entry.id || !entry.targetEndpointId) continue;
+      const serviceId = endpointTarget(entry.targetEndpointId);
+      if (!serviceId) continue;
+      entriesByService.set(serviceId, [...(entriesByService.get(serviceId) ?? []), entry]);
+    }
+
+    return [...entriesByService.entries()].flatMap(([serviceId, entries]) => {
+      const service = store.services.find((item) => item.id === serviceId);
+      if (!service) return [];
+      const ordered = [...entries].sort((left, right) => left.id.localeCompare(right.id));
+      return ordered.map((entry, index) => ({
+        id: `mock-api-${entry.id}`,
+        type: "mockApiTrigger",
+        position: {
+          x: entry.positionX ?? service.positionX - 220,
+          y: entry.positionY ?? service.positionY + (index - (ordered.length - 1) / 2) * 68,
+        },
+        data: {
+          id: entry.id,
+          name: entry.name,
+          active: entry.active,
+          ready: entry.status === "ready",
           running: runningMockId() === entry.id,
-        })),
-        collapsed: store.mockConnectionsCollapsed,
-        runningMockId: runningMockId(),
-      },
-      class: [
-        "app__flow-node",
-        store.observedMockApiId ? "app__flow-node--mock-observed" : "",
-        store.selectedNodeId === "mock-apis" ? "selected" : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    };
+          busy: Boolean(runningMockId()),
+          entry,
+        },
+        class: "app__flow-node app__flow-node--mock-trigger",
+        draggable: true,
+        selectable: false,
+      }));
+    });
   }
 
   function buildEdges() {
@@ -136,17 +134,23 @@ export function useGraphViewModel({
     const mock: Edge[] = mockApis().flatMap((entry) => {
       const target = endpointTarget(entry.targetEndpointId ?? "");
       if (!entry.id || !target) return [];
+      const status = runResults?.()[entry.id]?.status;
+      const running = runningMockId() === entry.id && status === "running";
+      const completed = status === "completed" || status === "failed";
       return [
         {
           id: `mock-${entry.id}`,
-          source: "mock-apis",
-          sourceHandle: store.mockConnectionsCollapsed
-            ? mockApis().find((item) => item.id)?.id
-            : entry.id,
+          source: `mock-api-${entry.id}`,
+          sourceHandle: "trigger-out",
           target,
           targetHandle: endpointHandle(entry.targetEndpointId ?? ""),
           type: "default",
-          class: mockEdgeClass(entry.id, runningMockId(), store.observedMockApiId),
+          class: running
+            ? "app__flow-edge app__flow-edge--running"
+            : completed
+              ? "app__flow-edge app__flow-edge--observed"
+              : "",
+          animated: completed,
         },
       ];
     });
@@ -173,7 +177,7 @@ export function useGraphViewModel({
   }
 
   function syncNodes() {
-    const nodes = [...store.services.map(serviceNode), mockNode()];
+    const nodes = [...store.services.map(serviceNode), ...mockApiNodes()];
     store.setNodes(nodes);
     buildEdges();
     return nodes;
@@ -185,28 +189,49 @@ export function useGraphViewModel({
       position: { x: number; y: number };
     }[];
     const servicePositions = graphNodes
-      .filter((node) => node.id !== "mock-apis")
+      .filter((node) => store.services.some((service) => service.id === node.id))
       .map((node) => ({ id: node.id, x: node.position.x, y: node.position.y }));
-    const mock = graphNodes.find((node) => node.id === "mock-apis");
+    const mockApiPositions = graphNodes
+      .filter((node) => node.id.startsWith("mock-api-"))
+      .map((node) => ({
+        id: node.id.slice("mock-api-".length),
+        x: node.position.x,
+        y: node.position.y,
+      }));
     return {
       viewport: store.viewport,
-      mockNode: mock ? mock.position : store.mockNodePosition,
+      mockNode: store.mockNodePosition,
       services: servicePositions,
+      mockApiPositions,
       edges: store.serviceEdges,
     };
   }
 
   return {
     endpointTarget,
-    mockEndpoint,
     endpointHandle,
     frameworkLabel,
     serviceEndpointOptions,
     serviceNode,
-    mockNode,
+    mockApiNodes,
     buildEdges,
     syncNodes,
     canvasPayload,
-    syncSavedPositions: () => store.syncSavedPositions(),
+    syncSavedPositions: () => {
+      store.syncSavedPositions();
+      const positions = new Map(
+        (store.nodes as unknown as { id: string; position: { x: number; y: number } }[])
+          .filter((node) => node.id.startsWith("mock-api-"))
+          .map((node) => [node.id.slice("mock-api-".length), node.position]),
+      );
+      for (const entry of mockApis()) {
+        const position = positions.get(entry.id);
+        if (position) {
+          entry.positionX = position.x;
+          entry.positionY = position.y;
+        }
+      }
+      syncNodes();
+    },
   };
 }

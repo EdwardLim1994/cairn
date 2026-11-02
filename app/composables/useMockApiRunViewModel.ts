@@ -33,7 +33,6 @@ export function useMockApiRunViewModel(options: {
 
   function setInitialObservations(entry: MockApiDraft, targetService?: GraphService) {
     options.graphStore.setObservations({
-      mockApiId: entry.id!,
       services: targetService ? [targetService.name] : [],
       errorServices: [],
       edges: [],
@@ -74,7 +73,6 @@ export function useMockApiRunViewModel(options: {
     targetService?: GraphService,
   ) {
     options.graphStore.setObservations({
-      mockApiId: entry.id!,
       errorServices: flow.errorServices,
       edges: flow.edges.map(({ sourceService, targetService }) => ({
         sourceService,
@@ -107,6 +105,7 @@ export function useMockApiRunViewModel(options: {
     try {
       const result = await options.apiClient.runMockApi(entry.id);
       options.mockApiStore.setRunResult(entry.id, result);
+      options.graphViewModel.buildEdges();
       if (result.status === "failed") await showServiceLogs(targetService);
       const flow = await waitForFlow(result.id);
       applyFlow(entry, result, flow, targetService);
@@ -120,6 +119,7 @@ export function useMockApiRunViewModel(options: {
         responseBody: null,
         error: cause instanceof Error ? cause.message : "Call failed",
       });
+      options.graphViewModel.buildEdges();
       await showServiceLogs(targetService);
     } finally {
       options.mockApiStore.setRunningMockId(null);
@@ -133,7 +133,6 @@ export function useMockApiRunViewModel(options: {
     const flow = await waitForFlow(entry.runId, () => generation === replayGeneration);
     if (generation !== replayGeneration) return;
     options.graphStore.setObservations({
-      mockApiId: entry.mockApiId,
       errorServices: flow.errorServices,
       edges: flow.edges.map(({ sourceService, targetService }) => ({
         sourceService,

@@ -44,23 +44,7 @@ const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
-const {
-  nodes,
-  edges,
-  services,
-  collapsedServiceEndpoints,
-  serviceHealth,
-  serviceEdges,
-  viewport,
-  mockNodePosition,
-  observedErrorServices,
-  observedServices,
-  observedEdges,
-  observedMockApiId,
-  mockConnectionsCollapsed,
-  selectedNodeId,
-  allNodesCollapsed,
-} = storeToRefs(graphStore);
+const { nodes, edges, services, allNodesCollapsed } = storeToRefs(graphStore);
 const dark = useCookie("cairn-dark-mode", {
   default: () => false,
   maxAge: 60 * 60 * 24 * 365,
@@ -110,8 +94,8 @@ const observabilityViewModel = useObservabilityViewModel({ store: observabilityS
 const graphViewModel = useGraphViewModel({
   store: graphStore,
   mockApis: () => mockApis.value,
-  runResults: () => runResults.value,
   runningMockId: () => runningMockId.value,
+  runResults: () => runResults.value,
 });
 const canvasViewModel = useCanvasViewModel({
   apiClient,
@@ -125,7 +109,6 @@ const canvasViewModel = useCanvasViewModel({
 const {
   buildEdges,
   syncNodes,
-  toggleMockConnections,
   toggleServiceEndpoints,
   toggleAllNodes,
   loadCanvas,
@@ -224,7 +207,7 @@ async function replayMockApiCallHistory(entry: MockApiCallHistoryEntry) {
 function stopMockApiCallHistoryReplay() {
   mockApiRunViewModel.stopReplay();
   historyReplayEntryId.value = null;
-  graphStore.setObservations({ mockApiId: null, services: [], errorServices: [], edges: [] });
+  graphStore.setObservations({ services: [], errorServices: [], edges: [] });
   graphViewModel.syncNodes();
 }
 
@@ -269,7 +252,6 @@ const graphInteractionViewModel = useGraphInteractionViewModel({
   contextMenu,
   graphCanvas,
   syncNodes,
-  openMockPanel,
   editService: (id) => editService(id),
 });
 const handleCanvasContextMenu = graphInteractionViewModel.handleCanvasContextMenu;
@@ -460,6 +442,7 @@ onUnmounted(() => {
       :dark="dark"
       @toggle-all="toggleAllNodes"
       @toggle-theme="dark = !dark"
+      @open-mock-apis="openMockPanel"
       @open-access-tokens="accessTokensOpen = true"
       @open-history="historyOpen = true"
     />
@@ -480,8 +463,6 @@ onUnmounted(() => {
           @node-drag-stop="saveCanvas"
           @toggle-service-endpoints="toggleServiceEndpoints"
           @open-service-endpoint="openServiceEndpoint"
-          @toggle-mock-connections="toggleMockConnections"
-          @open-mock-api="openMockPanel"
           @run-mock-api="runMock"
         />
       </ContextMenu>
@@ -769,14 +750,23 @@ body {
   width: 288px;
 }
 
-.app__graph-node--service,
-.app__graph-node--mock {
+.app__graph-node--service {
   width: 288px;
   overflow: visible;
 }
 
-.vue-flow__node.app__flow-node--service-observed .app__graph-node--service,
-.vue-flow__node.app__flow-node--mock-observed .app__graph-node--mock {
+.app__graph-node--mock-trigger {
+  width: max-content;
+  min-width: 200px;
+  overflow: visible;
+}
+
+.vue-flow__node.app__flow-node--mock-trigger {
+  width: max-content;
+  min-width: 200px;
+}
+
+.vue-flow__node.app__flow-node--service-observed .app__graph-node--service {
   border-color: var(--accent);
   box-shadow:
     0 0 0 2px var(--accent-soft),
@@ -862,7 +852,6 @@ body {
 }
 
 .app .app__endpoint-handle,
-.app .app__mock-handle,
 .app .app__service-source {
   width: 10px;
   height: 10px;
@@ -874,34 +863,9 @@ body {
   left: -5px;
 }
 
-.app .app__mock-handle {
-  right: -5px;
-}
-
 .app .app__service-source {
   right: -5px;
   top: 28px;
-}
-
-.app__mock-row--collapsed {
-  display: none;
-}
-
-.app__mock-row--collapsed.app__mock-row--bundle {
-  display: flex;
-  position: absolute;
-  top: 29px;
-  right: 0;
-  width: 0;
-  height: 0;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  overflow: visible;
-}
-
-.app__mock-row--collapsed > :not(.app__mock-handle) {
-  display: none;
 }
 
 .app__run-spinner {

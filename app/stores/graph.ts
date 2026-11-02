@@ -16,16 +16,14 @@ export const useGraphStore = defineStore("graph", () => {
   const observedErrorServices = ref<string[]>([]);
   const observedServices = ref<string[]>([]);
   const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
-  const observedMockApiId = ref<string | null>(null);
-  const mockConnectionsCollapsed = ref(false);
   const selectedNodeId = ref<string | null>(null);
-  const allNodesCollapsed = computed(
-    () =>
-      mockConnectionsCollapsed.value &&
-      services.value
-        .filter((service) => service.endpoints.length)
-        .every((service) => collapsedServiceEndpoints.value[service.id]),
-  );
+  const allNodesCollapsed = computed(() => {
+    const servicesWithEndpoints = services.value.filter((service) => service.endpoints.length);
+    return (
+      servicesWithEndpoints.length > 0 &&
+      servicesWithEndpoints.every((service) => collapsedServiceEndpoints.value[service.id])
+    );
+  });
 
   function applyCanvas(canvas: CanvasGetResponse) {
     services.value = canvas.services;
@@ -59,18 +57,12 @@ export const useGraphStore = defineStore("graph", () => {
     collapsedServiceEndpoints.value = Object.fromEntries(
       services.value.map((service) => [service.id, value]),
     );
-    mockConnectionsCollapsed.value = value;
-  }
-  function toggleMockConnections() {
-    mockConnectionsCollapsed.value = !mockConnectionsCollapsed.value;
   }
   function setObservations(value: {
-    mockApiId: string | null;
     services: string[];
     errorServices: string[];
     edges: { sourceService: string; targetService: string }[];
   }) {
-    observedMockApiId.value = value.mockApiId;
     observedServices.value = value.services;
     observedErrorServices.value = value.errorServices;
     observedEdges.value = value.edges;
@@ -80,13 +72,10 @@ export const useGraphStore = defineStore("graph", () => {
   }
   function syncSavedPositions() {
     for (const node of nodes.value) {
-      if (node.id === "mock-apis") mockNodePosition.value = { ...node.position };
-      else {
-        const service = services.value.find((item) => item.id === node.id);
-        if (service) {
-          service.positionX = node.position.x;
-          service.positionY = node.position.y;
-        }
+      const service = services.value.find((item) => item.id === node.id);
+      if (service) {
+        service.positionX = node.position.x;
+        service.positionY = node.position.y;
       }
     }
   }
@@ -103,8 +92,6 @@ export const useGraphStore = defineStore("graph", () => {
     observedErrorServices,
     observedServices,
     observedEdges,
-    observedMockApiId,
-    mockConnectionsCollapsed,
     selectedNodeId,
     allNodesCollapsed,
     applyCanvas,
@@ -115,7 +102,6 @@ export const useGraphStore = defineStore("graph", () => {
     setServiceEdges,
     toggleServiceEndpoints,
     setAllNodesCollapsed,
-    toggleMockConnections,
     setObservations,
     setSelection,
     syncSavedPositions,

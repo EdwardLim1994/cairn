@@ -5,6 +5,22 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { useGraphStore } from "../stores/graph";
 import { useGraphInteractionViewModel } from "./useGraphInteractionViewModel";
 
+const service = {
+  id: "service-1",
+  projectId: "project-1",
+  name: "Orders",
+  framework: "Spring Boot",
+  baseUrl: "http://localhost:8080",
+  healthCheckUrl: null,
+  healthCheckHeaderTemplateId: null,
+  healthCheckCustomHeaders: [],
+  active: true,
+  positionX: 100,
+  positionY: 200,
+  createdAt: "2025-01-01T00:00:00.000Z",
+  endpoints: [],
+};
+
 describe("graph interaction view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
@@ -19,7 +35,6 @@ describe("graph interaction view model", () => {
       contextMenu,
       graphCanvas,
       syncNodes: vi.fn(),
-      openMockPanel: vi.fn(),
       editService: vi.fn(),
     });
     const graph = document.createElement("div");
@@ -59,17 +74,16 @@ describe("graph interaction view model", () => {
       contextMenu,
       graphCanvas: ref(null),
       syncNodes: vi.fn(),
-      openMockPanel: vi.fn(),
       editService: vi.fn(),
     });
     model.handleCanvasContextMenu(new MouseEvent("contextmenu", { clientX: 30, clientY: 40 }));
     expect(contextMenu.value).toEqual({ x: 30, y: 40, flowX: 160, flowY: 120 });
   });
 
-  it("selects, synchronizes, and focuses the clicked node before opening its panel", () => {
+  it("selects services and ignores graph nodes that are not services", () => {
     const store = useGraphStore();
+    store.services = [service];
     const syncNodes = vi.fn();
-    const openMockPanel = vi.fn();
     const editService = vi.fn();
     const fitView = vi.fn();
     const model = useGraphInteractionViewModel({
@@ -77,7 +91,6 @@ describe("graph interaction view model", () => {
       contextMenu: ref(null),
       graphCanvas: ref({ screenToFlowCoordinate: vi.fn(), fitView }),
       syncNodes,
-      openMockPanel,
       editService,
     });
     model.onNodeClick("service-1");
@@ -85,7 +98,9 @@ describe("graph interaction view model", () => {
     expect(syncNodes).toHaveBeenCalledOnce();
     expect(fitView).toHaveBeenCalledWith({ nodes: ["service-1"], padding: 0.45, duration: 300 });
     expect(editService).toHaveBeenCalledWith("service-1");
-    model.onNodeClick("mock-apis");
-    expect(openMockPanel).toHaveBeenCalledOnce();
+    model.onNodeClick("mock-api-mock-1");
+    expect(syncNodes).toHaveBeenCalledOnce();
+    expect(fitView).toHaveBeenCalledOnce();
+    expect(editService).toHaveBeenCalledOnce();
   });
 });

@@ -24,10 +24,12 @@ describe("AppToolbar", () => {
     expect(wrapper.find('[class*="bg-[#15966f]"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Collapse all nodes"]').trigger("click");
     await wrapper.get('[aria-label="Use light theme"]').trigger("click");
+    await wrapper.get('[aria-label="Mock APIs"]').trigger("click");
     await wrapper.get('[aria-label="Manage access tokens"]').trigger("click");
     await wrapper.get('[aria-label="Mock API call history"]').trigger("click");
     expect(wrapper.emitted("toggleAll")).toEqual([[]]);
     expect(wrapper.emitted("toggleTheme")).toEqual([[]]);
+    expect(wrapper.emitted("openMockApis")).toEqual([[]]);
     expect(wrapper.emitted("openAccessTokens")).toEqual([[]]);
     expect(wrapper.emitted("openHistory")).toEqual([[]]);
   });

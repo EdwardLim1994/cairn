@@ -89,6 +89,10 @@ const settingsUiStubs = {
       return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
     },
   }),
+  UIcon: defineComponent({
+    props: { name: String },
+    template: '<span aria-hidden="true" />',
+  }),
   UInput: formControlStub("input"),
   UTextarea: formControlStub("textarea"),
   USelect: formControlStub("select"),
@@ -241,6 +245,50 @@ describe("MockApiSettingsPanel", () => {
       .find((button) => button.text() === "Add header")!
       .trigger("click");
     expect(wrapper.findAll('input[aria-label="Header name"]')).toHaveLength(templateRowsBefore + 1);
+  });
+
+  it("lets users select and see a mock API target endpoint in its card", async () => {
+    const entry: MockApiDraft = {
+      id: "mock-1",
+      name: "Fetch orders",
+      targetEndpointId: "endpoint-1",
+      active: true,
+      description: "",
+      requestJson: "{}",
+      pathParameters: {},
+    };
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [entry],
+        environmentVariables: [],
+        headerTemplates: [],
+        variablesOpen: false,
+        apisOpen: true,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [
+          { id: "endpoint-1", label: "Orders | List orders (GET)" },
+          { id: "endpoint-2", label: "Payments | Create payment (POST)" },
+        ],
+        endpointDetails: [
+          { id: "endpoint-1", url: "/orders" },
+          { id: "endpoint-2", url: "/payments" },
+        ],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    await wrapper.get('#mock-api-mock-1 [aria-expanded="false"]').trigger("click");
+    const target = wrapper.get("#mock-api-endpoint-mock-1");
+    (target.element as HTMLSelectElement).value = "endpoint-2";
+    await target.trigger("change");
+
+    expect(entry.targetEndpointId).toBe("endpoint-2");
+    expect(wrapper.get("#mock-api-mock-1").text()).toContain("Payments | Create payment (POST)");
+    expect(wrapper.emitted("setMockEndpoint")).toEqual([[entry]]);
   });
 
   it("deactivates invalid staged APIs and does not reactivate them when variables return", async () => {

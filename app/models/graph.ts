@@ -21,7 +21,5 @@ export type GraphState = {
   observedErrorServices: string[];
   observedServices: string[];
   observedEdges: ObservedServiceEdge[];
-  observedMockApiId: string | null;
-  mockConnectionsCollapsed: boolean;
   selectedNodeId: string | null;
 };

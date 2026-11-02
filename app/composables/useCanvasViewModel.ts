@@ -38,14 +38,6 @@ export function useCanvasViewModel(options: {
     return options.graphViewModel.buildEdges();
   }
 
-  async function toggleMockConnections() {
-    options.graphStore.toggleMockConnections();
-    await nextTick();
-    options.graphCanvas.value?.updateNodeInternals(["mock-apis"]);
-    await nextTick();
-    buildEdges();
-  }
-
   async function toggleServiceEndpoints(serviceId: string) {
     options.graphStore.toggleServiceEndpoints(serviceId);
     syncNodes();
@@ -60,10 +52,9 @@ export function useCanvasViewModel(options: {
     options.graphStore.setAllNodesCollapsed(collapsed);
     syncNodes();
     await nextTick();
-    options.graphCanvas.value?.updateNodeInternals([
-      ...options.graphStore.services.map((service) => service.id),
-      "mock-apis",
-    ]);
+    options.graphCanvas.value?.updateNodeInternals(
+      options.graphStore.services.map((service) => service.id),
+    );
     await nextTick();
     buildEdges();
   }
@@ -124,25 +115,8 @@ export function useCanvasViewModel(options: {
 
   async function onConnect(connection: Connection) {
     if (!connection.source || !connection.target || !connection.targetHandle) return;
-    if (connection.source === "mock-apis") {
-      const entry = options.mockApiStore.mockApis.find(
-        (item) => item.id === connection.sourceHandle,
-      );
-      if (!entry?.id) return;
-      try {
-        await saveCanvas();
-        await options.apiClient.updateMockApi(entry.id, {
-          ...entry,
-          targetEndpointId: connection.targetHandle,
-        });
-        options.mockApiStore.setMockApis(await options.apiClient.listMockApis());
-        syncNodes();
-        await saveCanvas();
-      } catch (cause) {
-        reportError(cause instanceof Error ? cause.message : "Could not connect mock API");
-      }
-      return;
-    }
+    if (!options.graphStore.services.some((service) => service.id === connection.source)) return;
+    if (!options.graphStore.services.some((service) => service.id === connection.target)) return;
     if (connection.source === connection.target) return;
     options.graphStore.setServiceEdges([
       ...options.graphStore.serviceEdges.filter(
@@ -165,7 +139,6 @@ export function useCanvasViewModel(options: {
   return {
     buildEdges,
     syncNodes,
-    toggleMockConnections,
     toggleServiceEndpoints,
     toggleAllNodes,
     loadCanvas,

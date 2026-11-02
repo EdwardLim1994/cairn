@@ -19,7 +19,6 @@ export function useGraphInteractionViewModel(options: {
   contextMenu: Ref<ContextMenuPosition | null>;
   graphCanvas: Ref<GraphCanvas | null>;
   syncNodes: () => void;
-  openMockPanel: () => void;
   editService: (id: string) => void;
 }) {
   function handleCanvasContextMenu(event: MouseEvent) {
@@ -36,11 +35,11 @@ export function useGraphInteractionViewModel(options: {
   }
 
   function onNodeClick(nodeId: string) {
+    if (!options.store.services.some((service) => service.id === nodeId)) return;
     options.store.setSelection(nodeId);
     options.syncNodes();
     void options.graphCanvas.value?.fitView({ nodes: [nodeId], padding: 0.45, duration: 300 });
-    if (nodeId === "mock-apis") options.openMockPanel();
-    else options.editService(nodeId);
+    options.editService(nodeId);
   }
 
   return { handleCanvasContextMenu, onNodeClick };

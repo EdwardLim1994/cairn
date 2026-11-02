@@ -60,6 +60,8 @@ export const canvasGetResponseSchema = z.object({
       authorizationTemplateId: z.string().nullable().optional(),
       customHeaders: z.array(z.object({ name: z.string(), value: z.string() })),
       active: z.boolean(),
+      positionX: z.number().nullable().optional(),
+      positionY: z.number().nullable().optional(),
       status: z.enum(["draft", "inactive", "ready"]),
       readinessReasons: z.array(readinessReasonSchema),
       importMethod: z.string().nullable(),
@@ -79,6 +81,7 @@ export const canvasPutRequestSchema = z.object({
   viewport: pointSchema.extend({ zoom: z.number().positive() }),
   mockNode: pointSchema,
   services: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })),
+  mockApiPositions: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })).optional(),
   edges: z.array(
     z.object({ sourceServiceId: z.string().min(1), targetEndpointId: z.string().min(1) }),
   ),

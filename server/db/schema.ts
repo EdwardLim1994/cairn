@@ -92,6 +92,8 @@ export const mockApis = mysqlTable(
       .notNull()
       .default([]),
     active: boolean("active").notNull().default(true),
+    positionX: double("position_x"),
+    positionY: double("position_y"),
     importMethod: varchar("import_method", { length: 10 }),
     importUrl: text("import_url"),
     matchUrl: text("match_url"),

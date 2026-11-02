@@ -7,6 +7,7 @@ import { listMockApis } from "../mock-apis";
 import {
   headerTemplates,
   authorizationTemplates,
+  mockApis,
   projects,
   serviceEdges,
   serviceEndpoints,
@@ -90,6 +91,24 @@ export async function saveCanvas(
             .update(services)
             .set({ positionX: position.x, positionY: position.y })
             .where(eq(services.id, position.id)),
+        ),
+      );
+    }
+    const mockApiPositions = canvas.mockApiPositions ?? [];
+    const mockApiIds = mockApiPositions.map(({ id }) => id);
+    if (mockApiIds.length) {
+      const owned = await tx
+        .select({ id: mockApis.id })
+        .from(mockApis)
+        .where(and(eq(mockApis.projectId, projectId), inArray(mockApis.id, mockApiIds)));
+      if (owned.length !== new Set(mockApiIds).size)
+        throw new CanvasConstraintError("Canvas contains an unknown or duplicate mock API");
+      await Promise.all(
+        mockApiPositions.map((position) =>
+          tx
+            .update(mockApis)
+            .set({ positionX: position.x, positionY: position.y })
+            .where(eq(mockApis.id, position.id)),
         ),
       );
     }

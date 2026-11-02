@@ -52,6 +52,8 @@ export const mockApiListResponseSchema = z.array(
     authorizationTemplateId: z.string().nullable().optional(),
     customHeaders: z.array(headerSchema),
     active: z.boolean(),
+    positionX: z.number().nullable().optional(),
+    positionY: z.number().nullable().optional(),
     status: z.enum(["draft", "inactive", "ready"]),
     readinessReasons: z.array(readinessReasonSchema),
     importMethod: z.string().nullable(),
