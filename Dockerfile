@@ -14,12 +14,12 @@ WORKDIR /app
 ENV DATABASE_URL="" \
     OTEL_COLLECTOR_URL="" \
     PROJECT_ID="" \
-    PORT=3001 \
+    PORT=3003 \
     HOST=0.0.0.0
 
 COPY --from=build /app/.output ./.output
 COPY --from=build /app/migrate.cjs ./migrate.cjs
 COPY --from=build /app/drizzle ./drizzle
 
-EXPOSE 3001
+EXPOSE 3003
 CMD ["sh", "-c", "node migrate.cjs && exec node .output/server/index.mjs"]

@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../../db";
-import { logs, projects, runs, services, spans } from "../../db/schema";
+import { logs, otelAccessTokens, projects, runs, services, spans } from "../../db/schema";
+import { digestAccessToken } from "../../use-cases/otel-access-tokens/token";
 
 vi.mock("../../utils/otlp", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../utils/otlp")>()),
@@ -14,6 +15,8 @@ const integration = describe.skipIf(!connectionString);
 
 integration("log query and OTLP controllers with MySQL", () => {
   const projectId = "telemetry-route-integration-project";
+  const bearerToken = "a".repeat(43);
+  const auth = { authorization: `Bearer ${bearerToken}` };
   let logsRoute: (event: never) => Promise<unknown>;
   let ingestLogsRoute: (event: never) => Promise<unknown>;
   let ingestTracesRoute: (event: never) => Promise<unknown>;
@@ -41,6 +44,13 @@ integration("log query and OTLP controllers with MySQL", () => {
     await getDb().delete(projects).where(eq(projects.id, projectId));
     const db = getDb();
     await db.insert(projects).values({ id: projectId });
+    await db.insert(otelAccessTokens).values({
+      id: "telemetry-access-token",
+      projectId,
+      name: "integration",
+      digest: digestAccessToken(bearerToken),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
     await db.insert(services).values({
       id: "telemetry-order-service",
       projectId,
@@ -111,7 +121,9 @@ integration("log query and OTLP controllers with MySQL", () => {
         },
       ],
     };
-    await expect(ingestLogsRoute({ context: { body } } as never)).resolves.toEqual({ accepted: 1 });
+    await expect(
+      ingestLogsRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+    ).resolves.toEqual({ accepted: 1 });
     await expect(
       getDb().select().from(logs).where(eq(logs.projectId, projectId)),
     ).resolves.toMatchObject([
@@ -161,10 +173,14 @@ integration("log query and OTLP controllers with MySQL", () => {
         },
       ],
     };
-    await expect(ingestTracesRoute({ context: { body } } as never)).resolves.toEqual({
+    await expect(
+      ingestTracesRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+    ).resolves.toEqual({
       accepted: 1,
     });
-    await expect(ingestTracesRoute({ context: { body } } as never)).resolves.toEqual({
+    await expect(
+      ingestTracesRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+    ).resolves.toEqual({
       accepted: 1,
     });
     await expect(
@@ -177,7 +193,78 @@ integration("log query and OTLP controllers with MySQL", () => {
 
   it("rejects malformed OTLP contracts", async () => {
     await expect(
-      ingestLogsRoute({ context: { body: { resourceLogs: "invalid" } } } as never),
+      ingestLogsRoute({
+        context: { body: { resourceLogs: "invalid" } },
+        node: { req: { headers: auth } },
+      } as never),
     ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("rejects unauthenticated requests before parsing or storing telemetry", async () => {
+    for (const authorization of [undefined, "Bearer malformed", `Bearer ${"c".repeat(43)}`]) {
+      await expect(
+        ingestLogsRoute({
+          context: { body: { resourceLogs: "invalid" } },
+          node: { req: { headers: authorization ? { authorization } : {} } },
+        } as never),
+      ).rejects.toMatchObject({ statusCode: 401 });
+    }
+    await expect(
+      ingestTracesRoute({
+        context: { body: { resourceSpans: "invalid" } },
+        node: { req: { headers: {} } },
+      } as never),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    await expect(
+      getDb().select().from(logs).where(eq(logs.projectId, projectId)),
+    ).resolves.toHaveLength(0);
+    await expect(
+      getDb().select().from(spans).where(eq(spans.projectId, projectId)),
+    ).resolves.toHaveLength(0);
+  });
+
+  it("rejects expired credentials before payload parsing", async () => {
+    const expired = "d".repeat(43);
+    await getDb()
+      .insert(otelAccessTokens)
+      .values({
+        id: "expired-access-token",
+        projectId,
+        name: "expired",
+        digest: digestAccessToken(expired),
+        expiresAt: new Date(Date.now() - 1),
+      });
+    await expect(
+      ingestLogsRoute({
+        context: { body: { resourceLogs: "invalid" } },
+        node: { req: { headers: { authorization: `Bearer ${expired}` } } },
+      } as never),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("accepts another active token after revoking the first", async () => {
+    const replacement = "b".repeat(43);
+    await getDb()
+      .insert(otelAccessTokens)
+      .values({
+        id: "telemetry-access-token-2",
+        projectId,
+        name: "replacement",
+        digest: digestAccessToken(replacement),
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+    await getDb().delete(otelAccessTokens).where(eq(otelAccessTokens.id, "telemetry-access-token"));
+    await expect(
+      ingestLogsRoute({
+        context: { body: { resourceLogs: [] } },
+        node: { req: { headers: auth } },
+      } as never),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    await expect(
+      ingestLogsRoute({
+        context: { body: { resourceLogs: [] } },
+        node: { req: { headers: { authorization: `Bearer ${replacement}` } } },
+      } as never),
+    ).resolves.toEqual({ accepted: 0 });
   });
 });

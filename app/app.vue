@@ -6,6 +6,7 @@ import ServiceSettingsPanel from "./components/ServiceSettingsPanel.vue";
 import MockApiSettingsPanel from "./components/MockApiSettingsPanel.vue";
 import LogsPanel from "./components/LogsPanel.vue";
 import AppToolbar from "./components/AppToolbar.vue";
+import OtelAccessTokensDialog from "./components/OtelAccessTokensDialog.vue";
 import AppToastStack from "./components/AppToastStack.vue";
 import LatestRunDrawer from "./components/LatestRunDrawer.vue";
 import { createApiClient } from "./models/api-client";
@@ -92,6 +93,7 @@ const expandedEnvironmentVariableId = ref<string | null>(null);
 const registeredMockApisOpen = ref(true);
 const sharedEnvironmentVariablesOpen = ref(true);
 const environmentVariablesLoading = ref(false);
+const accessTokensOpen = ref(false);
 const editingEnvironmentVariableId = ref<string | null>(null);
 const environmentCardDraft = ref({ name: "", value: "" });
 let healthTimer: ReturnType<typeof setInterval> | undefined;
@@ -399,7 +401,10 @@ onUnmounted(() => {
       :dark="dark"
       @toggle-all="toggleAllNodes"
       @toggle-theme="dark = !dark"
+      @open-access-tokens="accessTokensOpen = true"
     />
+
+    <OtelAccessTokensDialog v-model:open="accessTokensOpen" />
 
     <section class="absolute inset-0">
       <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">

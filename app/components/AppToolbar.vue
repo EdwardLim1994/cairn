@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{ allNodesCollapsed: boolean; dark: boolean }>();
-const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
+const emit = defineEmits<{ toggleAll: []; toggleTheme: []; openAccessTokens: [] }>();
 </script>
 
 <template>
@@ -19,6 +19,17 @@ const emit = defineEmits<{ toggleAll: []; toggleTheme: [] }>();
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
+        aria-label="Manage access tokens"
+        title="Manage access tokens"
+        @click.stop="emit('openAccessTokens')"
+      >
+        <UIcon name="i-lucide-key-round" class="size-4" aria-hidden="true" />
+      </UButton>
       <UButton
         type="button"
         color="neutral"

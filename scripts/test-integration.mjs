@@ -11,7 +11,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL || databaseUrl };
+const env = { ...process.env, DATABASE_URL: databaseUrl };
 const command = process.platform === "win32" ? "vp.exe" : "vp";
 
 function findIntegrationTests(directory) {

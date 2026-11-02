@@ -164,6 +164,24 @@ export const environmentVariables = mysqlTable(
   ],
 );
 
+export const otelAccessTokens = mysqlTable(
+  "otel_access_tokens",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    digest: varchar("digest", { length: 64 }).notNull(),
+    expiresAt: datetime("expires_at", { mode: "date", fsp: 3 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("otel_access_tokens_digest_unique").on(table.digest),
+    index("otel_access_tokens_project_idx").on(table.projectId),
+  ],
+);
+
 export const serviceEdges = mysqlTable(
   "service_edges",
   {

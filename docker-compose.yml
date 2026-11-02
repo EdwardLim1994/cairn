@@ -26,13 +26,13 @@ services:
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
       PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
-      PORT: ${PORT:-3001}
+      PORT: ${PORT:-3003}
       OUTBOUND_HOST_GATEWAY: host.docker.internal
       OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
       TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-1500}
       TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-10000}
     ports:
-      - "${PORT:-3001}:${PORT:-3001}"
+      - "${PORT:-3003}:${PORT:-3003}"
 
   adminer:
     image: adminer:latest

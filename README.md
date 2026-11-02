@@ -19,7 +19,7 @@ GitHub Actions reports unit/component tests and MySQL-backed integration tests i
 
 After MySQL is healthy, the app container applies pending Drizzle migrations before starting Cairn. A fresh database receives all migrations; subsequent starts skip recorded migrations. Migration failures stop the container before the web server starts. Generate new migrations with `vp run db:generate`, commit the SQL and metadata, then rebuild the image. Run one app container during migration; concurrent migration runners are not supported.
 
-Open `http://localhost:3001`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3306` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
+Open `http://localhost:3003`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3308` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
 
 Register microservices in Cairn with the same `http://localhost:<port>` base URLs used by Postman. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
 
@@ -29,10 +29,11 @@ The production image contains the Nuxt `.output` bundle, a bundled migration run
 
 | Variable                      | Purpose                                                                                                                                                      |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                | MySQL URL. Use `localhost` for host-run commands; Compose sets the app URL to the `mysql` service.                                                           |
+| `DATABASE_URL`                | MySQL URL. Use `localhost:3308` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
+| `MYSQL_PORT`                  | Host port for the Compose MySQL instance (Compose default `3306`; `.env.example` sets `3308`). The container still listens on port `3306`.                   |
 | `OTEL_COLLECTOR_URL`          | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
 | `PROJECT_ID`                  | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
-| `PORT`                        | Nuxt server port (default `3001`).                                                                                                                           |
+| `PORT`                        | Nuxt server port (default `3003`).                                                                                                                           |
 | `OUTBOUND_REQUEST_TIMEOUT_MS` | Timeout for triggered service calls (default `10000`).                                                                                                       |
 | `OUTBOUND_HOST_GATEWAY`       | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
 | `TELEMETRY_QUIET_MS`          | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
@@ -42,7 +43,11 @@ Keep real values in the ignored `.env` file or your deployment secret store. `.e
 
 ## OpenTelemetry Collector
 
-Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3001/v1/traces` and `/v1/logs`, without bearer authentication. If you change `PORT`, update the exporter endpoint to the same container port.
+Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3003/v1/traces` and `/v1/logs` with a bearer token. If you change `PORT`, update the exporter endpoint to the same container port.
+
+Create a token from **Manage access tokens** in Cairn. Set its required expiry date and copy the secret when Cairn shows it; Cairn cannot show it again. Supply the copied value as the Collector's `CAIRN_OTEL_ACCESS_TOKEN` environment secret. Do not commit the secret. The example Collector configuration reads this variable and sends it in the `Authorization` header. Generate a replacement before expiry, verify ingestion, then revoke the old token. Revocation takes effect immediately. Expired tokens stop working and remain listed as expired until revoked.
+
+This token protects only the OTLP ingestion routes. The management UI and management APIs assume Cairn is reachable only by trusted operators. Use TLS when Collector traffic crosses an untrusted network; bearer authentication does not encrypt HTTP traffic.
 
 Configure each instrumented service to send telemetry to the Collector and set the resource attributes:
 
@@ -55,7 +60,7 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 
 Use your actual `PROJECT_ID` in `OTEL_RESOURCE_ATTRIBUTES`. Service SDKs should propagate W3C trace context so their spans share the trace ID created by a mock API run. The app only overlays observed spans; configured graph edges do not stand in for telemetry.
 
-The Collector ingestion routes are `POST /v1/traces` and `POST /v1/logs`. Both accept OTLP/HTTP JSON bodies without bearer authentication for this temporary local setup. `/api/runs/:id/flow` reports pending data, then returns observed service edges and error services when telemetry is quiet or the maximum wait expires. `/api/logs` accepts optional `service`, `severity`, and `search` query parameters.
+The Collector ingestion routes are `POST /v1/traces` and `POST /v1/logs`. Both require an active, unexpired bearer token. `/api/runs/:id/flow` reports pending data, then returns observed service edges and error services when telemetry is quiet or the maximum wait expires. `/api/logs` accepts optional `service`, `severity`, and `search` query parameters.
 
 ## Local development
 
@@ -68,7 +73,7 @@ vp run db:migrate
 vp run dev
 ```
 
-For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3306/<database>`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3308/<database>`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
 
@@ -84,6 +89,7 @@ This excludes the MySQL integration tests, which run separately through `vp run 
 - `GET/POST /api/services`, `PUT/DELETE /api/services/:id`
 - `GET/POST /api/mock-apis`, `PUT/DELETE /api/mock-apis/:id`
 - `GET/POST /api/environment-variables`, `PUT/DELETE /api/environment-variables/:id`
+- `GET/POST /api/access-tokens`, `DELETE /api/access-tokens/:id`
 - `POST /api/mock-apis/:id/runs`, `GET /api/runs/:id`, `GET /api/runs/:id/flow`
 - `GET /api/logs`
 - `POST /v1/traces`, `POST /v1/logs`

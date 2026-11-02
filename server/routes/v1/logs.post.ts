@@ -4,6 +4,7 @@ import { getAppConfig } from "../../utils/config";
 import { ensureProject } from "../../utils/project";
 import { readOtlpBody } from "../../utils/otlp";
 import { createIngestOtlpLogsUseCase } from "../../use-cases/telemetry/ingest-otlp-logs";
+import { requireOtelAccessToken } from "../../utils/otel-access-token-auth";
 
 const ingestOtlpLogsUseCase = createIngestOtlpLogsUseCase({
   ensureProject,
@@ -13,6 +14,7 @@ const ingestOtlpLogsUseCase = createIngestOtlpLogsUseCase({
 });
 
 export default defineEventHandler(async (event) => {
+  await requireOtelAccessToken(event);
   const parsed = otlpLogsRequestSchema.safeParse(await readOtlpBody(event, "Log payload"));
   if (!parsed.success)
     throw createError({

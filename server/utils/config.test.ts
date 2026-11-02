@@ -8,7 +8,7 @@ describe("application configuration", () => {
     vi.stubEnv("DATABASE_URL", "mysql://db/cairn");
     vi.stubEnv("OTEL_COLLECTOR_URL", "http://collector:4318");
     vi.stubEnv("PROJECT_ID", "project-1");
-    vi.stubEnv("PORT", "3001");
+    vi.stubEnv("PORT", "3003");
     vi.stubEnv("OUTBOUND_REQUEST_TIMEOUT_MS", "10000");
     vi.stubEnv("TELEMETRY_QUIET_MS", "1500");
     vi.stubEnv("TELEMETRY_MAX_WAIT_MS", "10000");
@@ -16,7 +16,7 @@ describe("application configuration", () => {
       databaseUrl: "mysql://db/cairn",
       otelCollectorUrl: "http://collector:4318/",
       projectId: "project-1",
-      port: 3001,
+      port: 3003,
       outboundRequestTimeoutMs: 10000,
       telemetryQuietMs: 1500,
       telemetryMaxWaitMs: 10000,

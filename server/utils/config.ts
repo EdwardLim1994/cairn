@@ -22,7 +22,7 @@ export function getAppConfig() {
     databaseUrl: required("DATABASE_URL"),
     otelCollectorUrl: collectorUrl.toString(),
     projectId: required("PROJECT_ID"),
-    port: positiveInteger("PORT", 3001),
+    port: positiveInteger("PORT", 3003),
     outboundRequestTimeoutMs: positiveInteger("OUTBOUND_REQUEST_TIMEOUT_MS", 10000),
     telemetryQuietMs: positiveInteger("TELEMETRY_QUIET_MS", 1500),
     telemetryMaxWaitMs: positiveInteger("TELEMETRY_MAX_WAIT_MS", 10000),
