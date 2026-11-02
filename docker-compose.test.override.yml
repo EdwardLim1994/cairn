@@ -1,3 +1,0 @@
-networks:
-  default:
-    name: cairn-mock-auth-migration-test
