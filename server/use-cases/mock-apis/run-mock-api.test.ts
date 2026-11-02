@@ -81,6 +81,17 @@ describe("mock API run use case", () => {
     expect(deps.addFailureLog).not.toHaveBeenCalled();
   });
 
+  it("sends GET requests without a body or default content type", async () => {
+    const { deps, run } = setup({
+      getTarget: vi.fn().mockResolvedValue({ ...target, method: "GET" }),
+    });
+    await run("mock-1");
+    const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
+    expect(request.method).toBe("GET");
+    expect(request.body).toBeUndefined();
+    expect(new Headers(request.headers).has("content-type")).toBe(false);
+  });
+
   it("records detailed HTTP failures and their logs", async () => {
     const { deps, run } = setup({
       fetch: vi.fn().mockResolvedValue(new Response("invalid order", { status: 400 })),

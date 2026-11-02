@@ -72,6 +72,23 @@ function responseError(status: number, body: string) {
   return `Target returned HTTP ${status}: ${body.trim()}`;
 }
 
+function createFetchOptions(
+  method: string,
+  requestJson: unknown,
+  variables: Map<string, string>,
+  headers: Headers,
+  signal: AbortSignal,
+): RequestInit {
+  if (method === "GET") return { method, headers, signal };
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  return {
+    method,
+    headers,
+    body: JSON.stringify(resolveJsonVariables(requestJson, variables)),
+    signal,
+  };
+}
+
 export function createRunMockApiUseCase(dependencies: {
   ensureProject: () => Promise<string>;
   getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
@@ -166,10 +183,6 @@ export function createRunMockApiUseCase(dependencies: {
     try {
       const resolvedPath = resolveEndpointPath(target.url, target.pathParameters ?? {}, variables);
       targetUrl = getOutboundUrl(resolvedPath, target.baseUrl).toString();
-      const isGet = target.method === "GET";
-      const requestJson = isGet
-        ? target.requestJson
-        : resolveJsonVariables(target.requestJson, variables);
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
@@ -184,14 +197,17 @@ export function createRunMockApiUseCase(dependencies: {
       if (typeof authorization === "string") headers.set("Authorization", authorization);
       else for (const [name, value] of authorization) headers.set(name, value);
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
-      if (!isGet && !headers.has("content-type")) headers.set("content-type", "application/json");
       timeout = setTimeout(() => controller.abort(), timeoutMs);
-      const response = await dependencies.fetch(targetUrl, {
-        method: target.method,
-        headers,
-        ...(isGet ? {} : { body: JSON.stringify(requestJson) }),
-        signal: controller.signal,
-      });
+      const response = await dependencies.fetch(
+        targetUrl,
+        createFetchOptions(
+          target.method,
+          target.requestJson,
+          variables,
+          headers,
+          controller.signal,
+        ),
+      );
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());
       const status = response.ok ? "completed" : "failed";
