@@ -212,12 +212,11 @@ integration("service REST controllers with MySQL", () => {
     } as never);
     const health = await healthRoute({} as never);
     expect(health).toHaveLength(1);
-    expect(fetchStub).toHaveBeenCalledWith(
-      "https://health.example/status",
-      expect.objectContaining({
-        method: "GET",
-        headers: { "X-Health": "ready", "X-API-Key": "secret" },
-      }),
-    );
+    const [url, options] = fetchStub.mock.calls[0]!;
+    expect(String(url)).toBe("https://health.example/status");
+    expect(options).toMatchObject({
+      method: "GET",
+      headers: { "X-Health": "ready", "X-API-Key": "secret" },
+    });
   });
 });
