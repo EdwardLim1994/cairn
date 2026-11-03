@@ -316,6 +316,8 @@ describe("service view model", () => {
       ],
     ]);
     expect(context.errors).toEqual([]);
+    expect(context.calls).toEqual([]);
+    expect(context.events).toEqual([]);
   });
 
   it("reports parser failures through the service settings flow without changing endpoint drafts", async () => {

@@ -195,14 +195,18 @@ export const serviceEdges = mysqlTable(
     sourceServiceId: varchar("source_service_id", { length: 36 })
       .notNull()
       .references(() => services.id, { onDelete: "cascade" }),
+    sourceEndpointId: varchar("source_endpoint_id", { length: 36 }).references(
+      () => serviceEndpoints.id,
+      { onDelete: "cascade" },
+    ),
     targetEndpointId: varchar("target_endpoint_id", { length: 36 })
       .notNull()
       .references(() => serviceEndpoints.id, { onDelete: "cascade" }),
   },
   (table) => [
-    uniqueIndex("service_edges_project_source_target_unique").on(
+    uniqueIndex("service_edges_project_source_endpoint_target_unique").on(
       table.projectId,
-      table.sourceServiceId,
+      table.sourceEndpointId,
       table.targetEndpointId,
     ),
     index("service_edges_project_idx").on(table.projectId),

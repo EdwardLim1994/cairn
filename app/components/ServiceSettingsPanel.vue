@@ -22,13 +22,23 @@ type ServiceDraft = {
   active: boolean;
   endpoints: EndpointDraft[];
 };
+type OutboundCall = { id: string; sourceEndpointId: string | null; targetEndpointId: string };
+type EndpointOption = { id: string; serviceId: string; label: string };
 
 const draft = defineModel<ServiceDraft>("draft", { required: true });
 const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: true });
-const props = defineProps<{
-  editingServiceId: string | null;
-  headerTemplates: HeaderTemplateDraft[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    editingServiceId: string | null;
+    headerTemplates: HeaderTemplateDraft[];
+    outboundCallEdges?: OutboundCall[];
+    endpointOptions?: EndpointOption[];
+  }>(),
+  {
+    outboundCallEdges: () => [],
+    endpointOptions: () => [],
+  },
+);
 const openApiFileInput = ref<HTMLInputElement | null>(null);
 const expandedEndpointKey = ref<string | null>(null);
 const frameworks = [
@@ -45,7 +55,33 @@ const emit = defineEmits<{
   save: [];
   discard: [];
   removeService: [id: string];
+  addOutboundCall: [sourceEndpointId: string, targetEndpointId: string];
+  removeOutboundCall: [edgeId: string];
 }>();
+
+function callsFrom(endpointId: string | undefined) {
+  return endpointId
+    ? props.outboundCallEdges.filter((edge) => edge.sourceEndpointId === endpointId)
+    : [];
+}
+
+function availableTargets(endpointId: string | undefined) {
+  const existingTargets = new Set(callsFrom(endpointId).map((edge) => edge.targetEndpointId));
+  return props.endpointOptions
+    .filter(
+      (option) => option.serviceId !== props.editingServiceId && !existingTargets.has(option.id),
+    )
+    .map(({ id, label }) => ({ label, value: id }));
+}
+
+function targetLabel(endpointId: string) {
+  return props.endpointOptions.find((option) => option.id === endpointId)?.label ?? endpointId;
+}
+
+function confirmRemoveCall(call: OutboundCall) {
+  const target = targetLabel(call.targetEndpointId);
+  if (window.confirm(`Remove outbound call to ${target}?`)) emit("removeOutboundCall", call.id);
+}
 
 function handleOpenApiFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -332,6 +368,42 @@ function handleOpenChange(open: boolean) {
             placeholder="/orders"
           />
         </label>
+        <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
+          <strong class="text-[10px] font-medium">Outbound calls</strong>
+          <div
+            v-for="call in callsFrom(endpoint.id)"
+            :key="call.id"
+            class="flex items-center gap-2 text-[10px]"
+          >
+            <span class="min-w-0 flex-1 truncate">{{ targetLabel(call.targetEndpointId) }}</span>
+            <UButton
+              type="button"
+              color="error"
+              variant="ghost"
+              class="grid size-7 shrink-0 place-items-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+              :aria-label="`Remove outbound call to ${targetLabel(call.targetEndpointId)}`"
+              @click="confirmRemoveCall(call)"
+            >
+              <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
+            </UButton>
+          </div>
+          <USelect
+            v-if="endpoint.id"
+            :items="availableTargets(endpoint.id)"
+            placeholder="Add outbound call"
+            aria-label="Add outbound call"
+            :ui="{
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)]',
+            }"
+            @update:model-value="
+              (targetEndpointId: string) =>
+                targetEndpointId && emit('addOutboundCall', endpoint.id!, targetEndpointId)
+            "
+          />
+          <span v-else class="text-[10px] text-[var(--muted)]"
+            >Save endpoint before adding calls.</span
+          >
+        </section>
       </SettingsAccordionCard>
     </template>
     <template #footer>

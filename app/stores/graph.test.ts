@@ -36,7 +36,14 @@ describe("graph store", () => {
     const canvas = {
       nodesLocked: true,
       services: [service],
-      edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
+      edges: [
+        {
+          id: "edge-1",
+          sourceServiceId: "service-1",
+          sourceEndpointId: null,
+          targetEndpointId: "endpoint-1",
+        },
+      ],
       mockApis: [],
       headerTemplates: [],
       authorizationTemplates: [],

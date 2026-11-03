@@ -1,4 +1,4 @@
-import type { Connection } from "@vue-flow/core";
+import type { Connection, EdgeChange } from "@vue-flow/core";
 import type { Ref } from "vue";
 import { nextTick } from "vue";
 import type { createApiClient } from "../models/api-client";
@@ -134,25 +134,110 @@ export function useCanvasViewModel(options: {
   }
 
   async function onConnect(connection: Connection) {
-    if (!connection.source || !connection.target || !connection.targetHandle) return;
-    if (!options.graphStore.services.some((service) => service.id === connection.source)) return;
-    if (!options.graphStore.services.some((service) => service.id === connection.target)) return;
-    if (connection.source === connection.target) return;
+    const edge = edgeConnection(connection);
+    if (!edge) return;
     options.graphStore.setServiceEdges([
       ...options.graphStore.serviceEdges.filter(
-        (edge) =>
+        (current) =>
           !(
-            edge.sourceServiceId === connection.source &&
-            edge.targetEndpointId === connection.targetHandle
+            current.sourceEndpointId === edge.sourceEndpointId &&
+            current.targetEndpointId === edge.targetEndpointId
           ),
       ),
+      { id: crypto.randomUUID(), ...edge },
+    ]);
+    buildEdges();
+    await saveCanvas();
+  }
+
+  function edgeConnection(connection: Connection) {
+    const sourceEndpointId = connection.sourceHandle?.startsWith("out:")
+      ? connection.sourceHandle.slice(4)
+      : "";
+    const targetEndpointId = connection.targetHandle?.startsWith("in:")
+      ? connection.targetHandle.slice(3)
+      : "";
+    const sourceService = options.graphStore.services.find((service) =>
+      service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
+    );
+    const targetService = options.graphStore.services.find((service) =>
+      service.endpoints.some((endpoint) => endpoint.id === targetEndpointId),
+    );
+    if (
+      !sourceService ||
+      !targetService ||
+      sourceService.id !== connection.source ||
+      targetService.id !== connection.target ||
+      sourceService.id === targetService.id ||
+      options.graphStore.collapsedServiceEndpoints[sourceService.id] ||
+      options.graphStore.collapsedServiceEndpoints[targetService.id]
+    )
+      return undefined;
+    return { sourceServiceId: sourceService.id, sourceEndpointId, targetEndpointId };
+  }
+
+  async function onEdgeUpdate(event: { edge: { id: string }; connection: Connection }) {
+    if (!options.graphStore.serviceEdges.some(({ id }) => id === event.edge.id)) return;
+    const connection = edgeConnection(event.connection);
+    if (!connection) {
+      buildEdges();
+      return;
+    }
+    options.graphStore.setServiceEdges(
+      options.graphStore.serviceEdges.map((edge) =>
+        edge.id === event.edge.id ? { ...edge, ...connection } : edge,
+      ),
+    );
+    buildEdges();
+    await saveCanvas();
+  }
+
+  async function addServiceCall(sourceEndpointId: string, targetEndpointId: string) {
+    const sourceService = options.graphStore.services.find((service) =>
+      service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
+    );
+    const targetServiceId = options.graphViewModel.endpointTarget(targetEndpointId);
+    if (
+      !sourceService ||
+      !targetServiceId ||
+      sourceService.id === targetServiceId ||
+      options.graphStore.serviceEdges.some(
+        (edge) =>
+          edge.sourceEndpointId === sourceEndpointId && edge.targetEndpointId === targetEndpointId,
+      )
+    )
+      return false;
+    options.graphStore.setServiceEdges([
+      ...options.graphStore.serviceEdges,
       {
         id: crypto.randomUUID(),
-        sourceServiceId: connection.source,
-        targetEndpointId: connection.targetHandle,
+        sourceServiceId: sourceService.id,
+        sourceEndpointId,
+        targetEndpointId,
       },
     ]);
     buildEdges();
+    await saveCanvas();
+    return true;
+  }
+
+  async function removeServiceCall(edgeId: string) {
+    const remaining = options.graphStore.serviceEdges.filter(({ id }) => id !== edgeId);
+    if (remaining.length === options.graphStore.serviceEdges.length) return false;
+    options.graphStore.setServiceEdges(remaining);
+    buildEdges();
+    await saveCanvas();
+    return true;
+  }
+
+  async function onEdgesChange(changes: EdgeChange[]) {
+    const removed = new Set(
+      changes.flatMap((change) => (change.type === "remove" ? [change.id] : [])),
+    );
+    if (!removed.size) return;
+    const remaining = options.graphStore.serviceEdges.filter(({ id }) => !removed.has(id));
+    if (remaining.length === options.graphStore.serviceEdges.length) return;
+    options.graphStore.setServiceEdges(remaining);
     await saveCanvas();
   }
 
@@ -178,5 +263,9 @@ export function useCanvasViewModel(options: {
     onMoveEnd,
     onConnect,
     onEdgeDoubleClick,
+    onEdgeUpdate,
+    onEdgesChange,
+    addServiceCall,
+    removeServiceCall,
   };
 }

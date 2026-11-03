@@ -29,18 +29,19 @@ export function useGraphViewModel({
   }
 
   function endpointHandle(endpointId: string) {
-    const service = store.services.find((item) =>
-      item.endpoints.some((endpoint) => endpoint.id === endpointId),
-    );
-    return service && store.collapsedServiceEndpoints[service.id]
-      ? service.endpoints[0]?.id
-      : endpointId;
+    return `in:${endpointId}`;
+  }
+
+  function endpointSourceHandle(endpointId: string) {
+    return `out:${endpointId}`;
   }
 
   function serviceEndpointOptions() {
     return store.services.flatMap((service) =>
       service.endpoints.map((endpoint) => ({
         id: endpoint.id!,
+        serviceId: service.id,
+        method: endpoint.method,
         label: `${service.name}  |  ${endpoint.name} (${endpoint.method})`,
       })),
     );
@@ -111,6 +112,13 @@ export function useGraphViewModel({
     const declared: Edge[] = store.serviceEdges.flatMap((edge) => {
       const target = endpointTarget(edge.targetEndpointId);
       if (!target) return [];
+      const sourceEndpoint = edge.sourceEndpointId
+        ? endpointTarget(edge.sourceEndpointId)
+        : undefined;
+      if (edge.sourceEndpointId && sourceEndpoint !== edge.sourceServiceId) return [];
+      const canEdit =
+        !(store.collapsedServiceEndpoints[edge.sourceServiceId] ?? false) &&
+        !(store.collapsedServiceEndpoints[target] ?? false);
       const sourceName = store.services.find(
         (service) => service.id === edge.sourceServiceId,
       )?.name;
@@ -119,9 +127,13 @@ export function useGraphViewModel({
         {
           id: edge.id,
           source: edge.sourceServiceId,
-          sourceHandle: "service-out",
+          sourceHandle: edge.sourceEndpointId
+            ? endpointSourceHandle(edge.sourceEndpointId)
+            : "service-out",
           target,
           targetHandle: endpointHandle(edge.targetEndpointId),
+          updatable: canEdit,
+          deletable: canEdit,
           type: "default",
           class: store.observedEdges.some(
             (item) => item.sourceService === sourceName && item.targetService === targetName,
@@ -157,6 +169,8 @@ export function useGraphViewModel({
     const observed: Edge[] = store.observedEdges.flatMap((edge, index) => {
       const source = store.services.find((service) => service.name === edge.sourceService)?.id;
       const target = store.services.find((service) => service.name === edge.targetService)?.id;
+      const targetEndpointId = store.services.find((service) => service.id === target)?.endpoints[0]
+        ?.id;
       if (!source || !target) return [];
       return [
         {
@@ -164,7 +178,7 @@ export function useGraphViewModel({
           source,
           sourceHandle: "service-out",
           target,
-          targetHandle: store.services.find((service) => service.id === target)?.endpoints[0]?.id,
+          targetHandle: targetEndpointId ? endpointHandle(targetEndpointId) : undefined,
           type: "default",
           class: "app__flow-edge app__flow-edge--observed",
           animated: true,
@@ -257,6 +271,7 @@ export function useGraphViewModel({
   return {
     endpointTarget,
     endpointHandle,
+    endpointSourceHandle,
     frameworkLabel,
     serviceEndpointOptions,
     serviceNode,

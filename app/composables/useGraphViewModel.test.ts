@@ -60,7 +60,14 @@ describe("graph view model", () => {
     store.applyCanvas({
       nodesLocked: true,
       services: [service],
-      edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
+      edges: [
+        {
+          id: "edge-1",
+          sourceServiceId: "service-1",
+          sourceEndpointId: null,
+          targetEndpointId: "endpoint-1",
+        },
+      ],
       mockApis: apis,
       headerTemplates: [],
       authorizationTemplates: [],
@@ -79,14 +86,19 @@ describe("graph view model", () => {
     const { store, model } = createModel();
     expect(model.endpointTarget("endpoint-1")).toBe("service-1");
     expect(model.endpointTarget("missing")).toBeUndefined();
-    expect(model.endpointHandle("endpoint-1")).toBe("endpoint-1");
+    expect(model.endpointHandle("endpoint-1")).toBe("in:endpoint-1");
     expect(model.frameworkLabel("Microsoft .NET")).toBe(".NET");
     expect(model.frameworkLabel("Spring Boot")).toBe("Spring Boot");
     expect(model.serviceEndpointOptions()).toEqual([
-      { id: "endpoint-1", label: "Orders  |  List orders (GET)" },
+      {
+        id: "endpoint-1",
+        serviceId: "service-1",
+        method: "GET",
+        label: "Orders  |  List orders (GET)",
+      },
     ]);
     store.toggleServiceEndpoints("service-1");
-    expect(model.endpointHandle("endpoint-1")).toBe("endpoint-1");
+    expect(model.endpointHandle("endpoint-1")).toBe("in:endpoint-1");
   });
 
   it("projects service observations and mock API triggers into graph nodes", () => {
@@ -120,13 +132,26 @@ describe("graph view model", () => {
     });
     const edges = model.buildEdges();
     expect(edges.map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1", "observed-0"]);
+    expect(edges[0]).toMatchObject({
+      sourceHandle: "service-out",
+      targetHandle: "in:endpoint-1",
+      updatable: true,
+      deletable: true,
+    });
     expect(edges[1]).toMatchObject({
       source: "mock-api-mock-1",
       sourceHandle: "trigger-out",
       target: "service-1",
-      targetHandle: "endpoint-1",
+      targetHandle: "in:endpoint-1",
     });
     expect(edges[2]?.animated).toBe(true);
+    store.toggleServiceEndpoints("service-1");
+    expect(model.buildEdges()[0]).toMatchObject({
+      sourceHandle: "service-out",
+      targetHandle: "in:endpoint-1",
+      updatable: false,
+      deletable: false,
+    });
   });
 
   it("omits mock APIs without a valid endpoint target", () => {
@@ -148,6 +173,53 @@ describe("graph view model", () => {
     expect(model.buildEdges().map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1"]);
   });
 
+  it("renders assigned calls from endpoint handles and keeps endpoint identity when collapsed", () => {
+    const { store, model } = createModel();
+    const payments = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+      })),
+    };
+    store.services.push(payments);
+    store.setServiceEdges([
+      {
+        id: "assigned-edge",
+        sourceServiceId: "service-2",
+        sourceEndpointId: "endpoint-2",
+        targetEndpointId: "endpoint-1",
+      },
+    ]);
+
+    expect(model.buildEdges()[0]).toMatchObject({
+      id: "assigned-edge",
+      source: "service-2",
+      sourceHandle: "out:endpoint-2",
+      target: "service-1",
+      targetHandle: "in:endpoint-1",
+    });
+    store.setAllNodesCollapsed(true);
+    expect(model.buildEdges()[0]).toMatchObject({
+      id: "assigned-edge",
+      sourceHandle: "out:endpoint-2",
+      targetHandle: "in:endpoint-1",
+      updatable: false,
+      deletable: false,
+    });
+    store.setAllNodesCollapsed(false);
+    expect(model.buildEdges()[0]).toMatchObject({
+      id: "assigned-edge",
+      sourceHandle: "out:endpoint-2",
+      targetHandle: "in:endpoint-1",
+      updatable: true,
+      deletable: true,
+    });
+  });
+
   it("stacks triggers in stable order and follows the target service position", () => {
     const secondApi = { ...mockApi, id: "mock-2", name: "Create order" };
     const { store, model } = createModel([secondApi, mockApi]);
@@ -157,7 +229,7 @@ describe("graph view model", () => {
       { id: "mock-api-mock-2", position: { x: -120, y: 234 } },
     ]);
 
-    store.setNodes([{ id: "service-1", position: { x: 500, y: 300 } }, ...model.mockApiNodes()]);
+    store.setNodes([{ id: "service-1", position: { x: 500, y: 300 } }]);
     model.syncSavedPositions();
 
     expect(store.services[0]).toMatchObject({ positionX: 500, positionY: 300 });
@@ -193,7 +265,12 @@ describe("graph view model", () => {
   it("keeps service selection and observed trace highlighting", () => {
     const { store, model } = createModel();
     store.setServiceEdges([
-      { id: "edge-2", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" },
+      {
+        id: "edge-2",
+        sourceServiceId: "service-1",
+        sourceEndpointId: null,
+        targetEndpointId: "endpoint-1",
+      },
     ]);
     store.setSelection("service-1");
     store.setObservations({

@@ -11,7 +11,8 @@ export function createSaveCanvasUseCase(dependencies: {
       throw new CanvasConstraintError(parsed.error.issues[0]?.message ?? "Invalid canvas");
     const canvas = parsed.data;
     const edgeKeys = canvas.edges.map(
-      ({ sourceServiceId, targetEndpointId }) => `${sourceServiceId}:${targetEndpointId}`,
+      ({ sourceServiceId, sourceEndpointId, targetEndpointId }) =>
+        `${sourceEndpointId ?? sourceServiceId}:${targetEndpointId}`,
     );
     if (new Set(edgeKeys).size !== edgeKeys.length)
       throw new CanvasConstraintError("Canvas contains duplicate connections");

@@ -47,9 +47,10 @@ export async function getCanvas(
         .filter((endpoint) => endpoint.serviceId === service.id)
         .map((endpoint) => ({ ...endpoint, createdAt: endpoint.createdAt.toISOString() })),
     })),
-    edges: edges.map(({ id, sourceServiceId, targetEndpointId }) => ({
+    edges: edges.map(({ id, sourceServiceId, sourceEndpointId, targetEndpointId }) => ({
       id,
       sourceServiceId,
+      sourceEndpointId,
       targetEndpointId,
     })),
     mockApis: mockApiRows,
@@ -116,7 +117,11 @@ export async function saveCanvas(
     if (canvas.edges.length) {
       const sourceIds = [...new Set(canvas.edges.map(({ sourceServiceId }) => sourceServiceId))];
       const endpointIds = [
-        ...new Set(canvas.edges.map(({ targetEndpointId }) => targetEndpointId)),
+        ...new Set(
+          canvas.edges.flatMap(({ sourceEndpointId, targetEndpointId }) =>
+            sourceEndpointId ? [sourceEndpointId, targetEndpointId] : [targetEndpointId],
+          ),
+        ),
       ];
       const [ownedServices, ownedEndpoints] = await Promise.all([
         tx
@@ -142,10 +147,15 @@ export async function saveCanvas(
       );
       if (
         canvas.edges.some(
-          (edge) => endpointOwners.get(edge.targetEndpointId) === edge.sourceServiceId,
+          (edge) =>
+            endpointOwners.get(edge.targetEndpointId) === edge.sourceServiceId ||
+            (edge.sourceEndpointId &&
+              endpointOwners.get(edge.sourceEndpointId) !== edge.sourceServiceId),
         )
       )
-        throw new CanvasConstraintError("A service cannot connect to its own endpoint");
+        throw new CanvasConstraintError(
+          "A service cannot connect to its own endpoint or use another service's endpoint as source",
+        );
     }
     await tx
       .update(projects)
@@ -160,8 +170,13 @@ export async function saveCanvas(
       .where(eq(projects.id, projectId));
     await tx.delete(serviceEdges).where(eq(serviceEdges.projectId, projectId));
     if (canvas.edges.length)
-      await tx
-        .insert(serviceEdges)
-        .values(canvas.edges.map((edge) => ({ id: randomUUID(), projectId, ...edge })));
+      await tx.insert(serviceEdges).values(
+        canvas.edges.map((edge) => ({
+          id: randomUUID(),
+          projectId,
+          ...edge,
+          sourceEndpointId: edge.sourceEndpointId ?? null,
+        })),
+      );
   });
 }

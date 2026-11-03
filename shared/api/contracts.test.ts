@@ -296,7 +296,13 @@ describe("shared API contracts", () => {
       viewport: { x: 1, y: 2, zoom: 1 },
       mockNode: { x: 3, y: 4 },
       services: [{ id: "service-1", x: 5, y: 6 }],
-      edges: [{ sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
+      edges: [
+        {
+          sourceServiceId: "service-1",
+          sourceEndpointId: "endpoint-2",
+          targetEndpointId: "endpoint-1",
+        },
+      ],
     };
     expect(canvasPutRequestSchema.safeParse(request).success).toBe(true);
     expect(

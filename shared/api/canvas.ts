@@ -49,7 +49,12 @@ export const canvasGetResponseSchema = z.object({
     }),
   ),
   edges: z.array(
-    z.object({ id: z.string(), sourceServiceId: z.string(), targetEndpointId: z.string() }),
+    z.object({
+      id: z.string(),
+      sourceServiceId: z.string(),
+      sourceEndpointId: z.string().nullable(),
+      targetEndpointId: z.string(),
+    }),
   ),
   mockApis: z.array(
     z.object({
@@ -85,7 +90,11 @@ export const canvasPutRequestSchema = z.object({
   services: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })),
   mockApiPositions: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })).optional(),
   edges: z.array(
-    z.object({ sourceServiceId: z.string().min(1), targetEndpointId: z.string().min(1) }),
+    z.object({
+      sourceServiceId: z.string().min(1),
+      sourceEndpointId: z.string().min(1).nullable().optional(),
+      targetEndpointId: z.string().min(1),
+    }),
   ),
 });
 export const canvasPutResponseSchema = z.object({ saved: z.literal(true) });

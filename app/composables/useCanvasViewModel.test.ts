@@ -218,13 +218,21 @@ describe("canvas view model", () => {
       })),
     };
     context.graphStore.services = [...context.graphStore.services, paymentsService];
+    context.graphStore.services[0]!.endpoints.push({
+      ...service.endpoints[0]!,
+      id: "endpoint-source",
+    });
     await context.model.onConnect({
       source: "service-1",
       target: "service-2",
-      sourceHandle: null,
-      targetHandle: "endpoint-2",
+      sourceHandle: "out:endpoint-source",
+      targetHandle: "in:endpoint-2",
     });
     expect(context.graphStore.serviceEdges).toHaveLength(1);
+    expect(context.graphStore.serviceEdges[0]).toMatchObject({
+      sourceEndpointId: "endpoint-source",
+      targetEndpointId: "endpoint-2",
+    });
     await context.model.onConnect({
       source: "mock-api-mock-1",
       target: "service-1",
@@ -255,6 +263,118 @@ describe("canvas view model", () => {
       ({ url, options }) => url === "/api/canvas" && options.method === "PUT",
     );
     expect(request?.options.body).toMatchObject({ edges: [] });
+  it("reassigns a legacy wire to a source endpoint and saves the same relationship", async () => {
+    const context = setup();
+    context.graphStore.applyCanvas(canvas);
+    const paymentsService = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+      })),
+    };
+    context.graphStore.services = [...context.graphStore.services, paymentsService];
+    context.graphStore.setServiceEdges([
+      {
+        id: "legacy-edge",
+        sourceServiceId: "service-1",
+        sourceEndpointId: null,
+        targetEndpointId: "endpoint-2",
+      },
+    ]);
+    expect(context.graphViewModel.buildEdges()[0]).toMatchObject({
+      id: "legacy-edge",
+      sourceHandle: "service-out",
+      targetHandle: "in:endpoint-2",
+    });
+
+    await context.model.onEdgeUpdate({
+      edge: { id: "legacy-edge" },
+      connection: {
+        source: "service-1",
+        sourceHandle: "out:endpoint-1",
+        target: "service-2",
+        targetHandle: "in:endpoint-2",
+      },
+    });
+
+    expect(context.graphStore.serviceEdges[0]).toMatchObject({
+      id: "legacy-edge",
+      sourceEndpointId: "endpoint-1",
+      targetEndpointId: "endpoint-2",
+    });
+    expect(context.requests.some(({ options }) => options.method === "PUT")).toBe(true);
+  });
+
+  it("removes a deleted declared wire from saved canvas relationships", async () => {
+    const context = setup();
+    context.graphStore.setServiceEdges([
+      {
+        id: "edge-1",
+        sourceServiceId: "service-1",
+        sourceEndpointId: null,
+        targetEndpointId: "endpoint-1",
+      },
+    ]);
+
+    await context.model.onEdgesChange([
+      {
+        type: "remove",
+        id: "edge-1",
+        source: "service-1",
+        target: "service-1",
+        sourceHandle: "service-out",
+        targetHandle: "in:endpoint-1",
+      },
+    ]);
+
+    expect(context.graphStore.serviceEdges).toEqual([]);
+    expect(context.requests.some(({ options }) => options.method === "PUT")).toBe(true);
+  });
+
+  it("keeps endpoint panel calls and graph wires on the same saved edge", async () => {
+    const context = setup();
+    const paymentsService = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+      })),
+    };
+    context.graphStore.applyCanvas({ ...canvas, services: [service, paymentsService] });
+
+    await expect(context.model.addServiceCall("endpoint-1", "endpoint-2")).resolves.toBe(true);
+    const [edge] = context.graphStore.serviceEdges;
+    expect(edge).toMatchObject({
+      sourceServiceId: "service-1",
+      sourceEndpointId: "endpoint-1",
+      targetEndpointId: "endpoint-2",
+    });
+    const renderedEdge = (
+      context.graphStore.edges as unknown as Array<{
+        id: string;
+        sourceHandle?: string;
+        targetHandle?: string;
+      }>
+    ).find(({ id }) => id === edge?.id);
+    expect(renderedEdge).toMatchObject({
+      sourceHandle: "out:endpoint-1",
+      targetHandle: "in:endpoint-2",
+    });
+
+    await expect(context.model.removeServiceCall(edge!.id)).resolves.toBe(true);
+    expect(context.graphStore.serviceEdges).toEqual([]);
+    expect(
+      (context.graphStore.edges as unknown as Array<{ id: string }>).some(
+        ({ id }) => id === edge!.id,
+      ),
+    ).toBe(false);
   });
 
   it("refreshes node internals and rebuilds edges for collapse actions", async () => {

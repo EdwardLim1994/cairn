@@ -46,7 +46,7 @@ const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
-const { nodes, edges, services, allNodesCollapsed, nodesLocked } = storeToRefs(graphStore);
+const { nodes, edges, services, serviceEdges, allNodesCollapsed, nodesLocked } = storeToRefs(graphStore);
 const dark = useCookie("cairn-dark-mode", {
   default: () => false,
   maxAge: 60 * 60 * 24 * 365,
@@ -144,6 +144,10 @@ const {
   onMoveEnd,
   onConnect,
   onEdgeDoubleClick,
+  onEdgeUpdate,
+  onEdgesChange,
+  addServiceCall,
+  removeServiceCall,
 } = canvasViewModel;
 const { closeSettings, closeSettingsOutside } = useSettingsPanelViewModel({
   serviceDialog,
@@ -309,6 +313,18 @@ function addEndpoint() {
 
 function removeEndpoint(index: number) {
   serviceViewModel.removeEndpoint(index);
+}
+
+async function addOutboundCall(sourceEndpointId: string, targetEndpointId: string) {
+  const sourceService = services.value.find((service) =>
+    service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
+  );
+  if (sourceService?.id === editingServiceId.value)
+    await addServiceCall(sourceEndpointId, targetEndpointId);
+}
+
+async function removeOutboundCall(edgeId: string) {
+  await removeServiceCall(edgeId);
 }
 
 function saveService() {
@@ -492,6 +508,8 @@ onUnmounted(() => {
           :nodes-locked="nodesLocked"
           @connect="onConnect"
           @edge-double-click="onEdgeDoubleClick"
+          @edge-update="onEdgeUpdate"
+          @edges-change="onEdgesChange"
           @node-click="onNodeClick"
           @pane-context-menu="handleCanvasContextMenu"
           @move-end="onMoveEnd"
@@ -541,8 +559,12 @@ onUnmounted(() => {
       v-model:framework-menu-open="frameworkMenuOpen"
       :editing-service-id="editingServiceId"
       :header-templates="headerTemplates"
+      :outbound-call-edges="serviceEdges"
+      :endpoint-options="servicesForSelect"
       @add-endpoint="addEndpoint"
       @remove-endpoint="removeEndpoint"
+      @add-outbound-call="addOutboundCall"
+      @remove-outbound-call="removeOutboundCall"
       @import-open-api="serviceViewModel.importOpenApiFile"
       @save="saveService"
       @discard="closeSettings"

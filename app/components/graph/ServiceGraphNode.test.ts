@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
+import { defineComponent, h } from "vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
+
+const HandleStub = defineComponent({
+  props: { id: String, type: String, connectable: Boolean },
+  setup(props) {
+    return () =>
+      h("div", { "data-handle": props.id, "data-connectable": String(props.connectable) });
+  },
+});
 
 const data = {
   serviceId: "service-1",
@@ -54,5 +63,32 @@ describe("ServiceGraphNode", () => {
     });
 
     expect(wrapper.text()).toContain("Error reported for this service");
+  });
+
+  it("keeps endpoint handle identities at shared, non-connectable collapsed positions", () => {
+    const wrapper = mount(ServiceGraphNode, {
+      props: {
+        data: {
+          ...data,
+          endpoints: [
+            ...data.endpoints,
+            { id: "endpoint-2", name: "Create order", method: "POST" },
+          ],
+          endpointsCollapsed: true,
+        },
+      },
+      global: { stubs: { Handle: HandleStub } },
+    });
+
+    expect(
+      wrapper.findAll("[data-handle]").map((handle) => handle.attributes("data-handle")),
+    ).toEqual([
+      "service-out",
+      "in:endpoint-1",
+      "out:endpoint-1",
+      "in:endpoint-2",
+      "out:endpoint-2",
+    ]);
+    expect(wrapper.findAll('[data-connectable="false"]')).toHaveLength(5);
   });
 });

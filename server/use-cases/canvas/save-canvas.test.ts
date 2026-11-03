@@ -52,4 +52,29 @@ describe("save canvas use case", () => {
     );
     expect(dependencies.saveCanvas).not.toHaveBeenCalled();
   });
+
+  it("allows different source endpoints to call same target endpoint", async () => {
+    const dependencies = {
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      saveCanvas: vi.fn().mockResolvedValue(undefined),
+    };
+    const canvas = {
+      ...validCanvas,
+      edges: [
+        {
+          sourceServiceId: "service-1",
+          sourceEndpointId: "source-1",
+          targetEndpointId: "endpoint-2",
+        },
+        {
+          sourceServiceId: "service-1",
+          sourceEndpointId: "source-2",
+          targetEndpointId: "endpoint-2",
+        },
+      ],
+    };
+
+    await expect(createSaveCanvasUseCase(dependencies)(canvas)).resolves.toEqual({ saved: true });
+    expect(dependencies.saveCanvas).toHaveBeenCalledWith("project-1", canvas);
+  });
 });

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { VueFlow, useVueFlow, type Connection, type Edge, type Node } from "@vue-flow/core";
+import {
+  VueFlow,
+  useVueFlow,
+  type Connection,
+  type Edge,
+  type EdgeChange,
+  type EdgeUpdateEvent,
+  type Node,
+} from "@vue-flow/core";
 import { Background, BackgroundVariant } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
@@ -14,6 +22,8 @@ const emit = defineEmits<{
   "update:edges": [edges: Edge[]];
   connect: [connection: Connection];
   edgeDoubleClick: [event: { edge: { id: string } }];
+  edgeUpdate: [event: EdgeUpdateEvent];
+  edgesChange: [changes: EdgeChange[]];
   nodeClick: [event: { node: { id: string } }];
   paneContextMenu: [event: MouseEvent];
   moveEnd: [viewport: { x: number; y: number; zoom: number }];
@@ -49,6 +59,8 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     fit-view-on-init
     @connect="emit('connect', $event)"
     @edge-double-click="emit('edgeDoubleClick', $event)"
+    @edge-update="emit('edgeUpdate', $event)"
+    @edges-change="emit('edgesChange', $event)"
     @node-click="emit('nodeClick', $event)"
     @pane-context-menu="emit('paneContextMenu', $event)"
     @move-end="emit('moveEnd', $event.flowTransform)"

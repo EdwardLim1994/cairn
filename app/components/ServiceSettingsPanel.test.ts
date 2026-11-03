@@ -141,7 +141,7 @@ const nuxtUiStubs = {
 
 function mountPanel(props: Record<string, unknown>) {
   return mount(ServiceSettingsPanel, {
-    props: { headerTemplates: [], ...props },
+    props: { headerTemplates: [], outboundCallEdges: [], endpointOptions: [], ...props },
     global: { components: nuxtUiStubs },
   });
 }
@@ -214,6 +214,53 @@ describe("ServiceSettingsPanel", () => {
     await framework.setValue(".NET");
     expect(panelDraft.framework).toBe(".NET");
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true], [false]]);
+  });
+
+  it("lists, adds, and requests removal of endpoint outbound calls", async () => {
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      endpointOptions: [
+        { id: "endpoint-1", serviceId: "service-1", label: "Orders | List orders (GET)" },
+        { id: "endpoint-2", serviceId: "service-2", label: "Payments | Create payment (POST)" },
+      ],
+      outboundCallEdges: [],
+    });
+
+    await wrapper.get('[aria-expanded="false"]').trigger("click");
+    await wrapper.get('[aria-label="Add outbound call"]').setValue("endpoint-2");
+    expect(wrapper.emitted("addOutboundCall")).toEqual([["endpoint-1", "endpoint-2"]]);
+
+    const existingCallEdges = [
+      { id: "edge-1", sourceEndpointId: "endpoint-1", targetEndpointId: "endpoint-2" },
+    ];
+    const existingCall = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      endpointOptions: [
+        { id: "endpoint-2", serviceId: "service-2", label: "Payments | Create payment (POST)" },
+      ],
+      outboundCallEdges: existingCallEdges,
+    });
+    await existingCall.get('[aria-expanded="false"]').trigger("click");
+    expect(existingCall.text()).toContain("Payments | Create payment (POST)");
+    const confirmation = vi.fn().mockReturnValue(false);
+    Object.defineProperty(window, "confirm", { configurable: true, value: confirmation });
+    await existingCall
+      .get('[aria-label="Remove outbound call to Payments | Create payment (POST)"]')
+      .trigger("click");
+    expect(existingCall.emitted("removeOutboundCall")).toBeUndefined();
+    expect(existingCallEdges).toHaveLength(1);
+
+    confirmation.mockReturnValue(true);
+    await existingCall
+      .get('[aria-label="Remove outbound call to Payments | Create payment (POST)"]')
+      .trigger("click");
+
+    expect(existingCall.emitted("removeOutboundCall")).toEqual([["edge-1"]]);
+    Reflect.deleteProperty(window, "confirm");
   });
 
   it("shows the GET-only health URL and reusable header controls for Other", async () => {
@@ -298,7 +345,7 @@ describe("ServiceSettingsPanel", () => {
     await wrapper.get('[aria-expanded="false"]').trigger("click");
 
     expect(wrapper.findAll('input:not([type="file"])')).toHaveLength(4);
-    expect(wrapper.findAll("select")).toHaveLength(3);
+    expect(wrapper.findAll("select")).toHaveLength(4);
     expect(wrapper.findAll("button")).toHaveLength(6);
     expect(wrapper.find('select option[value="PATCH"]').exists()).toBe(true);
     await wrapper.get('input[placeholder="e.g. Checkout API"]').setValue("Catalog API");

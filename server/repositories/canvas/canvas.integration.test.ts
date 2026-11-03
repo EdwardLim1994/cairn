@@ -41,6 +41,15 @@ integration("canvas repositories with MySQL", () => {
       },
     ]);
     await db!.insert(serviceEndpoints).values({
+      id: "canvas-source-endpoint",
+      projectId,
+      serviceId: "canvas-service-source",
+      name: "Source endpoint",
+      apiType: "REST",
+      method: "GET",
+      url: "/source",
+    });
+    await db!.insert(serviceEndpoints).values({
       id: "canvas-target-endpoint",
       projectId,
       serviceId: "canvas-service-target",
@@ -60,6 +69,7 @@ integration("canvas repositories with MySQL", () => {
       id: "canvas-edge-1",
       projectId,
       sourceServiceId: "canvas-service-source",
+      sourceEndpointId: null,
       targetEndpointId: "canvas-target-endpoint",
     });
 
@@ -75,6 +85,7 @@ integration("canvas repositories with MySQL", () => {
       {
         id: "canvas-edge-1",
         sourceServiceId: "canvas-service-source",
+        sourceEndpointId: null,
         targetEndpointId: "canvas-target-endpoint",
       },
     ]);
@@ -89,7 +100,11 @@ integration("canvas repositories with MySQL", () => {
         mockNode: { x: 8, y: 9 },
         services: [{ id: "canvas-service-source", x: 10, y: 11 }],
         edges: [
-          { sourceServiceId: "canvas-service-source", targetEndpointId: "canvas-target-endpoint" },
+          {
+            sourceServiceId: "canvas-service-source",
+            sourceEndpointId: "canvas-source-endpoint",
+            targetEndpointId: "canvas-target-endpoint",
+          },
         ],
       },
       db!,
@@ -103,6 +118,93 @@ integration("canvas repositories with MySQL", () => {
       { positionX: 10, positionY: 11 },
     );
     expect(canvas.edges).toHaveLength(1);
+    expect(canvas.edges[0]).toMatchObject({ sourceEndpointId: "canvas-source-endpoint" });
+  });
+
+  it("round-trips assigned and legacy service-level connections", async () => {
+    await saveCanvas(
+      projectId,
+      {
+        viewport: { x: 0, y: 0, zoom: 1 },
+        mockNode: { x: 0, y: 0 },
+        services: [],
+        edges: [
+          { sourceServiceId: "canvas-service-source", targetEndpointId: "canvas-target-endpoint" },
+          {
+            sourceServiceId: "canvas-service-source",
+            sourceEndpointId: "canvas-source-endpoint",
+            targetEndpointId: "canvas-target-endpoint",
+          },
+        ],
+      },
+      db!,
+    );
+
+    const { edges } = await getCanvas(projectId, db!);
+    expect(edges).toHaveLength(2);
+    const sourceEndpointIds = edges.map(({ sourceEndpointId }) => sourceEndpointId);
+    expect(sourceEndpointIds).toContain(null);
+    expect(sourceEndpointIds).toContain("canvas-source-endpoint");
+  });
+
+  it("keeps legacy calls service-level until reassignment, then reloads assigned endpoint", async () => {
+    const base = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      mockNode: { x: 0, y: 0 },
+      services: [],
+    };
+    await saveCanvas(
+      projectId,
+      {
+        ...base,
+        edges: [
+          { sourceServiceId: "canvas-service-source", targetEndpointId: "canvas-target-endpoint" },
+        ],
+      },
+      db!,
+    );
+    expect((await getCanvas(projectId, db!)).edges[0]?.sourceEndpointId).toBeNull();
+
+    await saveCanvas(
+      projectId,
+      {
+        ...base,
+        edges: [
+          {
+            sourceServiceId: "canvas-service-source",
+            sourceEndpointId: "canvas-source-endpoint",
+            targetEndpointId: "canvas-target-endpoint",
+          },
+        ],
+      },
+      db!,
+    );
+
+    expect((await getCanvas(projectId, db!)).edges[0]).toMatchObject({
+      sourceEndpointId: "canvas-source-endpoint",
+      targetEndpointId: "canvas-target-endpoint",
+    });
+  });
+
+  it("rejects a source endpoint owned by another service", async () => {
+    await expect(
+      saveCanvas(
+        projectId,
+        {
+          viewport: { x: 0, y: 0, zoom: 1 },
+          mockNode: { x: 0, y: 0 },
+          services: [],
+          edges: [
+            {
+              sourceServiceId: "canvas-service-source",
+              sourceEndpointId: "canvas-target-endpoint",
+              targetEndpointId: "canvas-target-endpoint",
+            },
+          ],
+        },
+        db!,
+      ),
+    ).rejects.toBeInstanceOf(CanvasConstraintError);
   });
 
   it("rolls back earlier writes when an edge references an unknown endpoint", async () => {

@@ -27,7 +27,33 @@ const emit = defineEmits<{
 
 <template>
   <article class="app__graph-node--service app__graph-node relative rounded-2xl">
-    <Handle id="service-out" type="source" :position="Position.Right" class="app__service-source" />
+    <Handle
+      id="service-out"
+      type="source"
+      :position="Position.Right"
+      :connectable="false"
+      class="app__service-source"
+    />
+    <template v-if="data.endpointsCollapsed">
+      <template v-for="endpoint in data.endpoints" :key="endpoint.id">
+        <Handle
+          v-if="endpoint.id"
+          :id="`in:${endpoint.id}`"
+          type="target"
+          :position="Position.Left"
+          :connectable="false"
+          class="app__endpoint-handle app__endpoint-handle--collapsed"
+        />
+        <Handle
+          v-if="endpoint.id"
+          :id="`out:${endpoint.id}`"
+          type="source"
+          :position="Position.Right"
+          :connectable="false"
+          class="app__endpoint-source app__endpoint-source--collapsed"
+        />
+      </template>
+    </template>
     <div class="flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3">
       <div class="grid size-[31px] shrink-0 place-items-center rounded-[9px] bg-transparent">
         <img
@@ -110,11 +136,20 @@ const emit = defineEmits<{
       }"
     >
       <Handle
-        v-if="endpoint.id && (!data.endpointsCollapsed || endpoint.id === data.endpoints[0]?.id)"
-        :id="endpoint.id"
+        v-if="endpoint.id && !data.endpointsCollapsed"
+        :id="`in:${endpoint.id}`"
         type="target"
         :position="Position.Left"
+        :connectable="!data.endpointsCollapsed"
         class="app__endpoint-handle"
+      />
+      <Handle
+        v-if="endpoint.id && !data.endpointsCollapsed"
+        :id="`out:${endpoint.id}`"
+        type="source"
+        :position="Position.Right"
+        :connectable="!data.endpointsCollapsed"
+        class="app__endpoint-source"
       />
       <span
         class="rounded px-1 py-0.5 font-mono text-[9px]"
