@@ -4,7 +4,13 @@ import type { ServiceCreateRequest, ServiceUpdateRequest } from "#shared/api/ser
 import { getDb } from "../../db";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "../../db/schema";
-import { environmentVariables, headerTemplates, serviceEndpoints, services } from "../../db/schema";
+import {
+  environmentVariables,
+  graphNodePositions,
+  headerTemplates,
+  serviceEndpoints,
+  services,
+} from "../../db/schema";
 import { ServiceEndpointOwnershipError, ServiceHeaderTemplateOwnershipError } from "./errors";
 import { deactivateInvalidMockApis } from "../mock-apis/reconcile-readiness";
 
@@ -51,6 +57,7 @@ export async function createService(projectId: string, id: string, input: Servic
     await tx.insert(services).values({
       id,
       projectId,
+      codeKey: input.codeKey ?? randomUUID(),
       name: input.name,
       framework: input.framework,
       baseUrl: input.baseUrl,
@@ -58,6 +65,12 @@ export async function createService(projectId: string, id: string, input: Servic
       healthCheckHeaderTemplateId: input.healthCheckHeaderTemplateId,
       healthCheckCustomHeaders: input.healthCheckCustomHeaders,
       active: input.active,
+    });
+    await tx.insert(graphNodePositions).values({
+      id: randomUUID(),
+      projectId,
+      nodeType: "service",
+      entityId: id,
       positionX: input.positionX ?? 0,
       positionY: input.positionY ?? 0,
     });
@@ -65,6 +78,7 @@ export async function createService(projectId: string, id: string, input: Servic
       await tx.insert(serviceEndpoints).values(
         input.endpoints.map(({ id: _id, ...endpoint }) => ({
           ...endpoint,
+          codeKey: endpoint.codeKey ?? randomUUID(),
           id: randomUUID(),
           projectId,
           serviceId: id,
@@ -114,7 +128,7 @@ export async function updateService(
       })
       .where(eq(services.id, id));
     const oldEndpoints = await tx
-      .select({ id: serviceEndpoints.id })
+      .select({ id: serviceEndpoints.id, codeKey: serviceEndpoints.codeKey })
       .from(serviceEndpoints)
       .where(eq(serviceEndpoints.serviceId, id));
     const retainedIds = input.endpoints.flatMap((endpoint) => (endpoint.id ? [endpoint.id] : []));
@@ -131,6 +145,7 @@ export async function updateService(
         const values = {
           projectId,
           serviceId: id,
+          codeKey: oldEndpoints.find((old) => old.id === endpoint.id)?.codeKey ?? randomUUID(),
           name: endpoint.name,
           apiType: endpoint.apiType,
           method: endpoint.method,
@@ -155,6 +170,15 @@ export async function deleteService(
   db: Database = getDb(),
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
+    await tx
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "service"),
+          eq(graphNodePositions.entityId, id),
+        ),
+      );
     const result = await tx
       .delete(services)
       .where(and(eq(services.id, id), eq(services.projectId, projectId)));

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
-import { environmentVariables, headerTemplates, projects } from "../db/schema";
+import { environmentVariables, graphNodePositions, headerTemplates, projects } from "../db/schema";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
 const integration = describe.skipIf(!connectionString);
@@ -60,22 +60,36 @@ integration("service REST controllers with MySQL", () => {
       context: {
         body: {
           name: "Orders",
+          codeKey: "orders-key",
           framework: "Spring Boot",
           baseUrl: "http://localhost:8081",
           positionX: 12,
           positionY: 13,
-          endpoints: [{ name: "List orders", apiType: "REST", method: "GET", url: "/orders" }],
+          endpoints: [
+            {
+              codeKey: "list-orders",
+              name: "List orders",
+              apiType: "REST",
+              method: "GET",
+              url: "/orders",
+            },
+          ],
         },
       },
     } as never)) as { id: string };
     const initial = (await listRoute({} as never)) as Array<{
       id: string;
-      positionX: number;
-      endpoints: Array<{ id: string; name: string }>;
+      codeKey: string;
+      endpoints: Array<{ id: string; codeKey: string; name: string }>;
     }>;
     const endpointId = initial[0]?.endpoints[0]?.id;
     expect(created.id).toBeTruthy();
-    expect(initial[0]).toMatchObject({ id: created.id, positionX: 12 });
+    expect(initial[0]).toMatchObject({ id: created.id, codeKey: "orders-key" });
+    expect(initial[0]).not.toHaveProperty("positionX");
+    expect(initial[0]?.endpoints[0]?.codeKey).toBe("list-orders");
+    await expect(
+      getDb().select().from(graphNodePositions).where(eq(graphNodePositions.entityId, created.id)),
+    ).resolves.toMatchObject([{ positionX: 12, positionY: 13 }]);
     expect(endpointId).toBeTruthy();
 
     await expect(
@@ -100,13 +114,38 @@ integration("service REST controllers with MySQL", () => {
       } as never),
     ).resolves.toEqual({ id: created.id });
     const updated = (await listRoute({} as never)) as Array<{
+      codeKey: string;
       name: string;
-      endpoints: Array<{ name: string }>;
+      endpoints: Array<{ codeKey: string; name: string }>;
     }>;
     expect(updated[0]).toMatchObject({
+      codeKey: "orders-key",
       name: "Orders updated",
-      endpoints: [{ name: "List all orders" }],
+      endpoints: [{ codeKey: "list-orders", name: "List all orders" }],
     });
+  });
+
+  it("rejects duplicate code keys", async () => {
+    const body = {
+      name: "Orders",
+      codeKey: "duplicate-key",
+      framework: "Spring Boot",
+      baseUrl: "http://localhost:8081",
+      endpoints: [{ codeKey: "list", name: "List", apiType: "REST", method: "GET", url: "/" }],
+    };
+    await createRoute({ context: { body } } as never);
+    await expect(createRoute({ context: { body } } as never)).rejects.toThrow();
+    await expect(
+      createRoute({
+        context: {
+          body: {
+            ...body,
+            codeKey: "endpoint-key-check",
+            endpoints: [body.endpoints[0], { ...body.endpoints[0], name: "Duplicate" }],
+          },
+        },
+      } as never),
+    ).rejects.toThrow();
   });
 
   it("rejects endpoint ids owned by a different service", async () => {

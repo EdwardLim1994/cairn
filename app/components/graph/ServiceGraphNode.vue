@@ -32,7 +32,7 @@ const emit = defineEmits<{
       type="source"
       :position="Position.Right"
       :connectable="false"
-      class="app__service-source"
+      class="app__service-source app__service-source--hidden"
     />
     <template v-if="data.endpointsCollapsed">
       <template v-for="endpoint in data.endpoints" :key="endpoint.id">

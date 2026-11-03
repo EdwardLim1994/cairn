@@ -4,6 +4,7 @@ import { useGraphStore } from "./graph";
 
 const endpoint = {
   id: "endpoint-1",
+  codeKey: "list-orders",
   projectId: "project-1",
   serviceId: "service-1",
   name: "List orders",
@@ -14,6 +15,7 @@ const endpoint = {
 };
 const service = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   framework: "Spring Boot",
@@ -48,7 +50,6 @@ describe("graph store", () => {
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 10, y: 20, zoom: 1.2 },
-      mockNode: { x: 300, y: 400 },
     };
 
     store.applyCanvas(canvas);
@@ -65,7 +66,6 @@ describe("graph store", () => {
     expect(store.serviceHealth["service-1"]).toBe(true);
     expect(store.viewport).toEqual({ x: 1, y: 2, zoom: 2 });
     expect(store.nodesLocked).toBe(true);
-    expect(store.mockNodePosition).toEqual({ x: 300, y: 400 });
   });
 
   it("tracks selection, collapse state, observations, and saved positions", () => {
@@ -78,7 +78,6 @@ describe("graph store", () => {
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 560, y: 160 },
     });
     store.toggleServiceEndpoints("service-1");
     expect(store.collapsedServiceEndpoints["service-1"]).toBe(true);
@@ -102,7 +101,6 @@ describe("graph store", () => {
     expect(store.observedEdges).toEqual([{ sourceService: "Orders", targetService: "Payments" }]);
     expect(store.services[0]?.positionX).toBe(12);
     expect(store.services[0]?.positionY).toBe(34);
-    expect(store.mockNodePosition).toEqual({ x: 560, y: 160 });
     store.setSelection(null);
     expect(store.selectedNodeId).toBeNull();
   });

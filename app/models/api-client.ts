@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { graphCodeManifestSchema } from "#shared/api/graph-code";
 import {
   canvasGetRequestSchema,
   canvasGetResponseSchema,
@@ -86,6 +87,14 @@ export function createApiClient(transport: ApiTransport) {
       send("/api/canvas", "GET", undefined, canvasGetRequestSchema, canvasGetResponseSchema),
     saveCanvas: (input: z.input<typeof canvasPutRequestSchema>) =>
       send("/api/canvas", "PUT", input, canvasPutRequestSchema, canvasPutResponseSchema),
+    applyGraphCode: (input: z.input<typeof graphCodeManifestSchema>) =>
+      send(
+        "/api/graph-code",
+        "POST",
+        input,
+        graphCodeManifestSchema,
+        z.object({ applied: z.literal(true) }),
+      ),
     listServices: () =>
       send("/api/services", "GET", undefined, serviceListRequestSchema, serviceListResponseSchema),
     createService: (input: z.input<typeof serviceCreateRequestSchema>) =>

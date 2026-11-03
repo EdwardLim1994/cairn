@@ -11,6 +11,7 @@ const emit = defineEmits<{
   toggleNodesLocked: [];
   toggleTheme: [];
   openMockApis: [];
+  openGraphAsCode: [];
   openAccessTokens: [];
   openHistory: [];
   signOut: [];
@@ -33,6 +34,18 @@ const emit = defineEmits<{
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
+        aria-label="Graph as code"
+        title="Graph as code"
+        @click.stop="emit('openGraphAsCode')"
+      >
+        <UIcon name="i-lucide-braces" class="size-3.5" aria-hidden="true" />
+        Graph as code
+      </UButton>
       <UButton
         type="button"
         color="neutral"

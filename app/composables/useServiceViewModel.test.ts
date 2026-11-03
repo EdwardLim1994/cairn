@@ -84,6 +84,7 @@ const nuxtUiStubs = {
 
 const service = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   framework: "Spring Boot",
@@ -98,6 +99,7 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
+      codeKey: "list-orders",
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
@@ -242,7 +244,6 @@ describe("service view model", () => {
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 560, y: 160 },
     });
     context.editingServiceId.value = "service-1";
     const wrapper = mount(ServiceSettingsPanel, {

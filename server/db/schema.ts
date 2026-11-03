@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   boolean,
   datetime,
@@ -19,8 +20,6 @@ export const projects = mysqlTable("projects", {
   viewportX: double("viewport_x").notNull().default(0),
   viewportY: double("viewport_y").notNull().default(0),
   viewportZoom: double("viewport_zoom").notNull().default(1),
-  mockNodeX: double("mock_node_x").notNull().default(120),
-  mockNodeY: double("mock_node_y").notNull().default(120),
   nodesLocked: boolean("nodes_locked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -33,6 +32,9 @@ export const services = mysqlTable(
     projectId: varchar("project_id", { length: 64 })
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    codeKey: varchar("code_key", { length: 128 })
+      .notNull()
+      .$defaultFn(() => randomUUID()),
     name: varchar("name", { length: 255 }).notNull(),
     framework: varchar("framework", { length: 100 }).notNull(),
     baseUrl: text("base_url").notNull(),
@@ -45,11 +47,12 @@ export const services = mysqlTable(
       .notNull()
       .default([]),
     active: boolean("active").notNull().default(true),
-    positionX: double("position_x").notNull().default(0),
-    positionY: double("position_y").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("services_project_idx").on(table.projectId)],
+  (table) => [
+    index("services_project_idx").on(table.projectId),
+    uniqueIndex("services_project_code_key_unique").on(table.projectId, table.codeKey),
+  ],
 );
 
 export const serviceEndpoints = mysqlTable(
@@ -62,13 +65,19 @@ export const serviceEndpoints = mysqlTable(
     serviceId: varchar("service_id", { length: 36 })
       .notNull()
       .references(() => services.id, { onDelete: "cascade" }),
+    codeKey: varchar("code_key", { length: 128 })
+      .notNull()
+      .$defaultFn(() => randomUUID()),
     name: varchar("name", { length: 255 }).notNull(),
     apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     method: varchar("method", { length: 10 }).notNull(),
     url: text("url").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("endpoints_project_service_idx").on(table.projectId, table.serviceId)],
+  (table) => [
+    index("endpoints_project_service_idx").on(table.projectId, table.serviceId),
+    uniqueIndex("endpoints_service_code_key_unique").on(table.serviceId, table.codeKey),
+  ],
 );
 
 export const mockApis = mysqlTable(
@@ -93,8 +102,6 @@ export const mockApis = mysqlTable(
       .notNull()
       .default([]),
     active: boolean("active").notNull().default(true),
-    positionX: double("position_x"),
-    positionY: double("position_y"),
     importMethod: varchar("import_method", { length: 10 }),
     importUrl: text("import_url"),
     matchUrl: text("match_url"),
@@ -110,6 +117,28 @@ export const mockApis = mysqlTable(
       foreignColumns: [authorizationTemplates.id],
       name: "mock_apis_auth_template_fk",
     }).onDelete("set null"),
+  ],
+);
+
+export const graphNodePositions = mysqlTable(
+  "graph_node_positions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    nodeType: mysqlEnum("node_type", ["service", "mock_api"]).notNull(),
+    entityId: varchar("entity_id", { length: 36 }).notNull(),
+    positionX: double("position_x").notNull(),
+    positionY: double("position_y").notNull(),
+  },
+  (table) => [
+    uniqueIndex("graph_node_positions_entity_unique").on(
+      table.projectId,
+      table.nodeType,
+      table.entityId,
+    ),
+    index("graph_node_positions_project_idx").on(table.projectId),
   ],
 );
 

@@ -5,12 +5,14 @@ import ServiceSettingsPanel from "../components/ServiceSettingsPanel.vue";
 import MockApiSettingsPanel from "../components/MockApiSettingsPanel.vue";
 import LogsPanel from "../components/LogsPanel.vue";
 import AppToolbar from "../components/AppToolbar.vue";
+import GraphAsCodePanel from "../components/GraphAsCodePanel.vue";
 import OtelAccessTokensDialog from "../components/OtelAccessTokensDialog.vue";
 import AppToastStack from "../components/AppToastStack.vue";
 import LatestRunDrawer from "../components/LatestRunDrawer.vue";
 import MockApiCallHistoryPanel from "../components/MockApiCallHistoryPanel.vue";
 import { createApiClient } from "../models/api-client";
 import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
+import type { GraphCodeManifest } from "#shared/api/graph-code";
 import { storeToRefs } from "pinia";
 import { useGraphStore } from "../stores/graph";
 import { useGraphViewModel } from "../composables/useGraphViewModel";
@@ -23,6 +25,7 @@ import { useObservabilityViewModel } from "../composables/useObservabilityViewMo
 import { useCanvasViewModel } from "../composables/useCanvasViewModel";
 import { useGraphInteractionViewModel } from "../composables/useGraphInteractionViewModel";
 import { useSettingsPanelViewModel } from "../composables/useSettingsPanelViewModel";
+import { serializeGraphCode } from "../utils/graph-code";
 import type { MockApiDraft } from "../models/mock-api";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
@@ -46,7 +49,8 @@ const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
-const { nodes, edges, services, serviceEdges, allNodesCollapsed, nodesLocked } = storeToRefs(graphStore);
+const { nodes, edges, services, serviceEdges, allNodesCollapsed, nodesLocked } =
+  storeToRefs(graphStore);
 const dark = useCookie("cairn-dark-mode", {
   default: () => false,
   maxAge: 60 * 60 * 24 * 365,
@@ -87,6 +91,9 @@ const historyOpen = ref(false);
 const historyReplayEntryId = ref<string | null>(null);
 const historyEntries = ref<MockApiCallHistoryEntry[]>([]);
 const historyLoading = ref(false);
+const graphCodeOpen = ref(false);
+const graphCodeInitial = ref("");
+const graphCodeApplying = ref(false);
 const editingEnvironmentVariableId = ref<string | null>(null);
 const environmentCardDraft = ref({ name: "", value: "" });
 let healthTimer: ReturnType<typeof setInterval> | undefined;
@@ -459,6 +466,27 @@ const endpointDetails = computed(() =>
   services.value.flatMap((service) => service.endpoints.map(({ id, url }) => ({ id, url }))),
 );
 
+function openGraphAsCode() {
+  graphCodeInitial.value = serializeGraphCode(services.value, serviceEdges.value);
+  graphCodeOpen.value = true;
+}
+
+async function applyGraphCode(manifest: GraphCodeManifest) {
+  graphCodeApplying.value = true;
+  errorMessage.value = "";
+  try {
+    await apiClient.applyGraphCode(manifest);
+    await loadCanvas();
+    await nextTick();
+    await graphCanvas.value?.fitView({ padding: 0.2, duration: 300 });
+    graphCodeOpen.value = false;
+  } catch (cause) {
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not apply graph code";
+  } finally {
+    graphCodeApplying.value = false;
+  }
+}
+
 onMounted(async () => {
   document.addEventListener("pointerdown", closeSettingsOutside);
   logsPanelHeight.value = Math.max(
@@ -491,12 +519,19 @@ onUnmounted(() => {
       @toggle-nodes-locked="toggleNodesLocked"
       @toggle-theme="dark = !dark"
       @open-mock-apis="openMockPanel"
+      @open-graph-as-code="openGraphAsCode"
       @open-access-tokens="accessTokensOpen = true"
       @open-history="historyOpen = true"
       @sign-out="signOut"
     />
 
     <OtelAccessTokensDialog v-model:open="accessTokensOpen" />
+    <GraphAsCodePanel
+      v-model:open="graphCodeOpen"
+      :initial-code="graphCodeInitial"
+      :applying="graphCodeApplying"
+      @apply="applyGraphCode"
+    />
 
     <section class="absolute inset-0">
       <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">

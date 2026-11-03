@@ -9,6 +9,7 @@ import { useCanvasViewModel } from "./useCanvasViewModel";
 
 const service = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   framework: "Spring Boot",
@@ -23,6 +24,7 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
+      codeKey: "list-orders",
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
@@ -54,7 +56,6 @@ const mockApi = {
 const canvas = {
   nodesLocked: false,
   viewport: { x: 4, y: 5, zoom: 1.5 },
-  mockNode: { x: 30, y: 40 },
   services: [service],
   edges: [],
   mockApis: [mockApi],
@@ -253,7 +254,14 @@ describe("canvas view model", () => {
     context.graphStore.applyCanvas({
       ...canvas,
       services: [service, { ...service, id: "service-2", name: "Payments" }],
-      edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
+      edges: [
+        {
+          id: "edge-1",
+          sourceServiceId: "service-1",
+          sourceEndpointId: null,
+          targetEndpointId: "endpoint-1",
+        },
+      ],
     });
 
     await context.model.onEdgeDoubleClick({ edge: { id: "edge-1" } });
@@ -263,6 +271,7 @@ describe("canvas view model", () => {
       ({ url, options }) => url === "/api/canvas" && options.method === "PUT",
     );
     expect(request?.options.body).toMatchObject({ edges: [] });
+  });
   it("reassigns a legacy wire to a source endpoint and saves the same relationship", async () => {
     const context = setup();
     context.graphStore.applyCanvas(canvas);

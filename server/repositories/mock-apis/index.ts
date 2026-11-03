@@ -5,6 +5,7 @@ import * as schema from "../../db/schema";
 import {
   authorizationTemplates,
   environmentVariables,
+  graphNodePositions,
   headerTemplates,
   mockApis,
   serviceEndpoints,
@@ -222,8 +223,19 @@ export async function updateMockApi(
 }
 
 export async function deleteMockApi(projectId: string, id: string): Promise<boolean> {
-  const result = await getDb()
-    .delete(mockApis)
-    .where(and(eq(mockApis.id, id), eq(mockApis.projectId, projectId)));
-  return Boolean(result[0]?.affectedRows);
+  return getDb().transaction(async (tx) => {
+    await tx
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "mock_api"),
+          eq(graphNodePositions.entityId, id),
+        ),
+      );
+    const result = await tx
+      .delete(mockApis)
+      .where(and(eq(mockApis.id, id), eq(mockApis.projectId, projectId)));
+    return Boolean(result[0]?.affectedRows);
+  });
 }

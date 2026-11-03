@@ -215,7 +215,6 @@ export function useGraphViewModel({
     return {
       nodesLocked: store.nodesLocked,
       viewport: store.viewport,
-      mockNode: store.mockNodePosition,
       services: servicePositions,
       mockApiPositions,
       edges: store.serviceEdges,

@@ -6,6 +6,7 @@ import type { CanvasGetResponse } from "#shared/api/canvas";
 
 const service = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   framework: "Spring Boot",
@@ -20,6 +21,7 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
+      codeKey: "list-orders",
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
@@ -72,7 +74,6 @@ describe("graph view model", () => {
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 560, y: 160 },
     });
     const model = useGraphViewModel({
       store,
@@ -178,10 +179,12 @@ describe("graph view model", () => {
     const payments = {
       ...service,
       id: "service-2",
+      codeKey: "payments",
       name: "Payments",
       endpoints: service.endpoints.map((endpoint) => ({
         ...endpoint,
         id: "endpoint-2",
+        codeKey: "get-payment",
         serviceId: "service-2",
       })),
     };
@@ -251,7 +254,6 @@ describe("graph view model", () => {
     expect(model.canvasPayload()).toEqual({
       nodesLocked: true,
       viewport: { x: 4, y: 5, zoom: 1.5 },
-      mockNode: { x: 560, y: 160 },
       services: [{ id: "service-1", x: 30, y: 40 }],
       mockApiPositions: [{ id: "mock-1", x: -190, y: 40 }],
       edges: store.serviceEdges,

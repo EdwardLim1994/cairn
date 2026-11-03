@@ -29,6 +29,7 @@ const date = "2026-10-30T10:00:00.000Z";
 
 const validService = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   framework: "Spring Boot",
@@ -37,11 +38,10 @@ const validService = {
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
   active: true,
-  positionX: 0,
-  positionY: 0,
   createdAt: date,
   endpoints: [],
 };
+const validCanvasService = { ...validService, positionX: 0, positionY: 0 };
 const validMockApi = {
   id: "mock-1",
   projectId: "project-1",
@@ -104,8 +104,7 @@ const validFlow = {
 };
 const validCanvas = {
   viewport: { x: 0, y: 0, zoom: 1 },
-  mockNode: { x: 1, y: 2 },
-  services: [validService],
+  services: [validCanvasService],
   edges: [],
   mockApis: [validMockApi],
   headerTemplates: [],
@@ -137,7 +136,7 @@ const routeContracts: {
   {
     name: "canvas PUT request",
     schema: Canvas.canvasPutRequestSchema,
-    value: { viewport: { x: 0, y: 0, zoom: 1 }, mockNode: { x: 1, y: 2 }, services: [], edges: [] },
+    value: { viewport: { x: 0, y: 0, zoom: 1 }, services: [], edges: [] },
   },
   { name: "canvas PUT response", schema: Canvas.canvasPutResponseSchema, value: { saved: true } },
   { name: "service list request", schema: Services.serviceListRequestSchema, value: undefined },
@@ -294,7 +293,6 @@ describe("shared API contracts", () => {
   it("accepts and rejects canvas save requests and responses", () => {
     const request = {
       viewport: { x: 1, y: 2, zoom: 1 },
-      mockNode: { x: 3, y: 4 },
       services: [{ id: "service-1", x: 5, y: 6 }],
       edges: [
         {
@@ -316,10 +314,10 @@ describe("shared API contracts", () => {
     expect(
       canvasGetResponseSchema.safeParse({
         viewport: { x: 0, y: 0, zoom: 1 },
-        mockNode: { x: 1, y: 2 },
         services: [
           {
             id: "service-1",
+            codeKey: "orders",
             projectId: "project-1",
             name: "Orders",
             framework: "Spring Boot",
@@ -360,6 +358,7 @@ describe("shared API contracts", () => {
     ).toBe(false);
     const service = {
       id: "service-1",
+      codeKey: "orders",
       projectId: "project-1",
       name: "Orders",
       framework: "Spring Boot",
@@ -368,8 +367,6 @@ describe("shared API contracts", () => {
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],
       active: true,
-      positionX: 0,
-      positionY: 0,
       createdAt: date,
       endpoints: [],
     };

@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import type { Edge, Node } from "@vue-flow/core";
 import type { CanvasGetResponse } from "#shared/api/canvas";
-import type { GraphPosition, GraphViewport } from "../models/graph";
+import type { GraphViewport } from "../models/graph";
 
 export const useGraphStore = defineStore("graph", () => {
   const nodes = ref<Node[]>([]);
@@ -13,7 +13,6 @@ export const useGraphStore = defineStore("graph", () => {
   const serviceHealth = ref<Record<string, boolean | null>>({});
   const viewport = ref<GraphViewport>({ x: 0, y: 0, zoom: 1 });
   const nodesLocked = ref(false);
-  const mockNodePosition = ref<GraphPosition>({ x: 560, y: 160 });
   const observedErrorServices = ref<string[]>([]);
   const observedServices = ref<string[]>([]);
   const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
@@ -31,7 +30,6 @@ export const useGraphStore = defineStore("graph", () => {
     serviceEdges.value = canvas.edges;
     viewport.value = canvas.viewport;
     nodesLocked.value = canvas.nodesLocked;
-    mockNodePosition.value = canvas.mockNode;
     selectedNodeId.value = null;
   }
   function setNodes(value: Node[]) {
@@ -94,7 +92,6 @@ export const useGraphStore = defineStore("graph", () => {
     serviceHealth,
     viewport,
     nodesLocked,
-    mockNodePosition,
     observedErrorServices,
     observedServices,
     observedEdges,

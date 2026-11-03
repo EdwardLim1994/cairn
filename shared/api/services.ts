@@ -11,6 +11,7 @@ const methodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const headerRowSchema = z.object({ name: z.string(), value: z.string() });
 const endpointInputSchema = z.object({
   id: z.string().optional(),
+  codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
   apiType: z.literal("REST"),
   method: methodSchema,
@@ -18,12 +19,14 @@ const endpointInputSchema = z.object({
 });
 const endpointResponseSchema = endpointInputSchema.extend({
   id: z.string(),
+  codeKey: z.string(),
   projectId: z.string(),
   serviceId: z.string(),
   createdAt: isoDateTimeSchema,
 });
 
 export const serviceInputSchema = z.object({
+  codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
   framework: z.string().trim().min(1).max(100),
   baseUrl: z.string().trim().min(1).max(2048),
@@ -37,11 +40,14 @@ export const serviceCreateRequestSchema = serviceInputSchema.extend({
   positionX: z.number().optional(),
   positionY: z.number().optional(),
 });
-export const serviceUpdateRequestSchema = serviceInputSchema;
+export const serviceUpdateRequestSchema = serviceInputSchema
+  .omit({ codeKey: true })
+  .extend({ endpoints: z.array(endpointInputSchema.omit({ codeKey: true })) });
 export const serviceListRequestSchema = z.void();
 export const serviceListResponseSchema = z.array(
   z.object({
     id: z.string(),
+    codeKey: z.string(),
     projectId: z.string(),
     name: z.string(),
     framework: z.string(),
@@ -50,8 +56,6 @@ export const serviceListResponseSchema = z.array(
     healthCheckHeaderTemplateId: z.string().nullable(),
     healthCheckCustomHeaders: z.array(headerRowSchema),
     active: z.boolean(),
-    positionX: z.number(),
-    positionY: z.number(),
     createdAt: isoDateTimeSchema,
     endpoints: z.array(endpointResponseSchema),
   }),

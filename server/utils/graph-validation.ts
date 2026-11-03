@@ -3,6 +3,7 @@ import { validateHeaderRows } from "#shared/utils/headers";
 
 export type EndpointInput = {
   id?: string;
+  codeKey?: string;
   name: string;
   apiType: string;
   method: string;
@@ -10,6 +11,7 @@ export type EndpointInput = {
 };
 
 export type ServiceInput = {
+  codeKey?: string;
   name: string;
   framework: string;
   baseUrl: string;
@@ -37,6 +39,10 @@ function requiredText(value: unknown, label: string, maxLength = 255): string {
     });
   }
   return value.trim();
+}
+
+function optionalKey(value: unknown, label: string): string | undefined {
+  return value === undefined ? undefined : requiredText(value, label, 128);
 }
 
 export function httpUrl(value: unknown, label: string): string {
@@ -80,6 +86,7 @@ function endpoint(value: unknown): EndpointInput {
     throw createError({ statusCode: 400, statusMessage: "Only REST endpoints are supported" });
   return {
     id: typeof input.id === "string" ? input.id : undefined,
+    codeKey: optionalKey(input.codeKey, "Endpoint key"),
     name: requiredText(input.name, "Endpoint name"),
     apiType: "REST",
     method,
@@ -120,6 +127,7 @@ export function serviceInput(value: unknown): ServiceInput {
       statusMessage: "Health-check header template is invalid",
     });
   return {
+    codeKey: optionalKey(input.codeKey, "Service key"),
     name: requiredText(input.name, "Service name"),
     framework: requiredText(input.framework, "Framework", 100),
     baseUrl: httpUrl(input.baseUrl, "Base URL"),

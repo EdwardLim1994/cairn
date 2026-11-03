@@ -7,6 +7,7 @@ import * as schema from "../db/schema";
 import {
   authorizationTemplates,
   environmentVariables,
+  graphNodePositions,
   headerTemplates,
   mockApis,
   serviceEndpoints,
@@ -256,10 +257,20 @@ export async function saveMockApiSettings(
         );
     }
     const removedApiIds = [...oldApiIds].filter((id) => !apiIds.has(id));
-    if (removedApiIds.length)
+    if (removedApiIds.length) {
+      await tx
+        .delete(graphNodePositions)
+        .where(
+          and(
+            eq(graphNodePositions.projectId, projectId),
+            eq(graphNodePositions.nodeType, "mock_api"),
+            inArray(graphNodePositions.entityId, removedApiIds),
+          ),
+        );
       await tx
         .delete(mockApis)
         .where(and(eq(mockApis.projectId, projectId), inArray(mockApis.id, removedApiIds)));
+    }
     const removedVariableIds = [...oldVariableIds].filter((id) => !newVariableIds.has(id));
     if (removedVariableIds.length)
       await tx

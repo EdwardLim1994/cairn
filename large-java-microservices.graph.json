@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "key": "gateway",
+      "name": "Gateway",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:8080",
+      "endpoints": [
+        {
+          "key": "checkout",
+          "name": "Checkout",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/checkout",
+          "outboundConnections": [{ "serviceKey": "order", "endpointKey": "place-order" }]
+        },
+        {
+          "key": "get-product-page",
+          "name": "Get product page",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/products/{sku}",
+          "outboundConnections": [
+            { "serviceKey": "catalog", "endpointKey": "get-product" },
+            { "serviceKey": "review", "endpointKey": "get-reviews" },
+            { "serviceKey": "recommendation", "endpointKey": "get-recommendations" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order",
+      "name": "Order",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18101",
+      "endpoints": [
+        {
+          "key": "place-order",
+          "name": "Place order",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/orders",
+          "outboundConnections": [
+            { "serviceKey": "user", "endpointKey": "get-user" },
+            { "serviceKey": "pricing", "endpointKey": "quote" },
+            { "serviceKey": "fraud", "endpointKey": "check" },
+            { "serviceKey": "inventory", "endpointKey": "reserve" },
+            { "serviceKey": "payment", "endpointKey": "pay" },
+            { "serviceKey": "shipping", "endpointKey": "ship" },
+            { "serviceKey": "loyalty", "endpointKey": "earn" },
+            { "serviceKey": "notification", "endpointKey": "send" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "user",
+      "name": "User",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18102",
+      "endpoints": [
+        {
+          "key": "get-user",
+          "name": "Get user",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/users/{id}",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "catalog",
+      "name": "Catalog",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18103",
+      "endpoints": [
+        {
+          "key": "get-product",
+          "name": "Get product",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/products/{sku}",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "inventory",
+      "name": "Inventory",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18104",
+      "endpoints": [
+        {
+          "key": "reserve",
+          "name": "Reserve inventory",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/reservations",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "pricing",
+      "name": "Pricing",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18105",
+      "endpoints": [
+        {
+          "key": "quote",
+          "name": "Get quote",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/quotes",
+          "outboundConnections": [
+            { "serviceKey": "catalog", "endpointKey": "get-product" },
+            { "serviceKey": "tax", "endpointKey": "get-rate" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "tax",
+      "name": "Tax",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18106",
+      "endpoints": [
+        {
+          "key": "get-rate",
+          "name": "Get tax rate",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/rates/{country}",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "fraud",
+      "name": "Fraud",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18107",
+      "endpoints": [
+        {
+          "key": "check",
+          "name": "Check order",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/checks",
+          "outboundConnections": [{ "serviceKey": "user", "endpointKey": "get-user" }]
+        }
+      ]
+    },
+    {
+      "key": "payment",
+      "name": "Payment",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18108",
+      "endpoints": [
+        {
+          "key": "pay",
+          "name": "Pay order",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/payments",
+          "outboundConnections": [{ "serviceKey": "ledger", "endpointKey": "record" }]
+        }
+      ]
+    },
+    {
+      "key": "ledger",
+      "name": "Ledger",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18109",
+      "endpoints": [
+        {
+          "key": "record",
+          "name": "Record payment entry",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/entries",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "shipping",
+      "name": "Shipping",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18110",
+      "endpoints": [
+        {
+          "key": "ship",
+          "name": "Ship order",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/shipments",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "key": "notification",
+      "name": "Notification",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18111",
+      "endpoints": [
+        {
+          "key": "send",
+          "name": "Send notification",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/notifications",
+          "outboundConnections": [{ "serviceKey": "user", "endpointKey": "get-user" }]
+        }
+      ]
+    },
+    {
+      "key": "loyalty",
+      "name": "Loyalty",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18112",
+      "endpoints": [
+        {
+          "key": "earn",
+          "name": "Earn loyalty points",
+          "apiType": "REST",
+          "method": "POST",
+          "url": "/points",
+          "outboundConnections": [{ "serviceKey": "notification", "endpointKey": "send" }]
+        }
+      ]
+    },
+    {
+      "key": "review",
+      "name": "Review",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18113",
+      "endpoints": [
+        {
+          "key": "get-reviews",
+          "name": "Get reviews",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/reviews/{sku}",
+          "outboundConnections": [{ "serviceKey": "user", "endpointKey": "get-user" }]
+        }
+      ]
+    },
+    {
+      "key": "recommendation",
+      "name": "Recommendation",
+      "framework": "Spring Boot",
+      "baseUrl": "http://localhost:18114",
+      "endpoints": [
+        {
+          "key": "get-recommendations",
+          "name": "Get recommendations",
+          "apiType": "REST",
+          "method": "GET",
+          "url": "/recommendations/{sku}",
+          "outboundConnections": [
+            { "serviceKey": "catalog", "endpointKey": "get-product" },
+            { "serviceKey": "review", "endpointKey": "get-reviews" }
+          ]
+        }
+      ]
+    }
+  ]
+}

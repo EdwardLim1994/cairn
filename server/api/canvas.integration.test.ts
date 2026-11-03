@@ -81,7 +81,6 @@ integration("canvas REST controllers with MySQL", () => {
     const body = {
       nodesLocked: true,
       viewport: { x: 3, y: 4, zoom: 1.5 },
-      mockNode: { x: 5, y: 6 },
       services: [{ id: "canvas-route-source", x: 7, y: 8 }],
       edges: [
         { sourceServiceId: "canvas-route-source", targetEndpointId: "canvas-route-endpoint" },
@@ -92,13 +91,11 @@ integration("canvas REST controllers with MySQL", () => {
     const saved = (await getCanvasRoute({} as never)) as {
       nodesLocked: boolean;
       viewport: { x: number; y: number; zoom: number };
-      mockNode: { x: number; y: number };
       services: Array<{ id: string; positionX: number; positionY: number }>;
       edges: unknown[];
     };
     expect(saved.viewport).toEqual(body.viewport);
     expect(saved.nodesLocked).toBe(true);
-    expect(saved.mockNode).toEqual(body.mockNode);
     expect(saved.services.find(({ id }) => id === "canvas-route-source")).toMatchObject({
       positionX: 7,
       positionY: 8,

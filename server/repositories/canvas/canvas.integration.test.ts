@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { getCanvas, saveCanvas } from ".";
 import * as schema from "../../db/schema";
-import { projects, serviceEdges, serviceEndpoints, services } from "../../db/schema";
+import { mockApis, projects, serviceEdges, serviceEndpoints, services } from "../../db/schema";
 import { CanvasConstraintError } from "./errors";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
@@ -91,13 +91,12 @@ integration("canvas repositories with MySQL", () => {
     ]);
   });
 
-  it("saves positions, viewport, mock node, and edges in one transaction", async () => {
+  it("saves service positions, viewport, and edges in one transaction", async () => {
     await saveCanvas(
       projectId,
       {
         nodesLocked: true,
         viewport: { x: 4, y: 5, zoom: 1.25 },
-        mockNode: { x: 8, y: 9 },
         services: [{ id: "canvas-service-source", x: 10, y: 11 }],
         edges: [
           {
@@ -113,7 +112,6 @@ integration("canvas repositories with MySQL", () => {
     const canvas = await getCanvas(projectId, db!);
     expect(canvas.viewport).toEqual({ x: 4, y: 5, zoom: 1.25 });
     expect(canvas.nodesLocked).toBe(true);
-    expect(canvas.mockNode).toEqual({ x: 8, y: 9 });
     expect(canvas.services.find((service) => service.id === "canvas-service-source")).toMatchObject(
       { positionX: 10, positionY: 11 },
     );
@@ -121,12 +119,43 @@ integration("canvas repositories with MySQL", () => {
     expect(canvas.edges[0]).toMatchObject({ sourceEndpointId: "canvas-source-endpoint" });
   });
 
+  it("round-trips Mock API positions separately from Mock API details", async () => {
+    await db!.insert(mockApis).values({
+      id: "canvas-mock-api",
+      projectId,
+      name: "Trigger",
+      targetEndpointId: null,
+      active: false,
+      requestJson: {},
+    });
+    await saveCanvas(
+      projectId,
+      {
+        nodesLocked: false,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        services: [],
+        mockApiPositions: [{ id: "canvas-mock-api", x: 90, y: 110 }],
+        edges: [],
+      },
+      db!,
+    );
+    const canvas = await getCanvas(projectId, db!);
+    expect(canvas.mockApis[0]).toMatchObject({
+      id: "canvas-mock-api",
+      positionX: 90,
+      positionY: 110,
+    });
+    const detail = await db!.select().from(mockApis).where(eq(mockApis.id, "canvas-mock-api"));
+    expect(detail[0]).not.toHaveProperty("positionX");
+    expect(detail[0]).not.toHaveProperty("positionY");
+  });
+
   it("round-trips assigned and legacy service-level connections", async () => {
     await saveCanvas(
       projectId,
       {
+        nodesLocked: false,
         viewport: { x: 0, y: 0, zoom: 1 },
-        mockNode: { x: 0, y: 0 },
         services: [],
         edges: [
           { sourceServiceId: "canvas-service-source", targetEndpointId: "canvas-target-endpoint" },
@@ -149,8 +178,8 @@ integration("canvas repositories with MySQL", () => {
 
   it("keeps legacy calls service-level until reassignment, then reloads assigned endpoint", async () => {
     const base = {
+      nodesLocked: false,
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 0, y: 0 },
       services: [],
     };
     await saveCanvas(
@@ -191,8 +220,8 @@ integration("canvas repositories with MySQL", () => {
       saveCanvas(
         projectId,
         {
+          nodesLocked: false,
           viewport: { x: 0, y: 0, zoom: 1 },
-          mockNode: { x: 0, y: 0 },
           services: [],
           edges: [
             {
@@ -214,7 +243,6 @@ integration("canvas repositories with MySQL", () => {
         {
           nodesLocked: false,
           viewport: { x: 4, y: 5, zoom: 1 },
-          mockNode: { x: 8, y: 9 },
           services: [{ id: "canvas-service-source", x: 99, y: 99 }],
           edges: [
             { sourceServiceId: "canvas-service-source", targetEndpointId: "missing-endpoint" },

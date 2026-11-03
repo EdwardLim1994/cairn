@@ -7,6 +7,7 @@ import { listMockApis } from "../mock-apis";
 import {
   headerTemplates,
   authorizationTemplates,
+  graphNodePositions,
   mockApis,
   projects,
   serviceEdges,
@@ -22,38 +23,58 @@ export async function getCanvas(
   projectId: string,
   db: Database = getDb(),
 ): Promise<CanvasGetResponse> {
-  const [[project], serviceRows, endpoints, edges, mockApiRows, templateRows, authTemplateRows] =
-    await Promise.all([
-      db.select().from(projects).where(eq(projects.id, projectId)),
-      db.select().from(services).where(eq(services.projectId, projectId)),
-      db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
-      db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
-      listMockApis(projectId, db),
-      db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
-      db
-        .select()
-        .from(authorizationTemplates)
-        .where(eq(authorizationTemplates.projectId, projectId)),
-    ]);
+  const [
+    [project],
+    serviceRows,
+    endpoints,
+    edges,
+    positions,
+    mockApiRows,
+    templateRows,
+    authTemplateRows,
+  ] = await Promise.all([
+    db.select().from(projects).where(eq(projects.id, projectId)),
+    db.select().from(services).where(eq(services.projectId, projectId)),
+    db.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
+    db.select().from(serviceEdges).where(eq(serviceEdges.projectId, projectId)),
+    db.select().from(graphNodePositions).where(eq(graphNodePositions.projectId, projectId)),
+    listMockApis(projectId, db),
+    db.select().from(headerTemplates).where(eq(headerTemplates.projectId, projectId)),
+    db.select().from(authorizationTemplates).where(eq(authorizationTemplates.projectId, projectId)),
+  ]);
   if (!project) throw new Error("Project canvas could not be initialized");
+  const positionByNode = new Map(
+    positions.map((position) => [`${position.nodeType}:${position.entityId}`, position]),
+  );
   return {
     nodesLocked: project.nodesLocked,
     viewport: { x: project.viewportX, y: project.viewportY, zoom: project.viewportZoom },
-    mockNode: { x: project.mockNodeX, y: project.mockNodeY },
-    services: serviceRows.map((service) => ({
-      ...service,
-      createdAt: service.createdAt.toISOString(),
-      endpoints: endpoints
-        .filter((endpoint) => endpoint.serviceId === service.id)
-        .map((endpoint) => ({ ...endpoint, createdAt: endpoint.createdAt.toISOString() })),
-    })),
+    services: serviceRows.map((service) => {
+      const position = positionByNode.get(`service:${service.id}`);
+      return {
+        ...service,
+        positionX: position?.positionX ?? 0,
+        positionY: position?.positionY ?? 0,
+        createdAt: service.createdAt.toISOString(),
+        endpoints: endpoints
+          .filter((endpoint) => endpoint.serviceId === service.id)
+          .map((endpoint) => ({ ...endpoint, createdAt: endpoint.createdAt.toISOString() })),
+      };
+    }),
     edges: edges.map(({ id, sourceServiceId, sourceEndpointId, targetEndpointId }) => ({
       id,
       sourceServiceId,
       sourceEndpointId,
       targetEndpointId,
     })),
-    mockApis: mockApiRows,
+    mockApis: mockApiRows.map((api) => {
+      const position = api.id ? positionByNode.get(`mock_api:${api.id}`) : undefined;
+      return {
+        ...api,
+        positionX: position?.positionX ?? null,
+        positionY: position?.positionY ?? null,
+      };
+    }),
     headerTemplates: templateRows.map((template) => ({
       ...template,
       createdAt: template.createdAt.toISOString(),
@@ -90,9 +111,16 @@ export async function saveCanvas(
       await Promise.all(
         canvas.services.map((position) =>
           tx
-            .update(services)
-            .set({ positionX: position.x, positionY: position.y })
-            .where(eq(services.id, position.id)),
+            .insert(graphNodePositions)
+            .values({
+              id: randomUUID(),
+              projectId,
+              nodeType: "service",
+              entityId: position.id,
+              positionX: position.x,
+              positionY: position.y,
+            })
+            .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } }),
         ),
       );
     }
@@ -108,9 +136,16 @@ export async function saveCanvas(
       await Promise.all(
         mockApiPositions.map((position) =>
           tx
-            .update(mockApis)
-            .set({ positionX: position.x, positionY: position.y })
-            .where(eq(mockApis.id, position.id)),
+            .insert(graphNodePositions)
+            .values({
+              id: randomUUID(),
+              projectId,
+              nodeType: "mock_api",
+              entityId: position.id,
+              positionX: position.x,
+              positionY: position.y,
+            })
+            .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } }),
         ),
       );
     }
@@ -164,8 +199,6 @@ export async function saveCanvas(
         viewportX: canvas.viewport.x,
         viewportY: canvas.viewport.y,
         viewportZoom: canvas.viewport.zoom,
-        mockNodeX: canvas.mockNode.x,
-        mockNodeY: canvas.mockNode.y,
       })
       .where(eq(projects.id, projectId));
     await tx.delete(serviceEdges).where(eq(serviceEdges.projectId, projectId));

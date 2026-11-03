@@ -11,6 +11,7 @@ import { useMockApiRunViewModel } from "./useMockApiRunViewModel";
 const services = [
   {
     id: "orders",
+    codeKey: "orders",
     projectId: "p",
     name: "Orders",
     framework: "Spring Boot",
@@ -25,6 +26,7 @@ const services = [
     endpoints: [
       {
         id: "orders-endpoint",
+        codeKey: "create-order",
         projectId: "p",
         serviceId: "orders",
         name: "Create order",
@@ -37,6 +39,7 @@ const services = [
   },
   {
     id: "inventory",
+    codeKey: "inventory",
     projectId: "p",
     name: "Inventory",
     framework: ".NET",
@@ -51,6 +54,7 @@ const services = [
     endpoints: [
       {
         id: "inventory-endpoint",
+        codeKey: "reserve",
         projectId: "p",
         serviceId: "inventory",
         name: "Reserve",
@@ -95,7 +99,6 @@ describe("mock API run view model", () => {
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 500, y: 100 },
     });
     mockApiStore.setMockApis([mock]);
     mockApiStore.setMockDraft([mock]);

@@ -6,7 +6,6 @@ describe("get canvas use case dependencies", () => {
     const canvas = {
       nodesLocked: false,
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 120, y: 120 },
       services: [],
       edges: [],
       mockApis: [],

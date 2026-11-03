@@ -5,7 +5,6 @@ import { createApiClient } from "./api-client";
 const canvas = {
   nodesLocked: false,
   viewport: { x: 0, y: 0, zoom: 1 },
-  mockNode: { x: 1, y: 2 },
   services: [],
   edges: [],
   mockApis: [],
@@ -69,7 +68,6 @@ describe("typed API client", () => {
     await client.saveCanvas({
       nodesLocked: true,
       viewport: { x: 0, y: 0, zoom: 1 },
-      mockNode: { x: 1, y: 2 },
       services: [],
       edges: [],
     });
@@ -125,7 +123,6 @@ describe("typed API client", () => {
     await expect(
       client.saveCanvas({
         viewport: { x: 0, y: 0, zoom: 0 },
-        mockNode: { x: 0, y: 0 },
         services: [],
         edges: [],
       }),
