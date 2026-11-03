@@ -34,6 +34,7 @@ describe("graph store", () => {
   it("loads canvas data and preserves the legacy mock node coordinate", () => {
     const store = useGraphStore();
     const canvas = {
+      nodesLocked: true,
       services: [service],
       edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
       mockApis: [],
@@ -56,12 +57,14 @@ describe("graph store", () => {
     expect(store.serviceEdges).toEqual([]);
     expect(store.serviceHealth["service-1"]).toBe(true);
     expect(store.viewport).toEqual({ x: 1, y: 2, zoom: 2 });
+    expect(store.nodesLocked).toBe(true);
     expect(store.mockNodePosition).toEqual({ x: 300, y: 400 });
   });
 
   it("tracks selection, collapse state, observations, and saved positions", () => {
     const store = useGraphStore();
     store.applyCanvas({
+      nodesLocked: false,
       services: [service],
       edges: [],
       mockApis: [],

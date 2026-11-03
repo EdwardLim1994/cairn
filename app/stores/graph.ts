@@ -12,6 +12,7 @@ export const useGraphStore = defineStore("graph", () => {
   const collapsedServiceEndpoints = ref<Record<string, boolean>>({});
   const serviceHealth = ref<Record<string, boolean | null>>({});
   const viewport = ref<GraphViewport>({ x: 0, y: 0, zoom: 1 });
+  const nodesLocked = ref(false);
   const mockNodePosition = ref<GraphPosition>({ x: 560, y: 160 });
   const observedErrorServices = ref<string[]>([]);
   const observedServices = ref<string[]>([]);
@@ -29,6 +30,7 @@ export const useGraphStore = defineStore("graph", () => {
     services.value = canvas.services;
     serviceEdges.value = canvas.edges;
     viewport.value = canvas.viewport;
+    nodesLocked.value = canvas.nodesLocked;
     mockNodePosition.value = canvas.mockNode;
     selectedNodeId.value = null;
   }
@@ -43,6 +45,9 @@ export const useGraphStore = defineStore("graph", () => {
   }
   function setViewport(value: GraphViewport) {
     viewport.value = value;
+  }
+  function setNodesLocked(value: boolean) {
+    nodesLocked.value = value;
   }
   function setServiceEdges(value: CanvasGetResponse["edges"]) {
     serviceEdges.value = value;
@@ -88,6 +93,7 @@ export const useGraphStore = defineStore("graph", () => {
     collapsedServiceEndpoints,
     serviceHealth,
     viewport,
+    nodesLocked,
     mockNodePosition,
     observedErrorServices,
     observedServices,
@@ -99,6 +105,7 @@ export const useGraphStore = defineStore("graph", () => {
     setEdges,
     setServiceHealth,
     setViewport,
+    setNodesLocked,
     setServiceEdges,
     toggleServiceEndpoints,
     setAllNodesCollapsed,

@@ -1,7 +1,14 @@
 <script setup lang="ts">
-defineProps<{ allNodesCollapsed: boolean; dark: boolean; authEnabled?: boolean }>();
+defineProps<{
+  allNodesCollapsed: boolean;
+  dark: boolean;
+  nodesLocked: boolean;
+  authEnabled?: boolean;
+}>();
 const emit = defineEmits<{
   toggleAll: [];
+  autoArrange: [];
+  toggleNodesLocked: [];
   toggleTheme: [];
   openMockApis: [];
   openAccessTokens: [];
@@ -26,6 +33,33 @@ const emit = defineEmits<{
       >
     </div>
     <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
+        aria-label="Auto arrange"
+        title="Auto arrange"
+        @click.stop="emit('autoArrange')"
+      >
+        <UIcon name="i-lucide-layout-grid" class="size-3.5" aria-hidden="true" />
+        Auto arrange
+      </UButton>
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
+        :aria-label="nodesLocked ? 'Unlock node positions' : 'Lock node positions'"
+        :title="nodesLocked ? 'Unlock node positions' : 'Lock node positions'"
+        @click.stop="emit('toggleNodesLocked')"
+      >
+        <UIcon
+          :name="nodesLocked ? 'i-lucide-lock' : 'i-lucide-unlock'"
+          class="size-4"
+          aria-hidden="true"
+        />
+      </UButton>
       <UButton
         type="button"
         color="neutral"

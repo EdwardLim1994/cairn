@@ -17,6 +17,7 @@ const canvasViewportSchema = z
 
 export const canvasGetRequestSchema = z.void();
 export const canvasGetResponseSchema = z.object({
+  nodesLocked: z.boolean().default(false),
   viewport: canvasViewportSchema,
   mockNode: pointSchema,
   services: z.array(
@@ -78,6 +79,7 @@ export const canvasGetResponseSchema = z.object({
 });
 
 export const canvasPutRequestSchema = z.object({
+  nodesLocked: z.boolean().default(false),
   viewport: pointSchema.extend({ zoom: z.number().positive() }),
   mockNode: pointSchema,
   services: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })),

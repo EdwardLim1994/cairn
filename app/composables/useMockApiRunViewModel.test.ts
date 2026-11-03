@@ -88,6 +88,7 @@ describe("mock API run view model", () => {
     const graphStore = useGraphStore();
     const mockApiStore = useMockApiStore();
     graphStore.applyCanvas({
+      nodesLocked: false,
       services,
       edges: [],
       mockApis: [mock],

@@ -8,11 +8,12 @@ import MockApiTriggerNode from "./MockApiTriggerNode.vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
 import type { GraphMockApi } from "../../models/graph";
 
-const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean }>();
+const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean; nodesLocked: boolean }>();
 const emit = defineEmits<{
   "update:nodes": [nodes: Node[]];
   "update:edges": [edges: Edge[]];
   connect: [connection: Connection];
+  edgeDoubleClick: [event: { edge: { id: string } }];
   nodeClick: [event: { node: { id: string } }];
   paneContextMenu: [event: MouseEvent];
   moveEnd: [viewport: { x: number; y: number; zoom: number }];
@@ -42,10 +43,12 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     class="app__graph-flow"
     :select-nodes-on-drag="false"
     :elements-selectable="true"
+    :nodes-draggable="!nodesLocked"
     :min-zoom="0.2"
     :max-zoom="1.8"
     fit-view-on-init
     @connect="emit('connect', $event)"
+    @edge-double-click="emit('edgeDoubleClick', $event)"
     @node-click="emit('nodeClick', $event)"
     @pane-context-menu="emit('paneContextMenu', $event)"
     @move-end="emit('moveEnd', $event.flowTransform)"

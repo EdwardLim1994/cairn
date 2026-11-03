@@ -46,7 +46,7 @@ const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
-const { nodes, edges, services, allNodesCollapsed } = storeToRefs(graphStore);
+const { nodes, edges, services, allNodesCollapsed, nodesLocked } = storeToRefs(graphStore);
 const dark = useCookie("cairn-dark-mode", {
   default: () => false,
   maxAge: 60 * 60 * 24 * 365,
@@ -139,8 +139,11 @@ const {
   loadCanvas,
   loadServiceHealth,
   saveCanvas,
+  toggleNodesLocked,
+  autoArrange,
   onMoveEnd,
   onConnect,
+  onEdgeDoubleClick,
 } = canvasViewModel;
 const { closeSettings, closeSettingsOutside } = useSettingsPanelViewModel({
   serviceDialog,
@@ -465,8 +468,11 @@ onUnmounted(() => {
     <AppToolbar
       :all-nodes-collapsed="allNodesCollapsed"
       :dark="dark"
+      :nodes-locked="nodesLocked"
       :auth-enabled="authStatus.enabled"
       @toggle-all="toggleAllNodes"
+      @auto-arrange="autoArrange"
+      @toggle-nodes-locked="toggleNodesLocked"
       @toggle-theme="dark = !dark"
       @open-mock-apis="openMockPanel"
       @open-access-tokens="accessTokensOpen = true"
@@ -483,7 +489,9 @@ onUnmounted(() => {
           v-model:nodes="nodes"
           v-model:edges="edges"
           :dark="dark"
+          :nodes-locked="nodesLocked"
           @connect="onConnect"
+          @edge-double-click="onEdgeDoubleClick"
           @node-click="onNodeClick"
           @pane-context-menu="handleCanvasContextMenu"
           @move-end="onMoveEnd"

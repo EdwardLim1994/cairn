@@ -1,0 +1,1 @@
+ALTER TABLE `projects` ADD `nodes_locked` boolean DEFAULT false NOT NULL;

@@ -235,6 +235,7 @@ describe("service view model", () => {
     const context = setup();
     const graphStore = useGraphStore();
     graphStore.applyCanvas({
+      nodesLocked: false,
       services: [service],
       edges: [],
       mockApis: [],

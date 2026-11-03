@@ -66,6 +66,7 @@ integration("canvas repositories with MySQL", () => {
     const canvas = await getCanvas(projectId, db!);
 
     expect(canvas.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+    expect(canvas.nodesLocked).toBe(false);
     expect(canvas.services).toHaveLength(2);
     expect(
       canvas.services.find((service) => service.id === "canvas-service-target")?.endpoints,
@@ -83,6 +84,7 @@ integration("canvas repositories with MySQL", () => {
     await saveCanvas(
       projectId,
       {
+        nodesLocked: true,
         viewport: { x: 4, y: 5, zoom: 1.25 },
         mockNode: { x: 8, y: 9 },
         services: [{ id: "canvas-service-source", x: 10, y: 11 }],
@@ -95,6 +97,7 @@ integration("canvas repositories with MySQL", () => {
 
     const canvas = await getCanvas(projectId, db!);
     expect(canvas.viewport).toEqual({ x: 4, y: 5, zoom: 1.25 });
+    expect(canvas.nodesLocked).toBe(true);
     expect(canvas.mockNode).toEqual({ x: 8, y: 9 });
     expect(canvas.services.find((service) => service.id === "canvas-service-source")).toMatchObject(
       { positionX: 10, positionY: 11 },
@@ -107,6 +110,7 @@ integration("canvas repositories with MySQL", () => {
       saveCanvas(
         projectId,
         {
+          nodesLocked: false,
           viewport: { x: 4, y: 5, zoom: 1 },
           mockNode: { x: 8, y: 9 },
           services: [{ id: "canvas-service-source", x: 99, y: 99 }],

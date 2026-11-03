@@ -3,6 +3,7 @@ import type { ApiTransport, ApiTransportOptions } from "./api-client";
 import { createApiClient } from "./api-client";
 
 const canvas = {
+  nodesLocked: false,
   viewport: { x: 0, y: 0, zoom: 1 },
   mockNode: { x: 1, y: 2 },
   services: [],
@@ -66,6 +67,7 @@ describe("typed API client", () => {
 
     await client.getCanvas();
     await client.saveCanvas({
+      nodesLocked: true,
       viewport: { x: 0, y: 0, zoom: 1 },
       mockNode: { x: 1, y: 2 },
       services: [],

@@ -11,6 +11,7 @@ type GraphStore = ReturnType<typeof useGraphStore>;
 type MockApiStore = ReturnType<typeof useMockApiStore>;
 type GraphViewModel = ReturnType<typeof useGraphViewModel>;
 type GraphCanvas = {
+  fitView: (options?: { padding?: number; duration?: number }) => Promise<void> | void;
   setViewport: (viewport: { x: number; y: number; zoom: number }) => Promise<void> | void;
   updateNodeInternals: (nodeIds: string[]) => void;
 };
@@ -98,14 +99,33 @@ export function useCanvasViewModel(options: {
     return options.graphViewModel.canvasPayload();
   }
 
-  async function saveCanvas() {
+  async function persistCanvas() {
     try {
       await options.apiClient.saveCanvas(canvasPayload());
       options.graphViewModel.syncSavedPositions();
       options.errorMessage.value = "";
+      return true;
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : "Could not save the graph");
+      return false;
     }
+  }
+
+  async function saveCanvas() {
+    await persistCanvas();
+  }
+
+  async function toggleNodesLocked() {
+    const previous = options.graphStore.nodesLocked;
+    options.graphStore.setNodesLocked(!previous);
+    if (!(await persistCanvas())) options.graphStore.setNodesLocked(previous);
+  }
+
+  async function autoArrange() {
+    options.graphViewModel.arrangeNodes();
+    await persistCanvas();
+    await nextTick();
+    await options.graphCanvas.value?.fitView({ padding: 0.2, duration: 300 });
   }
 
   function onMoveEnd(viewport: { x: number; y: number; zoom: number }) {
@@ -136,6 +156,14 @@ export function useCanvasViewModel(options: {
     await saveCanvas();
   }
 
+  async function onEdgeDoubleClick({ edge }: { edge: { id: string } }) {
+    const edges = options.graphStore.serviceEdges.filter((item) => item.id !== edge.id);
+    if (edges.length === options.graphStore.serviceEdges.length) return;
+    options.graphStore.setServiceEdges(edges);
+    buildEdges();
+    await saveCanvas();
+  }
+
   return {
     buildEdges,
     syncNodes,
@@ -145,7 +173,10 @@ export function useCanvasViewModel(options: {
     loadServiceHealth,
     canvasPayload,
     saveCanvas,
+    toggleNodesLocked,
+    autoArrange,
     onMoveEnd,
     onConnect,
+    onEdgeDoubleClick,
   };
 }

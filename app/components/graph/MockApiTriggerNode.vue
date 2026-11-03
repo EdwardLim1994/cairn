@@ -28,7 +28,9 @@ const emit = defineEmits<{ trigger: [id: string] }>();
       :connectable="false"
       class="app__service-source"
     />
-    <strong class="whitespace-nowrap text-xs font-semibold">{{ data.name }}</strong>
+    <strong class="max-w-48 truncate whitespace-nowrap text-xs font-semibold">{{
+      data.name
+    }}</strong>
     <button
       type="button"
       class="nodrag inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"

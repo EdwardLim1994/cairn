@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@vue-flow/core";
 import type { GraphMockApi, GraphService } from "../models/graph";
 import type { useGraphStore } from "../stores/graph";
+import { arrangeGraph } from "../utils/graph-layout";
 
 type Store = ReturnType<typeof useGraphStore>;
 type ViewModelOptions = {
@@ -101,7 +102,6 @@ export function useGraphViewModel({
           entry,
         },
         class: "app__flow-node app__flow-node--mock-trigger",
-        draggable: true,
         selectable: false,
       }));
     });
@@ -199,12 +199,59 @@ export function useGraphViewModel({
         y: node.position.y,
       }));
     return {
+      nodesLocked: store.nodesLocked,
       viewport: store.viewport,
       mockNode: store.mockNodePosition,
       services: servicePositions,
       mockApiPositions,
       edges: store.serviceEdges,
     };
+  }
+
+  function syncSavedPositions() {
+    const derivedPositions = new Map(
+      mockApiNodes().map((node) => [
+        node.id.slice("mock-api-".length),
+        node.position as { x: number; y: number },
+      ]),
+    );
+    store.syncSavedPositions();
+    const positions = new Map(
+      (store.nodes as unknown as { id: string; position: { x: number; y: number } }[])
+        .filter((node) => node.id.startsWith("mock-api-"))
+        .map((node) => [node.id.slice("mock-api-".length), node.position]),
+    );
+    for (const entry of mockApis()) {
+      const position = positions.get(entry.id);
+      const derived = derivedPositions.get(entry.id);
+      if (
+        position &&
+        (entry.positionX != null ||
+          entry.positionY != null ||
+          position.x !== derived?.x ||
+          position.y !== derived?.y)
+      ) {
+        entry.positionX = position.x;
+        entry.positionY = position.y;
+      }
+    }
+    syncNodes();
+  }
+
+  function arrangeNodes() {
+    const positions = arrangeGraph(store.services, store.serviceEdges, mockApis());
+    const nodes = store.nodes as unknown as {
+      id: string;
+      position: { x: number; y: number };
+      [key: string]: unknown;
+    }[];
+    store.setNodes(
+      nodes.map((node) => ({
+        ...node,
+        position: positions.get(node.id) ?? node.position,
+      })) as Node[],
+    );
+    syncSavedPositions();
   }
 
   return {
@@ -217,21 +264,7 @@ export function useGraphViewModel({
     buildEdges,
     syncNodes,
     canvasPayload,
-    syncSavedPositions: () => {
-      store.syncSavedPositions();
-      const positions = new Map(
-        (store.nodes as unknown as { id: string; position: { x: number; y: number } }[])
-          .filter((node) => node.id.startsWith("mock-api-"))
-          .map((node) => [node.id.slice("mock-api-".length), node.position]),
-      );
-      for (const entry of mockApis()) {
-        const position = positions.get(entry.id);
-        if (position) {
-          entry.positionX = position.x;
-          entry.positionY = position.y;
-        }
-      }
-      syncNodes();
-    },
+    arrangeNodes,
+    syncSavedPositions,
   };
 }

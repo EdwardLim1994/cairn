@@ -37,6 +37,7 @@ export async function getCanvas(
     ]);
   if (!project) throw new Error("Project canvas could not be initialized");
   return {
+    nodesLocked: project.nodesLocked,
     viewport: { x: project.viewportX, y: project.viewportY, zoom: project.viewportZoom },
     mockNode: { x: project.mockNodeX, y: project.mockNodeY },
     services: serviceRows.map((service) => ({
@@ -149,6 +150,7 @@ export async function saveCanvas(
     await tx
       .update(projects)
       .set({
+        nodesLocked: canvas.nodesLocked,
         viewportX: canvas.viewport.x,
         viewportY: canvas.viewport.y,
         viewportZoom: canvas.viewport.zoom,

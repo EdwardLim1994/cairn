@@ -52,6 +52,7 @@ const mockApi = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 const canvas = {
+  nodesLocked: false,
   viewport: { x: 4, y: 5, zoom: 1.5 },
   mockNode: { x: 30, y: 40 },
   services: [service],
@@ -84,10 +85,14 @@ describe("canvas view model", () => {
       runningMockId: () => null,
     });
     const canvasElement = {
+      fitViewCalls: [] as unknown[],
       setViewportCalls: [] as unknown[],
       updateCalls: [] as string[][],
       setViewport(value: unknown) {
         this.setViewportCalls.push(value);
+      },
+      fitView(value: unknown) {
+        this.fitViewCalls.push(value);
       },
       updateNodeInternals(ids: string[]) {
         this.updateCalls.push(ids);
@@ -126,6 +131,7 @@ describe("canvas view model", () => {
     );
     expect(nodeIds).toEqual(["service-1", "mock-api-mock-1"]);
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
+    expect(context.graphStore.nodesLocked).toBe(false);
     expect(context.graphStore.serviceHealth).toEqual({ "service-1": true });
     expect(context.canvasElement.setViewportCalls).toEqual([canvas.viewport]);
     expect(context.loading.value).toBe(false);
@@ -155,6 +161,44 @@ describe("canvas view model", () => {
         ({ url, options }) => url === "/api/canvas" && options.method === "PUT",
       ),
     ).toBe(true);
+  });
+
+  it("arranges and saves service and mock positions before fitting the viewport", async () => {
+    const context = setup();
+    context.graphStore.applyCanvas(canvas);
+    context.graphStore.setNodesLocked(true);
+    context.mockApiStore.setMockApis([mockApi]);
+    context.model.syncNodes();
+
+    await context.model.autoArrange();
+
+    const request = context.requests.find(
+      ({ url, options }) => url === "/api/canvas" && options.method === "PUT",
+    );
+    expect(request?.options.body).toMatchObject({
+      nodesLocked: true,
+      services: [{ id: "service-1", x: 0, y: 0 }],
+      mockApiPositions: [{ id: "mock-1", x: -326, y: 44.5 }],
+    });
+    expect(context.canvasElement.fitViewCalls).toEqual([{ padding: 0.2, duration: 300 }]);
+  });
+
+  it("persists lock toggles and restores prior state when saving fails", async () => {
+    const context = setup();
+    context.graphStore.applyCanvas(canvas);
+    await context.model.toggleNodesLocked();
+    expect(context.graphStore.nodesLocked).toBe(true);
+    expect(context.requests.at(-1)?.options.body).toMatchObject({ nodesLocked: true });
+
+    const failing = setup((url, options) => {
+      if (url === "/api/canvas" && options.method === "PUT") throw new Error("offline");
+      if (url === "/api/canvas") return canvas;
+      return [];
+    });
+    failing.graphStore.applyCanvas(canvas);
+    await failing.model.toggleNodesLocked();
+    expect(failing.graphStore.nodesLocked).toBe(false);
+    expect(failing.errorMessage.value).toBe("offline");
   });
 
   it("ignores non-service graph connections because targets are selected in the panel", async () => {
@@ -194,6 +238,23 @@ describe("canvas view model", () => {
       ),
     ).toBe(false);
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
+  });
+
+  it("deletes a declared connection when its wire is double-clicked", async () => {
+    const context = setup();
+    context.graphStore.applyCanvas({
+      ...canvas,
+      services: [service, { ...service, id: "service-2", name: "Payments" }],
+      edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
+    });
+
+    await context.model.onEdgeDoubleClick({ edge: { id: "edge-1" } });
+
+    expect(context.graphStore.serviceEdges).toEqual([]);
+    const request = context.requests.find(
+      ({ url, options }) => url === "/api/canvas" && options.method === "PUT",
+    );
+    expect(request?.options.body).toMatchObject({ edges: [] });
   });
 
   it("refreshes node internals and rebuilds edges for collapse actions", async () => {

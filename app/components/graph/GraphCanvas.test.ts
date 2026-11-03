@@ -26,13 +26,30 @@ const mockApi: GraphMockApi = {
 };
 
 const VueFlowStub = defineComponent({
-  props: ["nodes", "edges", "selectNodesOnDrag", "elementsSelectable", "minZoom", "maxZoom"],
-  emits: ["update:nodes", "update:edges", "connect", "node-click", "move-end", "node-drag-stop"],
+  props: [
+    "nodes",
+    "edges",
+    "nodesDraggable",
+    "selectNodesOnDrag",
+    "elementsSelectable",
+    "minZoom",
+    "maxZoom",
+  ],
+  emits: [
+    "update:nodes",
+    "update:edges",
+    "connect",
+    "edge-double-click",
+    "node-click",
+    "move-end",
+    "node-drag-stop",
+  ],
   template: `
     <div data-testid="vue-flow">
       <slot name="node-service" :data="{ name: 'Orders' }" />
       <slot name="node-mockApiTrigger" :data="{ id: 'mock-1', entry: mockApi }" />
       <button data-testid="connect" @click="$emit('connect', { source: 'service-1', target: 'service-2' })" />
+      <button data-testid="edge-double-click" @click="$emit('edge-double-click', { edge: { id: 'edge-1' } })" />
       <button data-testid="node-click" @click="$emit('node-click', { node: { id: 'service-1' } })" />
       <button data-testid="move-end" @click="$emit('move-end', { event: {}, flowTransform: { x: 8, y: 9, zoom: 1.5 } })" />
       <button data-testid="drag-stop" @click="$emit('node-drag-stop')" />
@@ -57,7 +74,7 @@ const MockTriggerNodeStub = defineComponent({
 describe("GraphCanvas", () => {
   it("renders service and mock API trigger node slots with Vue Flow", () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: true },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: true, nodesLocked: false },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -77,7 +94,7 @@ describe("GraphCanvas", () => {
 
   it("forwards a trigger intent with the saved mock API to the run handler", async () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false, nodesLocked: true },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -97,7 +114,7 @@ describe("GraphCanvas", () => {
 
   it("forwards Vue Flow connection, selection, viewport, and drag events", async () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false, nodesLocked: true },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -111,12 +128,15 @@ describe("GraphCanvas", () => {
     });
 
     await wrapper.get('[data-testid="connect"]').trigger("click");
+    await wrapper.get('[data-testid="edge-double-click"]').trigger("click");
     await wrapper.get('[data-testid="node-click"]').trigger("click");
     await wrapper.get('[data-testid="move-end"]').trigger("click");
     await wrapper.get('[data-testid="drag-stop"]').trigger("click");
 
     expect(wrapper.emitted("connect")).toEqual([[{ source: "service-1", target: "service-2" }]]);
+    expect(wrapper.emitted("edgeDoubleClick")).toEqual([[{ edge: { id: "edge-1" } }]]);
     expect(wrapper.emitted("nodeClick")).toEqual([[{ node: { id: "service-1" } }]]);
+    expect(wrapper.getComponent(VueFlowStub).props("nodesDraggable")).toBe(false);
     expect(wrapper.emitted("moveEnd")).toEqual([[{ x: 8, y: 9, zoom: 1.5 }]]);
     expect(wrapper.emitted("nodeDragStop")).toEqual([[]]);
   });

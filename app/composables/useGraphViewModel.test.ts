@@ -58,6 +58,7 @@ describe("graph view model", () => {
   ) {
     const store = useGraphStore();
     store.applyCanvas({
+      nodesLocked: true,
       services: [service],
       edges: [{ id: "edge-1", sourceServiceId: "service-1", targetEndpointId: "endpoint-1" }],
       mockApis: apis,
@@ -106,7 +107,6 @@ describe("graph view model", () => {
     expect(triggerNode).toMatchObject({
       id: "mock-api-mock-1",
       type: "mockApiTrigger",
-      draggable: true,
       data: { id: "mock-1", name: "Fetch orders", active: true, ready: true, busy: false },
     });
   });
@@ -177,6 +177,7 @@ describe("graph view model", () => {
     ]);
     store.setViewport({ x: 4, y: 5, zoom: 1.5 });
     expect(model.canvasPayload()).toEqual({
+      nodesLocked: true,
       viewport: { x: 4, y: 5, zoom: 1.5 },
       mockNode: { x: 560, y: 160 },
       services: [{ id: "service-1", x: 30, y: 40 }],

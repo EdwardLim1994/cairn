@@ -21,6 +21,7 @@ export const projects = mysqlTable("projects", {
   viewportZoom: double("viewport_zoom").notNull().default(1),
   mockNodeX: double("mock_node_x").notNull().default(120),
   mockNodeY: double("mock_node_y").notNull().default(120),
+  nodesLocked: boolean("nodes_locked").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

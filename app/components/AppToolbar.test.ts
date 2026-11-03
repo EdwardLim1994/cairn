@@ -17,17 +17,21 @@ const components = {
 describe("AppToolbar", () => {
   it("omits service status and emits graph and theme actions", async () => {
     const wrapper = mount(AppToolbar, {
-      props: { allNodesCollapsed: false, dark: true },
+      props: { allNodesCollapsed: false, dark: true, nodesLocked: false },
       global: { components },
     });
     expect(wrapper.text()).not.toContain("services");
     expect(wrapper.find('[class*="bg-[#15966f]"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Collapse all nodes"]').trigger("click");
+    await wrapper.get('[aria-label="Auto arrange"]').trigger("click");
+    await wrapper.get('[aria-label="Lock node positions"]').trigger("click");
     await wrapper.get('[aria-label="Use light theme"]').trigger("click");
     await wrapper.get('[aria-label="Mock APIs"]').trigger("click");
     await wrapper.get('[aria-label="Manage access tokens"]').trigger("click");
     await wrapper.get('[aria-label="Mock API call history"]').trigger("click");
     expect(wrapper.emitted("toggleAll")).toEqual([[]]);
+    expect(wrapper.emitted("autoArrange")).toEqual([[]]);
+    expect(wrapper.emitted("toggleNodesLocked")).toEqual([[]]);
     expect(wrapper.emitted("toggleTheme")).toEqual([[]]);
     expect(wrapper.emitted("openMockApis")).toEqual([[]]);
     expect(wrapper.emitted("openAccessTokens")).toEqual([[]]);
@@ -36,14 +40,14 @@ describe("AppToolbar", () => {
 
   it("shows sign out only when authentication is enabled", async () => {
     const wrapper = mount(AppToolbar, {
-      props: { allNodesCollapsed: false, dark: false, authEnabled: true },
+      props: { allNodesCollapsed: false, dark: false, nodesLocked: false, authEnabled: true },
       global: { components },
     });
     await wrapper.get('[aria-label="Sign out"]').trigger("click");
     expect(wrapper.emitted("signOut")).toEqual([[]]);
 
     const disabled = mount(AppToolbar, {
-      props: { allNodesCollapsed: false, dark: false, authEnabled: false },
+      props: { allNodesCollapsed: false, dark: false, nodesLocked: false, authEnabled: false },
       global: { components },
     });
     expect(disabled.find('[aria-label="Sign out"]').exists()).toBe(false);

@@ -3,6 +3,7 @@ import { CanvasConstraintError } from "../../repositories/canvas/errors";
 import { createSaveCanvasUseCase } from "./save-canvas";
 
 const validCanvas = {
+  nodesLocked: true,
   viewport: { x: 10, y: 20, zoom: 1.5 },
   mockNode: { x: 30, y: 40 },
   services: [{ id: "service-1", x: 50, y: 60 }],
