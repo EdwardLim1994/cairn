@@ -33,4 +33,19 @@ describe("AppToolbar", () => {
     expect(wrapper.emitted("openAccessTokens")).toEqual([[]]);
     expect(wrapper.emitted("openHistory")).toEqual([[]]);
   });
+
+  it("shows sign out only when authentication is enabled", async () => {
+    const wrapper = mount(AppToolbar, {
+      props: { allNodesCollapsed: false, dark: false, authEnabled: true },
+      global: { components },
+    });
+    await wrapper.get('[aria-label="Sign out"]').trigger("click");
+    expect(wrapper.emitted("signOut")).toEqual([[]]);
+
+    const disabled = mount(AppToolbar, {
+      props: { allNodesCollapsed: false, dark: false, authEnabled: false },
+      global: { components },
+    });
+    expect(disabled.find('[aria-label="Sign out"]').exists()).toBe(false);
+  });
 });

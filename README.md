@@ -10,7 +10,7 @@ GitHub Actions reports unit/component tests and MySQL-backed integration tests i
 
 ## Run with Docker Compose
 
-1. Copy `.env.example` to `.env` and replace the `replace-me` database passwords.
+1. Copy `.env.example` to `.env`. Replace database and operator passwords, then generate a session secret with `openssl rand -hex 32`.
 2. Build and start the stack:
 
    ```sh
@@ -34,6 +34,10 @@ The production image contains the Nuxt `.output` bundle, a bundled migration run
 | `OTEL_COLLECTOR_URL`          | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
 | `PROJECT_ID`                  | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
 | `PORT`                        | Nuxt server port (default `3003`).                                                                                                                           |
+| `AUTH_ENABLED`                | Enables shared operator authentication by default. Set to `false` only for trusted deployments.                                                              |
+| `AUTH_USERNAME`               | Shared operator username. Required when authentication is enabled.                                                                                           |
+| `AUTH_PASSWORD`               | Shared operator password. Required when authentication is enabled.                                                                                           |
+| `AUTH_SESSION_SECRET`         | Secret used to encrypt sessions. Required with at least 32 characters; generate with `openssl rand -hex 32`.                                                 |
 | `OUTBOUND_REQUEST_TIMEOUT_MS` | Timeout for triggered service calls (default `10000`).                                                                                                       |
 | `OUTBOUND_HOST_GATEWAY`       | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
 | `TELEMETRY_QUIET_MS`          | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
@@ -47,7 +51,7 @@ Run the Collector separately from this Compose project and attach it and instrum
 
 Create a token from **Manage access tokens** in Cairn. Set its required expiry date and copy the secret when Cairn shows it; Cairn cannot show it again. Supply the copied value as the Collector's `CAIRN_OTEL_ACCESS_TOKEN` environment secret. Do not commit the secret. The example Collector configuration reads this variable and sends it in the `Authorization` header. Generate a replacement before expiry, verify ingestion, then revoke the old token. Revocation takes effect immediately. Expired tokens stop working and remain listed as expired until revoked.
 
-This token protects only the OTLP ingestion routes. The management UI and management APIs assume Cairn is reachable only by trusted operators. Use TLS when Collector traffic crosses an untrusted network; bearer authentication does not encrypt HTTP traffic.
+This token protects OTLP ingestion routes. The management UI and management APIs require the shared operator login by default. Use `AUTH_ENABLED=false` only on trusted networks. Use TLS when Collector traffic crosses an untrusted network; bearer authentication does not encrypt HTTP traffic.
 
 Configure each instrumented service to send telemetry to the Collector and set the resource attributes:
 
@@ -73,7 +77,7 @@ vp run db:migrate
 vp run dev
 ```
 
-For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3308/<database>`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3308/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
 

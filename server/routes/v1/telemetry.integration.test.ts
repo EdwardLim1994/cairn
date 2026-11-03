@@ -25,6 +25,10 @@ integration("log query and OTLP controllers with MySQL", () => {
     process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
+    process.env.AUTH_ENABLED = "true";
+    process.env.AUTH_USERNAME = "operator";
+    process.env.AUTH_PASSWORD = "integration-password";
+    process.env.AUTH_SESSION_SECRET = "integration-session-secret-with-32-characters";
     const runtime = globalThis as unknown as {
       defineEventHandler: <T>(handler: T) => T;
       getQuery: (event: {
@@ -221,6 +225,23 @@ integration("log query and OTLP controllers with MySQL", () => {
     await expect(
       getDb().select().from(spans).where(eq(spans.projectId, projectId)),
     ).resolves.toHaveLength(0);
+  });
+
+  it("keeps OTLP bearer authentication active when application authentication is disabled", async () => {
+    process.env.AUTH_ENABLED = "false";
+    await expect(
+      ingestLogsRoute({
+        context: { body: { resourceLogs: [] } },
+        node: { req: { headers: {} } },
+      } as never),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    await expect(
+      ingestLogsRoute({
+        context: { body: { resourceLogs: [] } },
+        node: { req: { headers: auth } },
+      } as never),
+    ).resolves.toEqual({ accepted: 0 });
+    process.env.AUTH_ENABLED = "true";
   });
 
   it("rejects expired credentials before payload parsing", async () => {

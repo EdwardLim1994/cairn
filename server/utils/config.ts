@@ -18,6 +18,14 @@ export function getAppConfig() {
     throw new Error("OTEL_COLLECTOR_URL must use HTTP or HTTPS");
   }
 
+  const authEnabled = process.env.AUTH_ENABLED !== "false";
+  const authUsername = authEnabled ? required("AUTH_USERNAME") : undefined;
+  const authPassword = authEnabled ? required("AUTH_PASSWORD") : undefined;
+  const authSessionSecret = authEnabled ? required("AUTH_SESSION_SECRET") : undefined;
+  if (authSessionSecret && authSessionSecret.length < 32) {
+    throw new Error("AUTH_SESSION_SECRET must be at least 32 characters");
+  }
+
   return {
     databaseUrl: required("DATABASE_URL"),
     otelCollectorUrl: collectorUrl.toString(),
@@ -26,5 +34,9 @@ export function getAppConfig() {
     outboundRequestTimeoutMs: positiveInteger("OUTBOUND_REQUEST_TIMEOUT_MS", 10000),
     telemetryQuietMs: positiveInteger("TELEMETRY_QUIET_MS", 1500),
     telemetryMaxWaitMs: positiveInteger("TELEMETRY_MAX_WAIT_MS", 10000),
+    authEnabled,
+    authUsername,
+    authPassword,
+    authSessionSecret,
   };
 }

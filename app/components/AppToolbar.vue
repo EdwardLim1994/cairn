@@ -1,11 +1,12 @@
 <script setup lang="ts">
-defineProps<{ allNodesCollapsed: boolean; dark: boolean }>();
+defineProps<{ allNodesCollapsed: boolean; dark: boolean; authEnabled?: boolean }>();
 const emit = defineEmits<{
   toggleAll: [];
   toggleTheme: [];
   openMockApis: [];
   openAccessTokens: [];
   openHistory: [];
+  signOut: [];
 }>();
 </script>
 
@@ -83,6 +84,17 @@ const emit = defineEmits<{
         @click.stop="emit('toggleTheme')"
       >
         <UIcon :name="dark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-4" aria-hidden="true" />
+      </UButton>
+      <UButton
+        v-if="authEnabled"
+        type="button"
+        color="neutral"
+        variant="ghost"
+        class="inline-flex h-[34px] items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
+        aria-label="Sign out"
+        @click.stop="emit('signOut')"
+      >
+        Sign out
       </UButton>
     </div>
   </header>

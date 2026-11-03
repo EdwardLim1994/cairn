@@ -27,6 +27,10 @@ services:
       OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
       PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
       PORT: ${PORT:-3003}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      AUTH_USERNAME: ${AUTH_USERNAME:?Set AUTH_USERNAME in .env}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:?Set AUTH_SESSION_SECRET in .env}
       OUTBOUND_HOST_GATEWAY: host.docker.internal
       OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
       TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-1500}
@@ -34,10 +38,10 @@ services:
     ports:
       - "${PORT:-3003}:${PORT:-3003}"
 
-  adminer:
-    image: adminer:latest
-    ports:
-      - "${ADMINER_PORT:-8888}:8080"
+  # adminer:
+  #   image: adminer:latest
+  #   ports:
+  #     - "${ADMINER_PORT:-8888}:8080"
 
 volumes:
   mysql_data:
