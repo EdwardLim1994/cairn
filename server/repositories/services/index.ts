@@ -59,6 +59,7 @@ export async function createService(projectId: string, id: string, input: Servic
       projectId,
       codeKey: input.codeKey ?? randomUUID(),
       name: input.name,
+      apiType: input.apiType,
       framework: input.framework,
       baseUrl: input.baseUrl,
       healthCheckUrl: input.healthCheckUrl,
@@ -119,6 +120,7 @@ export async function updateService(
       .update(services)
       .set({
         name: input.name,
+        apiType: input.apiType,
         framework: input.framework,
         baseUrl: input.baseUrl,
         healthCheckUrl: input.healthCheckUrl,
@@ -147,7 +149,6 @@ export async function updateService(
           serviceId: id,
           codeKey: oldEndpoints.find((old) => old.id === endpoint.id)?.codeKey ?? randomUUID(),
           name: endpoint.name,
-          apiType: endpoint.apiType,
           method: endpoint.method,
           url: endpoint.url,
         };

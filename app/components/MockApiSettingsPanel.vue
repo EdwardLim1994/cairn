@@ -11,6 +11,7 @@ import type {
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 
 const RequestJsonEditor = defineAsyncComponent(() => import("./RequestJsonEditor.vue"));
+const GraphqlRequestEditor = defineAsyncComponent(() => import("./GraphqlRequestEditor.vue"));
 
 const mockDraft = defineModel<MockApiDraft[]>("mockDraft", { required: true });
 const environmentVariables = defineModel<EnvironmentVariable[]>("environmentVariables", {
@@ -29,7 +30,7 @@ const props = defineProps<{
   environmentVariablesLoading: boolean;
   editingEnvironmentVariableId: string | null;
   expandedEnvironmentVariableId: string | null;
-  servicesForSelect: { id: string; label: string }[];
+  servicesForSelect: { id: string; label: string; apiType: "REST" | "GRAPHQL" }[];
   endpointPathParameterNames: (entry: MockApiDraft) => string[];
   endpointDetails: { id: string; url: string }[];
 }>();
@@ -58,6 +59,10 @@ const variableSectionItems = [{ value: "variables", label: "Shared environment v
 const mockApiSectionItems = [{ value: "apis", label: "Registered mock APIs" }];
 const expandedCardId = ref<string | null>(null);
 const visibleSecrets = ref(new Set<string>());
+const apiTypeOptions = [
+  { label: "REST", value: "REST" },
+  { label: "GraphQL", value: "GRAPHQL" },
+];
 const authorizationTypeOptions = [
   { label: "Bearer token", value: "bearer" },
   { label: "Basic Auth", value: "basic" },
@@ -147,11 +152,26 @@ function toggleSecret(template: AuthorizationTemplateDraft, field: string) {
   visibleSecrets.value = next;
 }
 
-function endpointOptions() {
+function endpointOptions(apiType: "REST" | "GRAPHQL") {
   return [
     { label: "Select endpoint", value: "" },
-    ...props.servicesForSelect.map(({ id, label }) => ({ label, value: id })),
+    ...props.servicesForSelect
+      .filter((option) => option.apiType === apiType)
+      .map(({ id, label }) => ({ label, value: id })),
   ];
+}
+
+function setMockApiType(entry: MockApiDraft, value: unknown) {
+  const apiType = value as "REST" | "GRAPHQL";
+  if (entry.apiType === apiType) return;
+  entry.apiType = apiType;
+  const endpoint =
+    props.servicesForSelect.find(
+      (option) => option.id === entry.targetEndpointId && option.apiType === apiType,
+    ) ?? props.servicesForSelect.find((option) => option.apiType === apiType);
+  entry.targetEndpointId = endpoint?.id ?? null;
+  if (!endpoint) entry.active = false;
+  emit("setMockEndpoint", entry);
 }
 
 function templateOptions() {
@@ -726,7 +746,7 @@ watchEffect(() => {
                   class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
                   @click="fileInput?.click()"
                 >
-                  Import APIs
+                  Import REST APIs
                 </UButton>
                 <UButton
                   type="button"
@@ -765,6 +785,22 @@ watchEffect(() => {
                     </div>
                   </template>
                   <label
+                    :for="`mock-api-type-${entry.id || index}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+                  >
+                    <span>API type</span>
+                    <USelect
+                      :id="`mock-api-type-${entry.id || index}`"
+                      :model-value="entry.apiType ?? 'REST'"
+                      :items="apiTypeOptions"
+                      :aria-label="`API type for ${entry.name || `Mock API ${index + 1}`}`"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
+                      @update:model-value="setMockApiType(entry, $event)"
+                    />
+                  </label>
+                  <label
                     :for="`mock-api-name-${entry.id || index}`"
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
@@ -786,7 +822,7 @@ watchEffect(() => {
                     <USelect
                       :id="`mock-api-endpoint-${entry.id || index}`"
                       v-model="entry.targetEndpointId"
-                      :items="endpointOptions()"
+                      :items="endpointOptions(entry.apiType ?? 'REST')"
                       :ui="{
                         base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
                       }"
@@ -883,8 +919,10 @@ watchEffect(() => {
                   <fieldset
                     class="min-w-0 flex flex-1 flex-col gap-1 m-0 border-0 p-0 [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
-                    <legend>Request (JSON)</legend>
-                    <div class="flex justify-end">
+                    <legend>
+                      {{ entry.apiType === "GRAPHQL" ? "GraphQL request" : "Request (JSON)" }}
+                    </legend>
+                    <div v-if="entry.apiType !== 'GRAPHQL'" class="flex justify-end">
                       <UButton
                         type="button"
                         color="neutral"
@@ -895,7 +933,14 @@ watchEffect(() => {
                         Format JSON
                       </UButton>
                     </div>
+                    <GraphqlRequestEditor
+                      v-if="entry.apiType === 'GRAPHQL'"
+                      :model-value="String(entry.requestJson ?? '')"
+                      :variables="environmentVariables"
+                      @update:model-value="entry.requestJson = $event"
+                    />
                     <RequestJsonEditor
+                      v-if="entry.apiType !== 'GRAPHQL'"
                       :model-value="String(entry.requestJson ?? '')"
                       :variables="environmentVariables"
                       @update:model-value="entry.requestJson = $event"

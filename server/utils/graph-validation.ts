@@ -5,7 +5,6 @@ export type EndpointInput = {
   id?: string;
   codeKey?: string;
   name: string;
-  apiType: string;
   method: string;
   url: string;
 };
@@ -13,6 +12,7 @@ export type EndpointInput = {
 export type ServiceInput = {
   codeKey?: string;
   name: string;
+  apiType: "REST" | "GRAPHQL";
   framework: string;
   baseUrl: string;
   healthCheckUrl: string | null;
@@ -82,13 +82,10 @@ function endpoint(value: unknown): EndpointInput {
   const method = requiredText(input.method, "Endpoint method", 10).toUpperCase();
   if (!methods.has(method))
     throw createError({ statusCode: 400, statusMessage: "Unsupported REST method" });
-  if (input.apiType !== "REST")
-    throw createError({ statusCode: 400, statusMessage: "Only REST endpoints are supported" });
   return {
     id: typeof input.id === "string" ? input.id : undefined,
     codeKey: optionalKey(input.codeKey, "Endpoint key"),
     name: requiredText(input.name, "Endpoint name"),
-    apiType: "REST",
     method,
     url: endpointPath(input.url),
   };
@@ -96,6 +93,9 @@ function endpoint(value: unknown): EndpointInput {
 
 export function serviceInput(value: unknown): ServiceInput {
   const input = record(value, "Service");
+  const apiType = input.apiType === undefined ? "REST" : input.apiType;
+  if (apiType !== "REST" && apiType !== "GRAPHQL")
+    throw createError({ statusCode: 400, statusMessage: "Unsupported service API type" });
   if (!Array.isArray(input.endpoints))
     throw createError({ statusCode: 400, statusMessage: "Endpoints must be an array" });
   let healthCheckUrl: string | null = null;
@@ -126,16 +126,25 @@ export function serviceInput(value: unknown): ServiceInput {
       statusCode: 400,
       statusMessage: "Health-check header template is invalid",
     });
+  const endpoints = input.endpoints.map(endpoint);
+  if (apiType === "GRAPHQL" && endpoints.length !== 1)
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Exactly one GraphQL endpoint is required",
+    });
+  if (apiType === "GRAPHQL" && endpoints[0]?.method !== "POST")
+    throw createError({ statusCode: 400, statusMessage: "GraphQL endpoint method must be POST" });
   return {
     codeKey: optionalKey(input.codeKey, "Service key"),
     name: requiredText(input.name, "Service name"),
+    apiType,
     framework: requiredText(input.framework, "Framework", 100),
     baseUrl: httpUrl(input.baseUrl, "Base URL"),
     healthCheckUrl,
     healthCheckHeaderTemplateId: typeof templateId === "string" && templateId ? templateId : null,
     healthCheckCustomHeaders: healthCheckCustomHeaders as Array<{ name: string; value: string }>,
     active: input.active === undefined ? true : Boolean(input.active),
-    endpoints: input.endpoints.map(endpoint),
+    endpoints,
   };
 }
 

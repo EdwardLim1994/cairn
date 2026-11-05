@@ -7,6 +7,7 @@ type ApiClient = ReturnType<typeof createApiClient>;
 type EndpointDraft = ServiceEndpointDraft & { requestJson?: unknown };
 export type ServiceDraft = {
   name: string;
+  apiType: "REST" | "GRAPHQL";
   framework: string;
   baseUrl: string;
   healthCheckUrl: string | null;
@@ -36,13 +37,14 @@ type ServiceViewModelOptions = {
 function newServiceDraft(): ServiceDraft {
   return {
     name: "",
+    apiType: "REST",
     framework: "",
     baseUrl: "http://localhost:3000",
     healthCheckUrl: null,
     healthCheckHeaderTemplateId: null,
     healthCheckCustomHeaders: [],
     active: true,
-    endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
+    endpoints: [{ name: "", method: "GET", url: "/" }],
   };
 }
 
@@ -67,6 +69,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
     options.editingServiceId.value = id;
     options.draft.value = {
       name: service.name,
+      apiType: service.apiType,
       framework: options.frameworkLabel(service.framework),
       baseUrl: service.baseUrl,
       healthCheckUrl: service.healthCheckUrl,
@@ -75,7 +78,6 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
       active: service.active,
       endpoints: service.endpoints.map((endpoint) => ({
         ...endpoint,
-        apiType: "REST",
         method: endpoint.method as EndpointDraft["method"],
       })),
     };
@@ -90,7 +92,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   function addEndpoint() {
-    options.draft.value.endpoints.push({ name: "", apiType: "REST", method: "GET", url: "/" });
+    options.draft.value.endpoints.push({ name: "", method: "GET", url: "/" });
   }
 
   function removeEndpoint(index: number) {
@@ -107,7 +109,6 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
         options.draft.value.endpoints.includes(starter) &&
         !starter.id &&
         !starter.name.trim() &&
-        starter.apiType === "REST" &&
         starter.method === "GET" &&
         starter.url === "/"
       ) {

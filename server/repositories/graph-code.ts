@@ -39,6 +39,7 @@ export async function applyGraphCode(
         projectId,
         codeKey: service.key,
         name: service.name,
+        apiType: service.apiType,
         framework: service.framework,
         baseUrl: service.baseUrl,
         healthCheckUrl: service.healthCheck?.url ?? null,
@@ -64,7 +65,6 @@ export async function applyGraphCode(
           serviceId,
           codeKey: endpoint.key,
           name: endpoint.name,
-          apiType: endpoint.apiType,
           method: endpoint.method,
           url: endpoint.url,
         };

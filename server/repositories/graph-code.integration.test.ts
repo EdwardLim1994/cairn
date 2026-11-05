@@ -65,7 +65,6 @@ integration("graph code repository with MySQL", () => {
         serviceId: "graph-code-orders",
         codeKey: "create-order",
         name: "Create order",
-        apiType: "REST",
         method: "POST",
         url: "/orders",
       },
@@ -75,7 +74,6 @@ integration("graph code repository with MySQL", () => {
         serviceId: "graph-code-payments",
         codeKey: "capture",
         name: "Capture",
-        apiType: "REST",
         method: "POST",
         url: "/capture",
       },
@@ -121,6 +119,7 @@ integration("graph code repository with MySQL", () => {
         {
           key: "orders",
           name: "Orders renamed",
+          apiType: "REST",
           framework: "Spring Boot",
           baseUrl: "http://orders-v2",
           healthCheck: { url: "/ready", headers: [{ name: "X-Key", value: "value" }] },
@@ -128,7 +127,6 @@ integration("graph code repository with MySQL", () => {
             {
               key: "create-order",
               name: "Create order",
-              apiType: "REST",
               method: "POST",
               url: "/orders",
               outboundConnections: [{ serviceKey: "billing", endpointKey: "charge" }],
@@ -138,13 +136,13 @@ integration("graph code repository with MySQL", () => {
         {
           key: "billing",
           name: "Billing",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://billing",
           endpoints: [
             {
               key: "charge",
               name: "Charge",
-              apiType: "REST",
               method: "POST",
               url: "/charges",
               outboundConnections: [],
@@ -211,13 +209,13 @@ integration("graph code repository with MySQL", () => {
         {
           key: "caller",
           name: "Caller",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://caller",
           endpoints: [
             {
               key: "call",
               name: "Call",
-              apiType: "REST",
               method: "GET",
               url: "/call",
               outboundConnections: [{ serviceKey: "target", endpointKey: "read" }],
@@ -227,13 +225,13 @@ integration("graph code repository with MySQL", () => {
         {
           key: "target",
           name: "Target",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://target",
           endpoints: [
             {
               key: "read",
               name: "Read",
-              apiType: "REST",
               method: "GET",
               url: "/read",
               outboundConnections: [],
@@ -274,6 +272,7 @@ integration("graph code repository with MySQL", () => {
         {
           key: "duplicate",
           name: "First",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://first",
           endpoints: [],
@@ -281,6 +280,7 @@ integration("graph code repository with MySQL", () => {
         {
           key: "duplicate",
           name: "Second",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://second",
           endpoints: [],

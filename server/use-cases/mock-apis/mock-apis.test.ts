@@ -7,6 +7,7 @@ import { createUpdateMockApiUseCase } from "./update-mock-api";
 
 const mockInput = {
   name: "Get order",
+  apiType: "REST" as const,
   targetEndpointId: "endpoint-1",
   pathParameters: { orderId: "123" },
   requestJson: {},
@@ -36,7 +37,7 @@ describe("mock API endpoint use cases", () => {
       ensureProject: vi.fn().mockResolvedValue("project-1"),
       findMockApiEndpoint: vi
         .fn()
-        .mockResolvedValue({ id: "endpoint-1", url: "/orders/{orderId}" }),
+        .mockResolvedValue({ id: "endpoint-1", apiType: "REST", url: "/orders/{orderId}" }),
       createMockApi,
       newId: () => "mock-1",
     });
@@ -53,6 +54,19 @@ describe("mock API endpoint use cases", () => {
     await expect(useCase(mockInput)).rejects.toBeInstanceOf(MockApiEndpointError);
   });
 
+  it("rejects mock APIs whose type differs from target service", async () => {
+    const useCase = createCreateMockApiUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      findMockApiEndpoint: vi.fn().mockResolvedValue({
+        id: "endpoint-1",
+        apiType: "GRAPHQL",
+        url: "/graphql",
+      }),
+      createMockApi: vi.fn(),
+    });
+    await expect(useCase(mockInput)).rejects.toThrow("Mock API type must match service API type");
+  });
+
   it("updates a mock API after checking its endpoint ownership", async () => {
     const updateMockApi = vi.fn().mockResolvedValue(undefined);
     const useCase = createUpdateMockApiUseCase({
@@ -60,7 +74,7 @@ describe("mock API endpoint use cases", () => {
       findMockApi: vi.fn().mockResolvedValue(true),
       findMockApiEndpoint: vi
         .fn()
-        .mockResolvedValue({ id: "endpoint-1", url: "/orders/{orderId}" }),
+        .mockResolvedValue({ id: "endpoint-1", apiType: "REST", url: "/orders/{orderId}" }),
       updateMockApi,
     });
     await expect(useCase("mock-1", mockInput)).resolves.toEqual({ id: "mock-1" });
@@ -77,7 +91,9 @@ describe("mock API endpoint use cases", () => {
     await expect(missingUseCase("missing", mockInput)).rejects.toBeInstanceOf(MockApiNotFoundError);
     const invalidPathUseCase = createCreateMockApiUseCase({
       ensureProject: vi.fn().mockResolvedValue("project-1"),
-      findMockApiEndpoint: vi.fn().mockResolvedValue({ id: "endpoint-1", url: "/orders/{id}" }),
+      findMockApiEndpoint: vi
+        .fn()
+        .mockResolvedValue({ id: "endpoint-1", apiType: "REST", url: "/orders/{id}" }),
       createMockApi: vi.fn(),
     });
     await expect(invalidPathUseCase(mockInput)).rejects.toThrow("Unknown path parameter: orderId");

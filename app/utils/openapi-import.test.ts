@@ -5,7 +5,6 @@ const existingEndpoints = [
   {
     id: "endpoint-1",
     name: "Existing items",
-    apiType: "REST" as const,
     method: "GET" as const,
     url: "/items",
   },
@@ -35,11 +34,11 @@ describe("parseOpenApiEndpoints", () => {
     );
 
     expect(result.endpoints).toEqual([
-      { name: "List items", apiType: "REST", method: "GET", url: "/items" },
-      { name: "createItem", apiType: "REST", method: "POST", url: "/items/{id}" },
-      { name: "Replace item", apiType: "REST", method: "PUT", url: "/items/replace" },
-      { name: "Modify item", apiType: "REST", method: "PATCH", url: "/items/modify" },
-      { name: "DELETE /health", apiType: "REST", method: "DELETE", url: "/health" },
+      { name: "List items", method: "GET", url: "/items" },
+      { name: "createItem", method: "POST", url: "/items/{id}" },
+      { name: "Replace item", method: "PUT", url: "/items/replace" },
+      { name: "Modify item", method: "PATCH", url: "/items/modify" },
+      { name: "DELETE /health", method: "DELETE", url: "/health" },
     ]);
     expect(result.warnings).toEqual([]);
   });
@@ -61,9 +60,7 @@ describe("parseOpenApiEndpoints", () => {
       existingEndpoints,
     );
 
-    expect(result.endpoints).toEqual([
-      { name: "Create item", apiType: "REST", method: "POST", url: "/items/" },
-    ]);
+    expect(result.endpoints).toEqual([{ name: "Create item", method: "POST", url: "/items/" }]);
     expect(result.warnings).toEqual([
       "Skipped duplicate GET /items: this endpoint is already registered.",
     ]);
@@ -88,9 +85,7 @@ describe("parseOpenApiEndpoints", () => {
       [],
     );
 
-    expect(result.endpoints).toEqual([
-      { name: "First items", apiType: "REST", method: "GET", url: "/items" },
-    ]);
+    expect(result.endpoints).toEqual([{ name: "First items", method: "GET", url: "/items" }]);
     expect(result.warnings).toEqual([
       "Skipped OPTIONS /items: this HTTP method is not supported.",
       "Skipped HEAD /items: this HTTP method is not supported.",
@@ -104,7 +99,7 @@ describe("parseOpenApiEndpoints", () => {
       parseOpenApiEndpoints("not an OpenAPI document", existingEndpoints),
     ).rejects.toThrow("Could not import OpenAPI document:");
     expect(existingEndpoints).toEqual([
-      { id: "endpoint-1", name: "Existing items", apiType: "REST", method: "GET", url: "/items" },
+      { id: "endpoint-1", name: "Existing items", method: "GET", url: "/items" },
     ]);
   });
 });

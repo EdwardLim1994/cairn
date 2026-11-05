@@ -55,6 +55,9 @@ function validateImportFields(input: Record<string, unknown>) {
 
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
+  const apiType = input.apiType === undefined ? "REST" : input.apiType;
+  if (apiType !== "REST" && apiType !== "GRAPHQL")
+    throw createError({ statusCode: 400, statusMessage: "Unsupported mock API type" });
   const targetEndpointId = input.targetEndpointId ?? null;
   if (targetEndpointId !== null && (typeof targetEndpointId !== "string" || !targetEndpointId))
     throw createError({ statusCode: 400, statusMessage: "Service endpoint is invalid" });
@@ -84,6 +87,7 @@ export function mockApiInput(value: unknown) {
   validateImportFields(input);
   return {
     name: input.name.trim(),
+    apiType,
     targetEndpointId,
     description,
     pathParameters: mockApiPathParameters(input.pathParameters),

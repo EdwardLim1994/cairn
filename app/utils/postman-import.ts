@@ -3,12 +3,12 @@ import { findVariableReferences } from "#shared/utils/environment-variables";
 
 type Endpoint = {
   id?: string;
-  apiType: string;
   method: string;
   url: string;
 };
 
 type Service = {
+  apiType: "REST" | "GRAPHQL";
   baseUrl: string;
   endpoints: Endpoint[];
 };
@@ -27,6 +27,7 @@ type PostmanRequest = {
 type RecordValue = Record<string, unknown>;
 
 export type ImportedMockApi = {
+  apiType: "REST";
   name: string;
   targetEndpointId: string | null;
   description: string;
@@ -328,13 +329,14 @@ function matchRequest(
   );
   if (request.unsupportedBody)
     return { warning: `Skipped "${request.name}": request body is not JSON.` };
-  const restMatches = urlMatches.filter(({ endpoint }) => endpoint.apiType === "REST");
+  const restMatches = urlMatches.filter(({ service }) => service.apiType === "REST");
   const matched = restMatches.find(
     ({ endpoint }) => endpoint.method.toUpperCase() === request.method,
   );
   const selected = matched ?? restMatches[0];
   const pathParameters = selected ? routeParameters(url, selected.service, selected.endpoint) : {};
   const draft: ImportedMockApi = {
+    apiType: "REST",
     name: request.name,
     targetEndpointId: matched?.endpoint.id ?? null,
     description: "",
@@ -359,7 +361,7 @@ function matchRequest(
   if (!matched) {
     let reason = `HTTP method ${request.method} did not match the endpoint`;
     if (!urlMatches.length) reason = "URL did not match a registered REST endpoint";
-    else if (!restMatches.length) reason = "matching endpoint is not REST";
+    else if (!restMatches.length) reason = "matching endpoint belongs to a GraphQL service";
     warnings.push(`${reason}.`);
   }
   return {

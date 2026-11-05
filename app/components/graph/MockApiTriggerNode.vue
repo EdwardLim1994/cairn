@@ -33,7 +33,7 @@ const emit = defineEmits<{ trigger: [id: string] }>();
     }}</strong>
     <button
       type="button"
-      class="nodrag inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+      class="nodrag ml-auto inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
       :disabled="!data.active || !data.ready || data.busy"
       :aria-label="data.running ? `Running ${data.name}` : `Trigger ${data.name}`"
       :title="data.running ? `Running ${data.name}` : `Trigger ${data.name}`"

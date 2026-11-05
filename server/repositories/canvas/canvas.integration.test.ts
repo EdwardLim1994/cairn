@@ -45,7 +45,6 @@ integration("canvas repositories with MySQL", () => {
       projectId,
       serviceId: "canvas-service-source",
       name: "Source endpoint",
-      apiType: "REST",
       method: "GET",
       url: "/source",
     });
@@ -54,7 +53,6 @@ integration("canvas repositories with MySQL", () => {
       projectId,
       serviceId: "canvas-service-target",
       name: "Target endpoint",
-      apiType: "REST",
       method: "POST",
       url: "/target",
     });

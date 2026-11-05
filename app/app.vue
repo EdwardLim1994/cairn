@@ -146,6 +146,11 @@ body {
   stroke-width: 2;
 }
 
+.vue-flow__edge.app__flow-edge--observed .vue-flow__edge-path,
+.vue-flow__edge.app__flow-edge--running .vue-flow__edge-path {
+  stroke: var(--accent);
+}
+
 .vue-flow__edge-text {
   fill: var(--muted);
   font-size: 10px;

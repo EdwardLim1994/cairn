@@ -67,7 +67,6 @@ integration("run detail and flow controllers with MySQL", () => {
       projectId,
       serviceId: "run-service-order",
       name: "Create order",
-      apiType: "REST",
       method: "POST",
       url: "/orders",
     });

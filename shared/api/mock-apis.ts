@@ -11,9 +11,11 @@ export {
 } from "./common";
 
 const headerSchema = z.object({ name: z.string(), value: z.string() });
+const apiTypeSchema = z.enum(["REST", "GRAPHQL"]).default("REST");
 export const readinessReasonSchema = z.object({ code: z.string(), message: z.string() });
 const mockApiInputFields = z.object({
   name: z.string().trim().min(1).max(255),
+  apiType: apiTypeSchema,
   targetEndpointId: z.string().min(1).nullable().default(null),
   description: z.string().optional().default(""),
   pathParameters: z.record(z.string(), z.string()).optional().default({}),
@@ -47,6 +49,7 @@ export const mockApiListResponseSchema = z.array(
     id: z.string(),
     projectId: z.string(),
     name: z.string(),
+    apiType: z.enum(["REST", "GRAPHQL"]),
     targetEndpointId: z.string().nullable(),
     headerTemplateId: z.string().nullable(),
     authorizationTemplateId: z.string().nullable().optional(),

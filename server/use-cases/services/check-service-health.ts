@@ -3,7 +3,7 @@ import { getOutboundUrl } from "../../utils/outbound-url";
 import { resolveHeaderRows } from "#shared/utils/headers";
 
 function healthPath(framework: string) {
-  if (framework === "spring boot") return "/actuator/health";
+  if (framework === "spring boot") return "/actuator/health/readiness";
   if (framework.includes(".net")) return "/health";
   return null;
 }

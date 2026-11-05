@@ -32,6 +32,7 @@ export function useMockApiRunViewModel(options: {
   let replayGeneration = 0;
 
   function setInitialObservations(entry: MockApiDraft, targetService?: GraphService) {
+    options.mockApiStore.clearRunResults();
     options.graphStore.setObservations({
       services: targetService ? [targetService.name] : [],
       errorServices: [],

@@ -1,6 +1,6 @@
 # API contracts
 
-These Zod schemas describe the existing REST and OTLP transport contracts. Request schemas cover path/query/body input as applicable; response schemas represent JSON over HTTP (database dates are ISO strings). Keep route behavior and these contracts aligned during the refactor.
+These Zod schemas describe REST, GraphQL, and OTLP transport contracts. Request schemas cover path/query/body input as applicable; response schemas represent JSON over HTTP (database dates are ISO strings). Keep route behavior and these contracts aligned during the refactor.
 
 | Route                                   | Request schema                                                                  | Response schema                           |
 | --------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -43,7 +43,11 @@ Environment variable Update remains an immediate `PUT /api/environment-variables
 
 An API can reference one live header template and add custom rows. Header names merge case-insensitively; a custom row overrides the template row with the same name, including when its value is empty. `{{name}}` values resolve from project environment variables at run time. Cairn owns `traceparent`; imported or custom values cannot override it. Header values are not copied into warnings or readiness diagnostics.
 
-Mock APIs derive `Draft`, `Inactive`, or `Ready` from endpoint selection, path values, variables, headers, and the saved Active setting. Drafts can be saved without a matched endpoint, but only Ready APIs can run. A dependency repair does not turn Active back on. Imported APIs start inactive.
+Mock APIs derive `Draft`, `Inactive`, or `Ready` from endpoint selection, matching REST/GraphQL types, path values, variables, headers, GraphQL syntax, and the saved Active setting. Drafts can be saved without a matched endpoint, but only Ready APIs can run. A dependency repair does not turn Active back on. Imported APIs start inactive.
+
+## GraphQL
+
+GraphQL services have exactly one endpoint and use HTTP POST. GraphQL mock API requests store `{ query, variables, operationName? }` in `requestJson`. The editor checks syntax only; it does not validate fields against a service schema or provide schema-aware autocomplete. Successful HTTP responses remain completed runs even when the GraphQL JSON response contains an `errors` array.
 
 ## Postman imports
 

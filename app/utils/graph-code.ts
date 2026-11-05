@@ -19,6 +19,7 @@ export function serializeGraphCode(
       services: services.map((service) => ({
         key: service.codeKey,
         name: service.name,
+        apiType: service.apiType,
         framework: service.framework,
         baseUrl: service.baseUrl,
         ...(service.healthCheckUrl
@@ -32,7 +33,6 @@ export function serializeGraphCode(
         endpoints: service.endpoints.map((endpoint) => ({
           key: endpoint.codeKey,
           name: endpoint.name,
-          apiType: endpoint.apiType,
           method: endpoint.method,
           url: endpoint.url,
           outboundConnections: edges

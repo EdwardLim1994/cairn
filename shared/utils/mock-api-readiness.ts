@@ -1,8 +1,11 @@
+import { parse } from "graphql";
 import { findVariableReferences } from "./environment-variables";
 import { mergeHeaderRows, resolveHeaderRows, type HeaderRow } from "./headers";
 
 export type ReadinessReason = { code: string; message: string };
 export type MockApiReadinessInput = {
+  apiType?: "REST" | "GRAPHQL";
+  targetApiType?: "REST" | "GRAPHQL" | null;
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
   headerTemplateExists?: boolean;
@@ -127,6 +130,11 @@ export function evaluateMockApiReadiness(
     reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
   } else {
     addPathParameterReasons(api, endpointUrl, variables, reasons);
+    if (api.apiType && api.targetApiType && api.apiType !== api.targetApiType)
+      reasons.push({
+        code: "api-type-mismatch",
+        message: "Mock API type must match service API type",
+      });
   }
   if (api.headerTemplateId && api.headerTemplateExists === false)
     reasons.push({
@@ -147,7 +155,37 @@ export function evaluateMockApiReadiness(
       reasons,
     );
 
-  addMissingVariables(api.requestJson, "Request body", variables, reasons);
+  if (api.apiType === "GRAPHQL") {
+    const query =
+      api.requestJson && typeof api.requestJson === "object" && !Array.isArray(api.requestJson)
+        ? (api.requestJson as { query?: unknown }).query
+        : undefined;
+    if (typeof query !== "string" || !query.trim())
+      reasons.push({ code: "graphql-query-missing", message: "Enter a GraphQL query" });
+    else {
+      try {
+        parse(query);
+      } catch (error) {
+        reasons.push({
+          code: "graphql-syntax-invalid",
+          message: error instanceof Error ? error.message : "GraphQL syntax is invalid",
+        });
+      }
+    }
+    const requestVariables =
+      api.requestJson && typeof api.requestJson === "object" && !Array.isArray(api.requestJson)
+        ? (api.requestJson as { variables?: unknown }).variables
+        : undefined;
+    if (
+      requestVariables !== undefined &&
+      (!requestVariables || typeof requestVariables !== "object" || Array.isArray(requestVariables))
+    )
+      reasons.push({
+        code: "graphql-variables-invalid",
+        message: "GraphQL variables must be a JSON object",
+      });
+    addMissingVariables(api.requestJson, "GraphQL request", variables, reasons);
+  } else addMissingVariables(api.requestJson, "Request body", variables, reasons);
   if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
     addMissingVariables(api.matchUrl ?? api.importUrl, "Imported URL", variables, reasons);
   addHeaderReasons(templateHeaders, api.customHeaders, variables, reasons);

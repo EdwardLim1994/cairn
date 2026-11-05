@@ -1,7 +1,6 @@
 export type ServiceEndpointDraft = {
   id?: string;
   name: string;
-  apiType: "REST";
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
 };
@@ -42,7 +41,6 @@ function parseOperation(
   return {
     endpoint: {
       name: summary || operationId || `${method} ${url}`,
-      apiType: "REST",
       method: method as SupportedMethod,
       url,
     },

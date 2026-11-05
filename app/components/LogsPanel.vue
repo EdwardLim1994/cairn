@@ -89,23 +89,22 @@ const severityFilterItems = computed(() => [
     class="app__surface absolute bottom-4 left-4 right-4 z-[35] flex h-[var(--logs-panel-height)] flex-col overflow-hidden rounded-[18px] max-h-[calc(100vh-32px)] max-[720px]:bottom-2 max-[720px]:left-2 max-[720px]:right-2"
     :style="{ '--logs-panel-height': `${props.height}px` }"
   >
-    <div class="app__logs-resize-control">
-      <span class="app__logs-resize-grip" aria-hidden="true"></span>
-      <input
-        type="range"
-        class="app__logs-resize-handle"
+    <div class="flex h-3 shrink-0 justify-center">
+      <div
+        class="flex w-16 cursor-row-resize touch-none items-center justify-center rounded-full outline-none hover:bg-[var(--panel2)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        role="separator"
+        tabindex="0"
         aria-label="Resize logs panel"
-        aria-orientation="vertical"
+        aria-orientation="horizontal"
         aria-controls="logs-panel"
+        :aria-valuenow="props.height"
         aria-valuetext="Panel height in pixels"
-        :value="props.height"
-        min="160"
-        max="1200"
-        step="24"
         @pointerdown.prevent="emit('resize', $event)"
         @keydown.up.prevent="emit('adjustHeight', 24)"
         @keydown.down.prevent="emit('adjustHeight', -24)"
-      />
+      >
+        <span class="h-1 w-10 rounded-full bg-[var(--muted)]" aria-hidden="true"></span>
+      </div>
     </div>
     <div
       class="flex min-h-[54px] flex-wrap items-center gap-2 border-b border-[var(--border)] px-3 pb-2 pt-3"

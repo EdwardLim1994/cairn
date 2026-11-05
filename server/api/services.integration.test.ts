@@ -69,7 +69,6 @@ integration("service REST controllers with MySQL", () => {
             {
               codeKey: "list-orders",
               name: "List orders",
-              apiType: "REST",
               method: "GET",
               url: "/orders",
             },
@@ -104,7 +103,6 @@ integration("service REST controllers with MySQL", () => {
               {
                 id: endpointId,
                 name: "List all orders",
-                apiType: "REST",
                 method: "GET",
                 url: "/orders",
               },
@@ -131,7 +129,7 @@ integration("service REST controllers with MySQL", () => {
       codeKey: "duplicate-key",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8081",
-      endpoints: [{ codeKey: "list", name: "List", apiType: "REST", method: "GET", url: "/" }],
+      endpoints: [{ codeKey: "list", name: "List", method: "GET", url: "/" }],
     };
     await createRoute({ context: { body } } as never);
     await expect(createRoute({ context: { body } } as never)).rejects.toThrow();
@@ -171,7 +169,6 @@ integration("service REST controllers with MySQL", () => {
               {
                 id: "belongs-elsewhere",
                 name: "Foreign",
-                apiType: "REST",
                 method: "GET",
                 url: "/",
               },

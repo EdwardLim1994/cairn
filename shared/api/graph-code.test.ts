@@ -7,13 +7,13 @@ const validManifest = {
     {
       key: "orders",
       name: "Orders",
+      apiType: "REST",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8081",
       endpoints: [
         {
           key: "list-orders",
           name: "List orders",
-          apiType: "REST",
           method: "GET",
           url: "/orders",
           outboundConnections: [],
@@ -27,6 +27,29 @@ const validEndpoint = validManifest.services[0]!.endpoints[0]!;
 describe("service graph code schema", () => {
   it("accepts valid graph manifests", () => {
     expect(graphCodeManifestSchema.safeParse(validManifest).success).toBe(true);
+  });
+
+  it("accepts one POST endpoint on a GraphQL service and rejects other shapes", () => {
+    const service = {
+      ...validManifest.services[0],
+      apiType: "GRAPHQL",
+      endpoints: [{ ...validEndpoint, method: "POST", url: "/graphql" }],
+    };
+    expect(graphCodeManifestSchema.safeParse({ version: 1, services: [service] }).success).toBe(
+      true,
+    );
+    expect(
+      graphCodeManifestSchema.safeParse({
+        version: 1,
+        services: [{ ...service, endpoints: [] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      graphCodeManifestSchema.safeParse({
+        version: 1,
+        services: [{ ...service, endpoints: [{ ...service.endpoints[0], method: "GET" }] }],
+      }).success,
+    ).toBe(false);
   });
 
   it("resolves references to services declared later in the document", () => {

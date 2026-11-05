@@ -15,8 +15,9 @@ describe("Postman path parameter import", () => {
     });
     const result = parsePostmanCollection(collection, [
       {
+        apiType: "REST" as const,
         baseUrl: "http://localhost:8080",
-        endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/items/{itemId}" }],
+        endpoints: [{ id: "endpoint-1", method: "GET", url: "/items/{itemId}" }],
       },
     ]);
     expect(result.drafts).toHaveLength(2);
@@ -38,8 +39,9 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
+          apiType: "REST",
           baseUrl: "http://localhost:8080///",
-          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/items/{id}///" }],
+          endpoints: [{ id: "endpoint-1", method: "GET", url: "/items/{id}///" }],
         },
       ],
     );
@@ -80,10 +82,9 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
+          apiType: "REST",
           baseUrl: "http://localhost:8080",
-          endpoints: [
-            { id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders?page=1&status=new" },
-          ],
+          endpoints: [{ id: "endpoint-1", method: "GET", url: "/orders?page=1&status=new" }],
         },
       ],
     );
@@ -116,11 +117,16 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
+          apiType: "GRAPHQL",
+          baseUrl: "http://localhost:8080",
+          endpoints: [{ id: "graphql", method: "POST", url: "/graphql" }],
+        },
+        {
+          apiType: "REST",
           baseUrl: "http://localhost:8080",
           endpoints: [
-            { id: "graphql", apiType: "GraphQL", method: "GET", url: "/graphql" },
-            { id: "orders", apiType: "REST", method: "GET", url: "/orders" },
-            { id: "upload", apiType: "REST", method: "POST", url: "/upload" },
+            { id: "orders", method: "GET", url: "/orders" },
+            { id: "upload", method: "POST", url: "/upload" },
           ],
         },
       ],
@@ -131,7 +137,7 @@ describe("Postman path parameter import", () => {
     ).toBe(true);
     expect(result.warnings).toHaveLength(4);
     expect(result.warnings.join("\n")).toContain("URL did not match");
-    expect(result.warnings.join("\n")).toContain("matching endpoint is not REST");
+    expect(result.warnings.join("\n")).toContain("matching endpoint belongs to a GraphQL service");
     expect(result.warnings.join("\n")).toContain("HTTP method POST");
     expect(result.warnings.join("\n")).toContain("request body is not JSON");
   });
@@ -169,8 +175,9 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
+          apiType: "REST",
           baseUrl: "http://localhost:8080",
-          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+          endpoints: [{ id: "endpoint-1", method: "GET", url: "/orders" }],
         },
       ],
     );
@@ -188,8 +195,9 @@ describe("Postman path parameter import", () => {
   it("matches with current variables while preserving original URL metadata and retries unresolved drafts", async () => {
     const services = [
       {
+        apiType: "REST" as const,
         baseUrl: "http://localhost:8080",
-        endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+        endpoints: [{ id: "endpoint-1", method: "GET", url: "/orders" }],
       },
     ];
     const imported = parsePostmanCollection(
@@ -220,8 +228,9 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
+          apiType: "REST",
           baseUrl: "http://localhost:8080",
-          endpoints: [{ id: "endpoint-1", apiType: "REST", method: "GET", url: "/orders" }],
+          endpoints: [{ id: "endpoint-1", method: "GET", url: "/orders" }],
         },
       ],
       [{ name: "base", value: "http://localhost:8080" }],

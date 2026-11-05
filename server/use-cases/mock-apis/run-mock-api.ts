@@ -12,6 +12,8 @@ import { getOAuthAccessToken } from "../../utils/oauth-client";
 type ExecutionTarget = {
   mockApiId: string;
   endpointId: string | null;
+  apiType: "REST" | "GRAPHQL";
+  targetApiType: "REST" | "GRAPHQL" | null;
   targetEndpointId: string | null;
   endpointUrl: string | null;
   method: string | null;
@@ -77,9 +79,10 @@ function createFetchOptions(
   requestBody: unknown,
   headers: Headers,
   signal: AbortSignal,
+  forceJson = false,
 ): RequestInit {
   if (method === "GET") return { method, headers, signal };
-  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  if (forceJson || !headers.has("content-type")) headers.set("content-type", "application/json");
   return {
     method,
     headers,
@@ -141,6 +144,8 @@ export function createRunMockApiUseCase(dependencies: {
     const readiness = evaluateMockApiReadiness(
       {
         targetEndpointId: target.targetEndpointId,
+        apiType: target.apiType,
+        targetApiType: target.targetApiType,
         headerTemplateId: target.headerTemplateId,
         headerTemplateExists: target.headerTemplateExists,
         authorizationTemplateId: target.authorizationTemplateId,
@@ -219,7 +224,13 @@ export function createRunMockApiUseCase(dependencies: {
       timeout = setTimeout(() => controller.abort(), timeoutMs);
       const response = await dependencies.fetch(
         targetUrl,
-        createFetchOptions(target.method, requestBody, headers, controller.signal),
+        createFetchOptions(
+          target.method,
+          requestBody,
+          headers,
+          controller.signal,
+          target.apiType === "GRAPHQL",
+        ),
       );
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());

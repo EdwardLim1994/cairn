@@ -59,11 +59,11 @@ export function useMockApiViewModel(options: {
     () =>
       JSON.stringify({
         endpoints: options.services().flatMap((service) =>
-          service.endpoints.map(({ id, url, method, apiType }) => ({
+          service.endpoints.map(({ id, url, method }) => ({
             id,
             url,
             method,
-            apiType,
+            apiType: service.apiType,
             baseUrl: service.baseUrl,
           })),
         ),
@@ -108,11 +108,13 @@ export function useMockApiViewModel(options: {
   function addMockDraft() {
     const endpointId = options
       .services()
+      .filter((service) => service.apiType === "REST")
       .flatMap((service) => service.endpoints)
       .find((item) => item.id)?.id;
     const entry: MockApiDraft = {
       id: `draft-${crypto.randomUUID()}`,
       name: "",
+      apiType: "REST",
       targetEndpointId: endpointId ?? null,
       description: "",
       requestJson: "{}",

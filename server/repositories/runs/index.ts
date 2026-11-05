@@ -18,6 +18,7 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
     .select({
       mockApiId: mockApis.id,
       active: mockApis.active,
+      apiType: mockApis.apiType,
       targetEndpointId: mockApis.targetEndpointId,
       headerTemplateId: mockApis.headerTemplateId,
       authorizationTemplateId: mockApis.authorizationTemplateId,
@@ -30,6 +31,7 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
       endpointId: serviceEndpoints.id,
       method: serviceEndpoints.method,
       endpointUrl: serviceEndpoints.url,
+      targetApiType: services.apiType,
       url: serviceEndpoints.url,
       requestJson: mockApis.requestJson,
       pathParameters: mockApis.pathParameters,

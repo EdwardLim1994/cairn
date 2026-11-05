@@ -87,6 +87,7 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
         .select({
           api: mockApis,
           endpointUrl: serviceEndpoints.url,
+          targetApiType: services.apiType,
           templateId: headerTemplates.id,
           templateHeaders: headerTemplates.headers,
           authorizationTemplateType: authorizationTemplates.type,
@@ -101,6 +102,7 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
             eq(serviceEndpoints.projectId, projectId),
           ),
         )
+        .leftJoin(services, eq(serviceEndpoints.serviceId, services.id))
         .leftJoin(
           headerTemplates,
           and(
@@ -128,6 +130,7 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
         async ({
           api,
           endpointUrl,
+          targetApiType,
           templateId,
           templateHeaders,
           authorizationTemplateType,
@@ -140,6 +143,8 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
               : null;
           const readinessInput = {
             targetEndpointId: api.targetEndpointId,
+            apiType: api.apiType as "REST" | "GRAPHQL",
+            targetApiType: targetApiType as "REST" | "GRAPHQL" | null,
             headerTemplateId: api.headerTemplateId,
             headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
             authorizationTemplateId: api.authorizationTemplateId,
@@ -181,8 +186,9 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
 
 export async function findMockApiEndpoint(projectId: string, endpointId: string) {
   const [endpoint] = await getDb()
-    .select({ id: serviceEndpoints.id, url: serviceEndpoints.url })
+    .select({ id: serviceEndpoints.id, url: serviceEndpoints.url, apiType: services.apiType })
     .from(serviceEndpoints)
+    .innerJoin(services, eq(serviceEndpoints.serviceId, services.id))
     .where(and(eq(serviceEndpoints.id, endpointId), eq(serviceEndpoints.projectId, projectId)));
   return endpoint;
 }

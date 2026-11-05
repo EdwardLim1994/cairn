@@ -66,6 +66,7 @@ integration("header template repository with MySQL", () => {
       id: "health-template-owner-service",
       projectId,
       name: "Orders",
+      apiType: "REST",
       framework: "Other",
       baseUrl: "http://localhost:8080",
     });
@@ -75,6 +76,7 @@ integration("header template repository with MySQL", () => {
         "health-template-owner-service",
         {
           name: "Orders",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://localhost:8080",
           healthCheckUrl: "/health",
@@ -288,6 +290,7 @@ integration("header template repository with MySQL", () => {
       "mutation-service",
       {
         name: "Orders",
+        apiType: "REST",
         framework: "REST",
         baseUrl: "http://localhost:8080",
         healthCheckUrl: null,
@@ -298,7 +301,6 @@ integration("header template repository with MySQL", () => {
           {
             id: "mutation-endpoint",
             name: "List",
-            apiType: "REST",
             method: "GET",
             url: "/orders",
           },
@@ -312,6 +314,7 @@ integration("header template repository with MySQL", () => {
       "mutation-service",
       {
         name: "Orders",
+        apiType: "REST",
         framework: "REST",
         baseUrl: "http://localhost:8080",
         healthCheckUrl: null,
@@ -322,7 +325,6 @@ integration("header template repository with MySQL", () => {
           {
             id: "mutation-endpoint",
             name: "List",
-            apiType: "REST",
             method: "GET",
             url: "/orders/{orderId}",
           },

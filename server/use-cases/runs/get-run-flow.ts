@@ -6,10 +6,17 @@ type RunFlowData = NonNullable<
 >;
 
 function normalizeServiceName(name: string, registeredServices: Array<{ name: string }>) {
-  const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/ssubgraph$/, "subgraph");
   return (
     registeredServices.find(
-      (service) => service.name.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized,
+      (service) =>
+        service.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "")
+          .replace(/ssubgraph$/, "subgraph") === normalized,
     )?.name ?? name
   );
 }

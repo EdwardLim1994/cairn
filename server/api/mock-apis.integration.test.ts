@@ -60,7 +60,6 @@ integration("mock API REST controllers with MySQL", () => {
       projectId,
       serviceId: "mock-api-service",
       name: "Get order",
-      apiType: "REST",
       method: "GET",
       url: "/orders/{orderId}",
     });

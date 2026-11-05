@@ -7,6 +7,7 @@ import {
   headerTemplates,
   mockApis,
   serviceEndpoints,
+  services,
 } from "../../db/schema";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 
@@ -20,6 +21,7 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
       .select({
         api: mockApis,
         endpointUrl: serviceEndpoints.url,
+        targetApiType: services.apiType,
         templateHeaders: headerTemplates.headers,
         templateId: headerTemplates.id,
         authorizationTemplateType: authorizationTemplates.type,
@@ -34,6 +36,7 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
           eq(serviceEndpoints.projectId, projectId),
         ),
       )
+      .leftJoin(services, eq(serviceEndpoints.serviceId, services.id))
       .leftJoin(
         headerTemplates,
         and(
@@ -59,6 +62,7 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
     ({
       api,
       endpointUrl,
+      targetApiType,
       templateHeaders,
       templateId,
       authorizationTemplateType,
@@ -72,6 +76,8 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
       const readiness = evaluateMockApiReadiness(
         {
           ...api,
+          apiType: api.apiType as "REST" | "GRAPHQL",
+          targetApiType: targetApiType as "REST" | "GRAPHQL" | null,
           headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
           authorizationTemplateExists:
             !api.authorizationTemplateId || Boolean(authorizationTemplateExists),

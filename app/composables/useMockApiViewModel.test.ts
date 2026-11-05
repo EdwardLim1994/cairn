@@ -7,8 +7,10 @@ import { createApiClient } from "../models/api-client";
 
 const service = {
   id: "service-1",
+  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
   healthCheckUrl: null,
@@ -21,10 +23,10 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
+      codeKey: "get-order",
       projectId: "project-1",
       serviceId: "service-1",
       name: "Get order",
-      apiType: "REST",
       method: "GET",
       url: "/orders/{orderId}",
       createdAt: "2025-01-01T00:00:00.000Z",
@@ -143,6 +145,7 @@ describe("mock API view model", () => {
         id: "mock-1",
         projectId: "project-1",
         name: "Get order",
+        apiType: "REST",
         targetEndpointId: "endpoint-1",
         headerTemplateId: null,
         customHeaders: [],
@@ -335,6 +338,7 @@ describe("mock API view model", () => {
         id: "saved-api",
         projectId: "project-1",
         name: "Saved",
+        apiType: "REST",
         targetEndpointId: "endpoint-1",
         headerTemplateId: null,
         customHeaders: [],
@@ -452,6 +456,7 @@ describe("mock API view model", () => {
       id: "mock-keep",
       projectId: "project-1",
       name: "Get order",
+      apiType: "REST" as const,
       targetEndpointId: "endpoint-1",
       headerTemplateId: null,
       customHeaders: [],

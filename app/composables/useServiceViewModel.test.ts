@@ -87,6 +87,7 @@ const service = {
   codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
   healthCheckUrl: "/ready",
@@ -103,7 +104,6 @@ const service = {
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
-      apiType: "REST",
       method: "GET",
       url: "/orders",
       createdAt: "2025-01-01T00:00:00.000Z",
@@ -122,15 +122,14 @@ describe("service view model", () => {
     });
     const draft = ref<ServiceDraft>({
       name: "Orders",
+      apiType: "REST",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8080",
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],
       active: true,
-      endpoints: [
-        { id: "endpoint-1", name: "List orders", apiType: "REST", method: "GET", url: "/orders" },
-      ],
+      endpoints: [{ id: "endpoint-1", name: "List orders", method: "GET", url: "/orders" }],
     });
     const editingServiceId = ref<string | null>(null);
     const dialogOpen = ref(false);
@@ -163,13 +162,14 @@ describe("service view model", () => {
     const context = setup();
     expect(context.vm.newServiceDraft()).toEqual({
       name: "",
+      apiType: "REST",
       framework: "",
       baseUrl: "http://localhost:3000",
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],
       active: true,
-      endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
+      endpoints: [{ name: "", method: "GET", url: "/" }],
     });
     context.vm.beginAddService({ x: 70, y: 90 });
     expect(context.addPosition.value).toEqual({ x: 70, y: 90 });
@@ -306,7 +306,6 @@ describe("service view model", () => {
     expect(context.draft.value.endpoints[0]?.name).toBe("List orders");
     expect(context.draft.value.endpoints[1]).toEqual({
       name: "List products",
-      apiType: "REST",
       method: "GET",
       url: "/products",
     });
@@ -342,7 +341,7 @@ describe("service view model", () => {
     await importPromise;
 
     expect(context.draft.value.endpoints).toEqual([
-      { id: "endpoint-1", name: "List orders", apiType: "REST", method: "GET", url: "/orders" },
+      { id: "endpoint-1", name: "List orders", method: "GET", url: "/orders" },
     ]);
     expect(context.errors[0]).toContain("Could not import OpenAPI document");
     expect(context.calls).toEqual([]);
@@ -365,7 +364,7 @@ describe("service view model", () => {
       body: {
         endpoints: [
           { id: "endpoint-1", name: "List orders", method: "GET", url: "/orders" },
-          { name: "List products", apiType: "REST", method: "GET", url: "/products" },
+          { name: "List products", method: "GET", url: "/products" },
         ],
       },
     });
@@ -376,14 +375,14 @@ describe("service view model", () => {
     addContext.draft.value.framework = "Spring Boot";
     await addContext.vm.importOpenApiFile(new File([content], "openapi.json"));
     expect(addContext.draft.value.endpoints).toEqual([
-      { name: "List products", apiType: "REST", method: "GET", url: "/products" },
+      { name: "List products", method: "GET", url: "/products" },
     ]);
     expect(addContext.calls).toEqual([]);
     await addContext.vm.saveService();
     expect(addContext.calls[0]?.options).toMatchObject({
       method: "POST",
       body: {
-        endpoints: [{ name: "List products", apiType: "REST", method: "GET", url: "/products" }],
+        endpoints: [{ name: "List products", method: "GET", url: "/products" }],
       },
     });
   });

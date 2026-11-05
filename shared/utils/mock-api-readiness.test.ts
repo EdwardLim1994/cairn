@@ -10,6 +10,45 @@ const base = {
 };
 
 describe("mock API readiness", () => {
+  it("validates GraphQL syntax without requiring a schema", () => {
+    const valid = evaluateMockApiReadiness(
+      {
+        ...base,
+        apiType: "GRAPHQL",
+        customHeaders: [],
+        requestJson: { query: "query { orders { id } }", variables: {} },
+      },
+      "/graphql",
+      [],
+      new Map(),
+    );
+    expect(valid.status).toBe("ready");
+    const invalid = evaluateMockApiReadiness(
+      {
+        ...base,
+        apiType: "GRAPHQL",
+        customHeaders: [],
+        requestJson: { query: "query {", variables: {} },
+      },
+      "/graphql",
+      [],
+      new Map(),
+    );
+    expect(invalid.reasons.map(({ code }) => code)).toContain("graphql-syntax-invalid");
+    const invalidVariables = evaluateMockApiReadiness(
+      {
+        ...base,
+        apiType: "GRAPHQL",
+        customHeaders: [],
+        requestJson: { query: "query { orders { id } }", variables: "{" },
+      },
+      "/graphql",
+      [],
+      new Map(),
+    );
+    expect(invalidVariables.reasons.map(({ code }) => code)).toContain("graphql-variables-invalid");
+  });
+
   it("reports missing endpoint, path values, and referenced variables", () => {
     const result = evaluateMockApiReadiness(
       { ...base, targetEndpointId: null },

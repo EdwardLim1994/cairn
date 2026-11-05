@@ -19,7 +19,7 @@ GitHub Actions reports unit/component tests and MySQL-backed integration tests i
 
 After MySQL is healthy, the app container applies pending Drizzle migrations before starting Cairn. A fresh database receives all migrations; subsequent starts skip recorded migrations. Migration failures stop the container before the web server starts. Generate new migrations with `vp run db:generate`, commit the SQL and metadata, then rebuild the image. Run one app container during migration; concurrent migration runners are not supported.
 
-Open `http://localhost:3003`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3308` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
+Open `http://localhost:3002`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3307` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
 
 Register microservices in Cairn with the same `http://localhost:<port>` base URLs used by Postman. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
 
@@ -29,11 +29,11 @@ The production image contains the Nuxt `.output` bundle, a bundled migration run
 
 | Variable                      | Purpose                                                                                                                                                      |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                | MySQL URL. Use `localhost:3308` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
-| `MYSQL_PORT`                  | Host port for the Compose MySQL instance (Compose default `3306`; `.env.example` sets `3308`). The container still listens on port `3306`.                   |
+| `DATABASE_URL`                | MySQL URL. Use `localhost:3307` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
+| `MYSQL_PORT`                  | Host port for the Compose MySQL instance (Compose default `3306`; `.env.example` sets `3307`). The container still listens on port `3306`.                   |
 | `OTEL_COLLECTOR_URL`          | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
 | `PROJECT_ID`                  | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
-| `PORT`                        | Nuxt server port (default `3003`).                                                                                                                           |
+| `PORT`                        | Nuxt server port (default `3003`; `.env.example` sets `3002`).                                                                                               |
 | `AUTH_ENABLED`                | Enables shared operator authentication by default. Set to `false` only for trusted deployments.                                                              |
 | `AUTH_USERNAME`               | Shared operator username. Required when authentication is enabled.                                                                                           |
 | `AUTH_PASSWORD`               | Shared operator password. Required when authentication is enabled.                                                                                           |
@@ -47,7 +47,7 @@ Keep real values in the ignored `.env` file or your deployment secret store. `.e
 
 ## OpenTelemetry Collector
 
-Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3003/v1/traces` and `/v1/logs` with a bearer token. If you change `PORT`, update the exporter endpoint to the same container port.
+Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3002/v1/traces` and `/v1/logs` with a bearer token. If you change `PORT`, update the exporter endpoint to the same container port.
 
 Create a token from **Manage access tokens** in Cairn. Set its required expiry date and copy the secret when Cairn shows it; Cairn cannot show it again. Supply the copied value as the Collector's `CAIRN_OTEL_ACCESS_TOKEN` environment secret. Do not commit the secret. The example Collector configuration reads this variable and sends it in the `Authorization` header. Generate a replacement before expiry, verify ingestion, then revoke the old token. Revocation takes effect immediately. Expired tokens stop working and remain listed as expired until revoked.
 
@@ -77,7 +77,7 @@ vp run db:migrate
 vp run dev
 ```
 
-For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3308/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3307/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
 
@@ -110,4 +110,4 @@ The **Shareable authorization templates** section supports **Bearer token**, **B
 
 Bearer, Basic, and OAuth send an `Authorization` header; API key sends the configured key as a request header. A raw header template or custom header with the same name, ignoring case, makes that API not ready until the conflict is removed. Authorization secrets are masked while editing and are stored with project settings in MySQL; this does not encrypt them or restrict access from trusted Cairn operators. Postman collection authorization is not imported and remains reported as an unsupported feature.
 
-Mock API request bodies use a JSON-aware CodeMirror editor with formatting, syntax diagnostics, placeholder highlighting, and shared-variable autocomplete. GraphQL request syntax and chained API calls remain future enhancements.
+Services can use REST endpoints or one GraphQL endpoint. GraphQL mock APIs store `query`, JSON `variables`, and optional `operationName` in the request field. The editor checks GraphQL syntax without a service schema; schema-aware validation and autocomplete remain deferred. Postman import remains REST-only.

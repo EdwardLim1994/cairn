@@ -75,10 +75,11 @@ const serviceDialog = ref(false);
 const editingServiceId = ref<string | null>(null);
 const serviceDraft = ref<ServiceDraft>({
   name: "",
+  apiType: "REST",
   framework: "",
   baseUrl: "http://localhost:3000",
   active: true,
-  endpoints: [{ name: "", apiType: "REST", method: "GET", url: "/" }],
+  endpoints: [{ name: "", method: "GET", url: "/" }],
 });
 const frameworkMenuOpen = ref(false);
 const mockPanel = ref(false);

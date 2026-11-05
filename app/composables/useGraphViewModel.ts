@@ -8,7 +8,7 @@ type ViewModelOptions = {
   store: Store;
   mockApis: () => GraphMockApi[];
   runningMockId: () => string | null;
-  runResults?: () => Record<string, { status: string }>;
+  runResults?: () => Record<string, { status: string; flow?: unknown }>;
 };
 
 function frameworkLabel(framework: string) {
@@ -41,6 +41,7 @@ export function useGraphViewModel({
       service.endpoints.map((endpoint) => ({
         id: endpoint.id!,
         serviceId: service.id,
+        apiType: service.apiType,
         method: endpoint.method,
         label: `${service.name}  |  ${endpoint.name} (${endpoint.method})`,
       })),
@@ -123,6 +124,9 @@ export function useGraphViewModel({
         (service) => service.id === edge.sourceServiceId,
       )?.name;
       const targetName = store.services.find((service) => service.id === target)?.name;
+      const observed = store.observedEdges.some(
+        (item) => item.sourceService === sourceName && item.targetService === targetName,
+      );
       return [
         {
           id: edge.id,
@@ -135,20 +139,18 @@ export function useGraphViewModel({
           updatable: canEdit,
           deletable: canEdit,
           type: "default",
-          class: store.observedEdges.some(
-            (item) => item.sourceService === sourceName && item.targetService === targetName,
-          )
-            ? "app__flow-edge app__flow-edge--observed"
-            : "",
+          class: observed ? "app__flow-edge app__flow-edge--observed" : "",
+          animated: observed,
         },
       ];
     });
     const mock: Edge[] = mockApis().flatMap((entry) => {
       const target = endpointTarget(entry.targetEndpointId ?? "");
       if (!entry.id || !target) return [];
-      const status = runResults?.()[entry.id]?.status;
+      const result = runResults?.()[entry.id];
+      const status = result?.status;
       const running = runningMockId() === entry.id && status === "running";
-      const completed = status === "completed" || status === "failed";
+      const completed = (status === "completed" || status === "failed") && Boolean(result?.flow);
       return [
         {
           id: `mock-${entry.id}`,
@@ -172,6 +174,7 @@ export function useGraphViewModel({
       const targetEndpointId = store.services.find((service) => service.id === target)?.endpoints[0]
         ?.id;
       if (!source || !target) return [];
+      if (declared.some((item) => item.source === source && item.target === target)) return [];
       return [
         {
           id: `observed-${index}`,

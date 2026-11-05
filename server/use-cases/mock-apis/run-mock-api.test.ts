@@ -8,6 +8,8 @@ function requestUrl(input: RequestInfo | URL): string {
 
 const target = {
   mockApiId: "mock-1",
+  apiType: "REST" as const,
+  targetApiType: "REST" as const,
   endpointId: "endpoint-1",
   targetEndpointId: "endpoint-1",
   endpointUrl: "/orders/{orderId}",
@@ -88,6 +90,62 @@ describe("mock API run use case", () => {
       expect.objectContaining({ status: "completed" }),
     );
     expect(deps.addFailureLog).not.toHaveBeenCalled();
+  });
+
+  it("sends GraphQL query, variables, and operation name as JSON and completes HTTP 200 errors", async () => {
+    const graphqlTarget = {
+      ...target,
+      apiType: "GRAPHQL" as const,
+      targetApiType: "GRAPHQL" as const,
+      endpointUrl: "/graphql",
+      url: "/graphql",
+      method: "POST",
+      pathParameters: {},
+      customHeaders: [{ name: "Content-Type", value: "text/plain" }],
+      requestJson: {
+        query: "query GetOrder { order(id: $id) { id } }",
+        variables: { id: "{{ORDER_ID}}" },
+        operationName: "GetOrder",
+      },
+    };
+    const responseBody = JSON.stringify({
+      data: { order: null },
+      errors: [{ message: "missing" }],
+    });
+    const { deps, run } = setup({
+      getTarget: vi.fn().mockResolvedValue(graphqlTarget),
+      getVariables: vi.fn().mockResolvedValue([{ name: "ORDER_ID", value: "42" }]),
+      fetch: vi.fn().mockResolvedValue(new Response(responseBody, { status: 200 })),
+    });
+    const result = await run("mock-1");
+    expect(result).toMatchObject({ status: "completed", responseStatus: 200, responseBody });
+    expect(deps.fetch).toHaveBeenCalledWith(
+      "http://localhost:8081/graphql",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          query: "query GetOrder { order(id: $id) { id } }",
+          variables: { id: "42" },
+          operationName: "GetOrder",
+        }),
+      }),
+    );
+    const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
+    expect(new Headers(request.headers).get("content-type")).toBe("application/json");
+    expect(deps.createRun).toHaveBeenCalledWith(
+      "project-1",
+      "mock-1",
+      "run-1",
+      "a".repeat(32),
+      "Create order",
+      "POST",
+      "http://localhost:8081/graphql",
+      expect.objectContaining({ operationName: "GetOrder" }),
+    );
+    expect(deps.finishRun).toHaveBeenCalledWith(
+      "run-1",
+      expect.objectContaining({ status: "completed", responseStatus: 200, responseBody }),
+    );
   });
 
   it("sends GET requests without a body or default content type", async () => {

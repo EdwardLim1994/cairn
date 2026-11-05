@@ -36,6 +36,7 @@ export const services = mysqlTable(
       .notNull()
       .$defaultFn(() => randomUUID()),
     name: varchar("name", { length: 255 }).notNull(),
+    apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     framework: varchar("framework", { length: 100 }).notNull(),
     baseUrl: text("base_url").notNull(),
     healthCheckUrl: text("health_check_url"),
@@ -69,7 +70,6 @@ export const serviceEndpoints = mysqlTable(
       .notNull()
       .$defaultFn(() => randomUUID()),
     name: varchar("name", { length: 255 }).notNull(),
-    apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     method: varchar("method", { length: 10 }).notNull(),
     url: text("url").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -88,6 +88,7 @@ export const mockApis = mysqlTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
+    apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     targetEndpointId: varchar("target_endpoint_id", { length: 36 }).references(
       () => serviceEndpoints.id,
       { onDelete: "set null" },

@@ -13,6 +13,7 @@ describe("serializeGraphCode", () => {
         codeKey: "orders",
         projectId: "project-1",
         name: "Orders",
+        apiType: "REST",
         framework: "Spring Boot",
         baseUrl: "http://orders",
         healthCheckUrl: "/ready",
@@ -29,7 +30,6 @@ describe("serializeGraphCode", () => {
             projectId: "project-1",
             serviceId: "service-1",
             name: "Create order",
-            apiType: "REST",
             method: "POST",
             url: "/orders",
             createdAt: "2026-01-01T00:00:00.000Z",
@@ -41,6 +41,7 @@ describe("serializeGraphCode", () => {
         codeKey: "inventory",
         projectId: "project-1",
         name: "Inventory",
+        apiType: "REST",
         framework: "Other",
         baseUrl: "http://inventory",
         healthCheckUrl: null,
@@ -57,7 +58,6 @@ describe("serializeGraphCode", () => {
             projectId: "project-1",
             serviceId: "service-2",
             name: "Reserve",
-            apiType: "REST",
             method: "POST",
             url: "/reserve",
             createdAt: "2026-01-01T00:00:00.000Z",
@@ -80,6 +80,7 @@ describe("serializeGraphCode", () => {
         {
           key: "orders",
           name: "Orders",
+          apiType: "REST",
           framework: "Spring Boot",
           baseUrl: "http://orders",
           healthCheck: { url: "/ready", headers: [{ name: "X-Key", value: "secret" }] },
@@ -87,7 +88,6 @@ describe("serializeGraphCode", () => {
             {
               key: "create-order",
               name: "Create order",
-              apiType: "REST",
               method: "POST",
               url: "/orders",
               outboundConnections: [{ serviceKey: "inventory", endpointKey: "reserve" }],
@@ -97,13 +97,13 @@ describe("serializeGraphCode", () => {
         {
           key: "inventory",
           name: "Inventory",
+          apiType: "REST",
           framework: "Other",
           baseUrl: "http://inventory",
           endpoints: [
             {
               key: "reserve",
               name: "Reserve",
-              apiType: "REST",
               method: "POST",
               url: "/reserve",
               outboundConnections: [],

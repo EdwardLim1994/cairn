@@ -4,11 +4,12 @@ import { useGraphViewModel } from "./useGraphViewModel";
 import { useGraphStore } from "../stores/graph";
 import type { CanvasGetResponse } from "#shared/api/canvas";
 
-const service = {
+const service: CanvasGetResponse["services"][number] = {
   id: "service-1",
   codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST",
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
   healthCheckUrl: null,
@@ -25,7 +26,6 @@ const service = {
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
-      apiType: "REST",
       method: "GET",
       url: "/orders",
       createdAt: "2025-01-01T00:00:00.000Z",
@@ -36,6 +36,7 @@ const mockApi: CanvasGetResponse["mockApis"][number] = {
   id: "mock-1",
   projectId: "project-1",
   name: "Fetch orders",
+  apiType: "REST",
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],
@@ -57,6 +58,8 @@ describe("graph view model", () => {
   function createModel(
     apis: CanvasGetResponse["mockApis"] = [mockApi],
     runningMockId: string | null = null,
+    runStatus?: string,
+    hasFlow = false,
   ) {
     const store = useGraphStore();
     store.applyCanvas({
@@ -79,6 +82,10 @@ describe("graph view model", () => {
       store,
       mockApis: () => apis,
       runningMockId: () => runningMockId,
+      runResults: () =>
+        runStatus
+          ? { "mock-1": { status: runStatus, flow: hasFlow ? true : undefined } }
+          : ({} as Record<string, { status: string; flow?: unknown }>),
     });
     return { store, model };
   }
@@ -94,6 +101,7 @@ describe("graph view model", () => {
       {
         id: "endpoint-1",
         serviceId: "service-1",
+        apiType: "REST",
         method: "GET",
         label: "Orders  |  List orders (GET)",
       },
@@ -132,12 +140,13 @@ describe("graph view model", () => {
       edges: [{ sourceService: "Orders", targetService: "Orders" }],
     });
     const edges = model.buildEdges();
-    expect(edges.map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1", "observed-0"]);
+    expect(edges.map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1"]);
     expect(edges[0]).toMatchObject({
       sourceHandle: "service-out",
       targetHandle: "in:endpoint-1",
       updatable: true,
       deletable: true,
+      animated: true,
     });
     expect(edges[1]).toMatchObject({
       source: "mock-api-mock-1",
@@ -145,13 +154,45 @@ describe("graph view model", () => {
       target: "service-1",
       targetHandle: "in:endpoint-1",
     });
-    expect(edges[2]?.animated).toBe(true);
     store.toggleServiceEndpoints("service-1");
     expect(model.buildEdges()[0]).toMatchObject({
       sourceHandle: "service-out",
       targetHandle: "in:endpoint-1",
       updatable: false,
       deletable: false,
+    });
+  });
+
+  it("animates a saved connection when trace telemetry observes it", () => {
+    const { store, model } = createModel();
+    store.setObservations({
+      services: ["Orders"],
+      errorServices: [],
+      edges: [{ sourceService: "Orders", targetService: "Orders" }],
+    });
+
+    expect(model.buildEdges()[0]).toMatchObject({
+      id: "edge-1",
+      class: "app__flow-edge app__flow-edge--observed",
+      animated: true,
+    });
+  });
+
+  it("keeps the connections static while the targeted API is running", () => {
+    const { model } = createModel([mockApi], "mock-1", "running");
+
+    const edges = model.buildEdges();
+    expect(edges[0]?.animated).toBe(false);
+    expect(edges[1]?.animated).toBe(false);
+  });
+
+  it("animates the trigger connection only after its trace flow arrives", () => {
+    const { model } = createModel([mockApi], null, "completed", true);
+
+    expect(model.buildEdges()[1]).toMatchObject({
+      id: "mock-mock-1",
+      class: "app__flow-edge app__flow-edge--observed",
+      animated: true,
     });
   });
 
@@ -285,7 +326,7 @@ describe("graph view model", () => {
     const payload = model.canvasPayload();
 
     expect(store.nodes[0]?.class).toContain("service-error");
-    expect(store.edges.some((edge) => edge.id === "observed-0" && edge.animated)).toBe(true);
+    expect(store.edges.some((edge) => edge.id === "edge-2" && edge.animated)).toBe(true);
     expect(store.allNodesCollapsed).toBe(true);
     expect(payload.edges).toEqual(store.serviceEdges);
   });

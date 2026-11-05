@@ -17,6 +17,9 @@ services:
       retries: 20
   app:
     build: .
+    networks:
+      - default
+      - graphql-java-microservices
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -45,3 +48,8 @@ services:
 
 volumes:
   mysql_data:
+
+networks:
+  graphql-java-microservices:
+    external: true
+    name: graphql-java-microservices_default

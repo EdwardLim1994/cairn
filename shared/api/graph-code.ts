@@ -8,32 +8,47 @@ const outboundConnectionSchema = z.object({ serviceKey: keySchema, endpointKey: 
 const endpointSchema = z.object({
   key: keySchema,
   name: z.string().trim().min(1).max(255),
-  apiType: z.literal("REST"),
   method: methodSchema,
   url: z.string().trim().min(1).max(2048),
   outboundConnections: z.array(outboundConnectionSchema),
 });
-const serviceSchema = z.object({
-  key: keySchema,
-  name: z.string().trim().min(1).max(255),
-  framework: frameworkSchema,
-  baseUrl: z.url().refine((url) => /^https?:\/\//i.test(url), "Expected HTTP URL"),
-  healthCheck: z
-    .object({
-      url: z
-        .string()
-        .trim()
-        .min(1)
-        .max(2048)
-        .refine(
-          (url) => /^https?:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//")),
-          "Expected HTTP URL or service path",
-        ),
-      headers: z.array(headerSchema),
-    })
-    .optional(),
-  endpoints: z.array(endpointSchema),
-});
+const serviceSchema = z
+  .object({
+    key: keySchema,
+    name: z.string().trim().min(1).max(255),
+    apiType: z.enum(["REST", "GRAPHQL"]).default("REST"),
+    framework: frameworkSchema,
+    baseUrl: z.url().refine((url) => /^https?:\/\//i.test(url), "Expected HTTP URL"),
+    healthCheck: z
+      .object({
+        url: z
+          .string()
+          .trim()
+          .min(1)
+          .max(2048)
+          .refine(
+            (url) => /^https?:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//")),
+            "Expected HTTP URL or service path",
+          ),
+        headers: z.array(headerSchema),
+      })
+      .optional(),
+    endpoints: z.array(endpointSchema),
+  })
+  .superRefine(({ apiType, endpoints }, context) => {
+    if (apiType === "GRAPHQL" && endpoints.length !== 1)
+      context.addIssue({
+        code: "custom",
+        path: ["endpoints"],
+        message: "Exactly one GraphQL endpoint is required",
+      });
+    if (apiType === "GRAPHQL" && endpoints[0]?.method !== "POST")
+      context.addIssue({
+        code: "custom",
+        path: ["endpoints", 0, "method"],
+        message: "GraphQL endpoint method must be POST",
+      });
+  });
 
 export const graphCodeManifestSchema = z
   .object({ version: z.literal(1), services: z.array(serviceSchema) })

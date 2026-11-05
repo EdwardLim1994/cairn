@@ -7,13 +7,13 @@ import type { HeaderTemplateDraft } from "../models/mock-api";
 type EndpointDraft = {
   id?: string;
   name: string;
-  apiType: "REST";
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
   requestJson?: unknown;
 };
 type ServiceDraft = {
   name: string;
+  apiType: "REST" | "GRAPHQL";
   framework: string;
   baseUrl: string;
   healthCheckUrl: string | null;
@@ -46,7 +46,7 @@ const frameworks = [
   { label: ".NET", value: ".NET" },
   { label: "Other", value: "Other" },
 ];
-const apiTypes = ["REST"];
+const apiTypes = ["REST", "GRAPHQL"];
 const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const emit = defineEmits<{
   addEndpoint: [];
@@ -108,6 +108,22 @@ function healthTemplateOptions() {
 
 function endpointKey(endpoint: EndpointDraft, index: number) {
   return endpoint.id || `endpoint-${index}`;
+}
+
+function setApiType(apiType: "REST" | "GRAPHQL") {
+  draft.value.apiType = apiType;
+  if (apiType === "GRAPHQL") {
+    const endpoint = draft.value.endpoints[0] ?? {
+      name: "GraphQL",
+      method: "POST" as const,
+      url: "/graphql",
+    };
+    endpoint.name = "GraphQL";
+    endpoint.method = "POST";
+    draft.value.endpoints = [endpoint];
+  } else if (!draft.value.endpoints.length) {
+    draft.value.endpoints = [{ name: "", method: "GET", url: "/" }];
+  }
 }
 
 function isEndpointOpen(endpoint: EndpointDraft, index: number) {
@@ -269,8 +285,10 @@ function handleOpenChange(open: boolean) {
         />
       </section>
       <div class="mt-1 flex items-center justify-between gap-2">
-        <strong class="text-xs">Available endpoints</strong>
-        <div class="flex items-center gap-2">
+        <strong class="text-xs">{{
+          draft.apiType === "GRAPHQL" ? "GraphQL endpoint" : "Available endpoints"
+        }}</strong>
+        <div v-if="draft.apiType === 'REST'" class="flex items-center gap-2">
           <UButton
             type="button"
             color="neutral"
@@ -299,7 +317,25 @@ function handleOpenChange(open: boolean) {
           </UButton>
         </div>
       </div>
+      <label for="service-api-type" class="flex flex-col gap-1">
+        <span class="text-[10px] font-medium text-[var(--muted)]">API type</span>
+        <USelect
+          id="service-api-type"
+          :model-value="draft.apiType"
+          :items="apiTypes"
+          @update:model-value="setApiType"
+        />
+      </label>
+      <label
+        v-if="draft.apiType === 'GRAPHQL'"
+        for="service-graphql-url"
+        class="flex flex-col gap-1"
+      >
+        <span class="text-[10px] font-medium text-[var(--muted)]">GraphQL endpoint URL</span>
+        <UInput id="service-graphql-url" v-model="draft.endpoints[0]!.url" placeholder="/graphql" />
+      </label>
       <SettingsAccordionCard
+        v-if="draft.apiType === 'REST'"
         v-for="(endpoint, index) in draft.endpoints"
         :id="endpoint.id ? `service-endpoint-${endpoint.id}` : undefined"
         :key="endpoint.id || index"
@@ -325,20 +361,6 @@ function handleOpenChange(open: boolean) {
           />
         </label>
         <div class="flex gap-2.5 max-[720px]:flex-col">
-          <label
-            :for="`service-endpoint-type-${endpoint.id || index}`"
-            class="min-w-0 flex flex-1 flex-col gap-1"
-          >
-            <span class="text-[10px] font-medium text-[var(--muted)]">API type</span>
-            <USelect
-              :id="`service-endpoint-type-${endpoint.id || index}`"
-              v-model="endpoint.apiType"
-              :items="apiTypes"
-              :ui="{
-                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-              }"
-            />
-          </label>
           <label
             :for="`service-endpoint-method-${endpoint.id || index}`"
             class="min-w-0 flex flex-1 flex-col gap-1"

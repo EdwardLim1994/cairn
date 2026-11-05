@@ -14,6 +14,7 @@ const services = [
     codeKey: "orders",
     projectId: "p",
     name: "Orders",
+    apiType: "REST" as const,
     framework: "Spring Boot",
     baseUrl: "http://orders",
     healthCheckUrl: null,
@@ -42,6 +43,7 @@ const services = [
     codeKey: "inventory",
     projectId: "p",
     name: "Inventory",
+    apiType: "REST" as const,
     framework: ".NET",
     baseUrl: "http://inventory",
     healthCheckUrl: null,
@@ -70,6 +72,7 @@ const mock = {
   id: "mock-1",
   projectId: "p",
   name: "Create order",
+  apiType: "REST" as const,
   targetEndpointId: "orders-endpoint",
   headerTemplateId: null,
   customHeaders: [],
@@ -88,14 +91,14 @@ const mock = {
 describe("mock API run view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function setup(status: "completed" | "failed") {
+  function setup(status: "completed" | "failed", previousMock?: typeof mock) {
     const graphStore = useGraphStore();
     const mockApiStore = useMockApiStore();
     graphStore.applyCanvas({
       nodesLocked: false,
       services,
       edges: [],
-      mockApis: [mock],
+      mockApis: previousMock ? [mock, previousMock] : [mock],
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -137,8 +140,9 @@ describe("mock API run view model", () => {
     });
     const graphViewModel = useGraphViewModel({
       store: graphStore,
-      mockApis: () => [mock],
+      mockApis: () => (previousMock ? [mock, previousMock] : [mock]),
       runningMockId: () => mockApiStore.runningMockId,
+      runResults: () => mockApiStore.runResults,
     });
     const logService = ref<string[]>([]);
     const logSeverity = ref<string[]>([]);
@@ -182,6 +186,31 @@ describe("mock API run view model", () => {
     expect(nodes.find((node) => node.id === "orders")?.class).toContain("service-observed");
     expect(context.logsOpen.value).toBe(false);
     expect(context.calls.saveCanvas).toBe(2);
+  });
+
+  it("clears the previous call animation when triggering another mock API", async () => {
+    const previousMock = {
+      ...mock,
+      id: "mock-previous",
+      name: "Previous call",
+      targetEndpointId: "inventory-endpoint",
+    };
+    const context = setup("completed", previousMock);
+    context.mockApiStore.setRunResult("mock-previous", {
+      id: "previous-run",
+      traceId: "previous-trace",
+      status: "completed",
+      responseStatus: 201,
+      responseBody: "{}",
+      error: null,
+    });
+
+    await context.viewModel.runMock(mock);
+
+    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
+    expect(edges.find((edge) => edge.id === "mock-mock-previous")?.animated).toBe(false);
+    expect(edges.find((edge) => edge.id === "mock-mock-1")?.animated).toBe(true);
+    expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
   });
 
   it("filters logs to the failing downstream service and highlights its node", async () => {

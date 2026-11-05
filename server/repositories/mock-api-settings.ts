@@ -120,14 +120,24 @@ export async function saveMockApiSettings(
     );
     const ownedEndpoints = endpoints.length
       ? await tx
-          .select({ id: serviceEndpoints.id })
+          .select({ id: serviceEndpoints.id, apiType: services.apiType })
           .from(serviceEndpoints)
+          .innerJoin(services, eq(serviceEndpoints.serviceId, services.id))
           .where(
             and(eq(serviceEndpoints.projectId, projectId), inArray(serviceEndpoints.id, endpoints)),
           )
       : [];
     if (ownedEndpoints.length !== new Set(endpoints).size)
       throw new Error("One or more selected endpoints are not in this project");
+    const endpointTypes = new Map(ownedEndpoints.map(({ id, apiType }) => [id, apiType]));
+    if (
+      input.mockApis.some(
+        (api) =>
+          api.targetEndpointId &&
+          endpointTypes.get(api.targetEndpointId) !== (api.apiType ?? "REST"),
+      )
+    )
+      throw new Error("Mock API type must match service API type");
     const apiEntries = validateApiEntries(input.mockApis, oldApiIds, templateIds, authTemplateIds);
     const apiIds = new Set(apiEntries.map(({ id }) => id));
 
@@ -186,6 +196,7 @@ export async function saveMockApiSettings(
           : null;
         const row = {
           name: api.name,
+          apiType: api.apiType,
           targetEndpointId: api.targetEndpointId,
           headerTemplateId,
           authorizationTemplateId: api.authorizationTemplateId
@@ -328,6 +339,10 @@ export async function saveMockApiSettings(
           const readiness = evaluateMockApiReadiness(
             {
               ...api,
+              apiType: api.apiType as "REST" | "GRAPHQL",
+              targetApiType: api.targetEndpointId
+                ? (endpointTypes.get(api.targetEndpointId) as "REST" | "GRAPHQL" | undefined)
+                : null,
               headerTemplateExists: !api.headerTemplateId || template.length > 0,
               authorizationTemplateExists: !api.authorizationTemplateId || authTemplate.length > 0,
               authorizationTemplate: authTemplate[0]

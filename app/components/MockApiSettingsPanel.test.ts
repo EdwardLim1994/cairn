@@ -213,7 +213,9 @@ describe("MockApiSettingsPanel", () => {
         environmentVariablesLoading: false,
         editingEnvironmentVariableId: null,
         expandedEnvironmentVariableId: null,
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
+        servicesForSelect: [
+          { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "REST" },
+        ],
         endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
         endpointPathParameterNames: () => [],
       },
@@ -247,11 +249,12 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.findAll('input[aria-label="Header name"]')).toHaveLength(templateRowsBefore + 1);
   });
 
-  it("lets users select and see a mock API target endpoint in its card", async () => {
+  it("creates an API and filters its target when its type changes", async () => {
     const entry: MockApiDraft = {
       id: "mock-1",
       name: "Fetch orders",
-      targetEndpointId: "endpoint-1",
+      apiType: "GRAPHQL",
+      targetEndpointId: null,
       active: true,
       description: "",
       requestJson: "{}",
@@ -269,8 +272,9 @@ describe("MockApiSettingsPanel", () => {
         editingEnvironmentVariableId: null,
         expandedEnvironmentVariableId: null,
         servicesForSelect: [
-          { id: "endpoint-1", label: "Orders | List orders (GET)" },
-          { id: "endpoint-2", label: "Payments | Create payment (POST)" },
+          { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "REST" },
+          { id: "endpoint-2", label: "Payments | Create payment (POST)", apiType: "REST" },
+          { id: "endpoint-3", label: "GraphQL | API (POST)", apiType: "GRAPHQL" },
         ],
         endpointDetails: [
           { id: "endpoint-1", url: "/orders" },
@@ -281,14 +285,38 @@ describe("MockApiSettingsPanel", () => {
       global: { components: settingsUiStubs },
     });
 
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "+ New API")!
+      .trigger("click");
+    expect(wrapper.emitted("addMockApi")).toEqual([[]]);
     await wrapper.get('#mock-api-mock-1 [aria-expanded="false"]').trigger("click");
+    const apiType = wrapper.get("#mock-api-type-mock-1");
+    expect(apiType.findAll("option").map((option) => option.attributes("value"))).toEqual([
+      "REST",
+      "GRAPHQL",
+    ]);
+    await apiType.setValue("REST");
+    expect(entry.apiType).toBe("REST");
+    const restTarget = wrapper.get("#mock-api-endpoint-mock-1");
+    expect(restTarget.findAll("option").map((option) => option.attributes("value"))).toEqual([
+      "",
+      "endpoint-1",
+      "endpoint-2",
+    ]);
+    await apiType.setValue("GRAPHQL");
+    expect(entry.apiType).toBe("GRAPHQL");
     const target = wrapper.get("#mock-api-endpoint-mock-1");
-    (target.element as HTMLSelectElement).value = "endpoint-2";
+    expect(target.findAll("option").map((option) => option.attributes("value"))).toEqual([
+      "",
+      "endpoint-3",
+    ]);
+    (target.element as HTMLSelectElement).value = "endpoint-3";
     await target.trigger("change");
 
-    expect(entry.targetEndpointId).toBe("endpoint-2");
-    expect(wrapper.get("#mock-api-mock-1").text()).toContain("Payments | Create payment (POST)");
-    expect(wrapper.emitted("setMockEndpoint")).toEqual([[entry]]);
+    expect(entry.targetEndpointId).toBe("endpoint-3");
+    expect(wrapper.get("#mock-api-mock-1").text()).toContain("GraphQL | API (POST)");
+    expect(wrapper.emitted("setMockEndpoint")).toHaveLength(3);
   });
 
   it("deactivates invalid staged APIs and does not reactivate them when variables return", async () => {
@@ -341,7 +369,9 @@ describe("MockApiSettingsPanel", () => {
         environmentVariablesLoading: false,
         editingEnvironmentVariableId: "var-1",
         expandedEnvironmentVariableId: "var-1",
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
+        servicesForSelect: [
+          { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "REST" },
+        ],
         endpointDetails: [{ id: "endpoint-1", url: "/orders/{orderId}" }],
         endpointPathParameterNames: () => ["orderId"],
       },
@@ -351,7 +381,7 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.text()).toContain("Shared environment variables");
     expect(wrapper.text()).toContain("Registered mock APIs");
     expect(wrapper.text()).toContain("Fetch orders");
-    expect(wrapper.text()).toContain("Import APIs");
+    expect(wrapper.text()).toContain("Import REST APIs");
     expect(wrapper.text()).toContain("Import environment");
     expect(wrapper.text()).toContain("New variable");
     expect(wrapper.find('[aria-label="Close"]').exists()).toBe(false);
@@ -491,7 +521,9 @@ describe("MockApiSettingsPanel", () => {
         environmentVariablesLoading: false,
         editingEnvironmentVariableId: null,
         expandedEnvironmentVariableId: null,
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
+        servicesForSelect: [
+          { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "REST" },
+        ],
         endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
         endpointPathParameterNames: () => [],
       },
@@ -534,7 +566,9 @@ describe("MockApiSettingsPanel", () => {
         environmentVariablesLoading: false,
         editingEnvironmentVariableId: "var-1",
         expandedEnvironmentVariableId: "var-1",
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
+        servicesForSelect: [
+          { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "REST" },
+        ],
         endpointDetails: [{ id: "endpoint-1", url: "/orders/{orderId}" }],
         endpointPathParameterNames: () => [],
       },
@@ -554,7 +588,7 @@ describe("MockApiSettingsPanel", () => {
       .trigger("click");
     await wrapper
       .findAll("button")
-      .find((button) => button.text().includes("+ New API"))!
+      .find((button) => button.text() === "+ New API")!
       .trigger("click");
     const fileInput = wrapper.get("#postman-collection-file");
     Object.defineProperty(fileInput.element, "files", {

@@ -18,8 +18,9 @@ describe("graph input validation", () => {
       }),
     ).toMatchObject({
       name: "Orders",
+      apiType: "REST",
       active: true,
-      endpoints: [{ name: "Get orders", apiType: "REST", method: "GET", url: "/orders/{id}" }],
+      endpoints: [{ name: "Get orders", method: "GET", url: "/orders/{id}" }],
     });
   });
 
@@ -49,14 +50,39 @@ describe("graph input validation", () => {
         name: "x",
         framework: "Spring Boot",
         baseUrl: "http://localhost",
-        endpoints: [{ name: "x", apiType: "GRAPHQL", method: "GET", url: "/" }],
+        apiType: "GRAPHQL",
+        endpoints: [{ name: "GraphQL", method: "GET", url: "/graphql" }],
       }),
-    ).toThrow("Only REST endpoints are supported");
+    ).toThrow("GraphQL endpoint method must be POST");
   });
 
   it("validates finite numbers and falls back for omitted values", () => {
     expect(finiteNumber(undefined, "x", 12)).toBe(12);
     expect(finiteNumber("2.5", "x", 0)).toBe(2.5);
     expect(() => finiteNumber("NaN", "x", 0)).toThrow("x must be a finite number");
+  });
+
+  it("requires exactly one POST endpoint for GraphQL services", () => {
+    const base = {
+      name: "GraphQL",
+      apiType: "GRAPHQL",
+      framework: "Other",
+      baseUrl: "http://localhost:8080",
+    };
+    expect(
+      serviceInput({ ...base, endpoints: [{ name: "GraphQL", method: "POST", url: "/graphql" }] }),
+    ).toMatchObject({ apiType: "GRAPHQL", endpoints: [{ method: "POST" }] });
+    expect(() => serviceInput({ ...base, endpoints: [] })).toThrow(
+      "Exactly one GraphQL endpoint is required",
+    );
+    expect(() =>
+      serviceInput({
+        ...base,
+        endpoints: [
+          { name: "GraphQL", method: "POST", url: "/graphql" },
+          { name: "Extra", method: "POST", url: "/extra" },
+        ],
+      }),
+    ).toThrow("Exactly one GraphQL endpoint is required");
   });
 });

@@ -74,7 +74,6 @@ integration("canvas REST controllers with MySQL", () => {
       projectId,
       serviceId: "canvas-route-target",
       name: "Target endpoint",
-      apiType: "REST",
       method: "POST",
       url: "/target",
     });

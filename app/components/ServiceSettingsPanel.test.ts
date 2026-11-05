@@ -148,6 +148,7 @@ function mountPanel(props: Record<string, unknown>) {
 
 const draft = {
   name: "Orders",
+  apiType: "REST" as "REST" | "GRAPHQL",
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
   healthCheckUrl: null,
@@ -158,7 +159,6 @@ const draft = {
     {
       id: "endpoint-1",
       name: "List orders",
-      apiType: "REST" as const,
       method: "GET" as const,
       url: "/orders",
     },
@@ -332,6 +332,34 @@ describe("ServiceSettingsPanel", () => {
     Object.defineProperty(input.element, "files", { configurable: true, value: [file] });
     await input.trigger("change");
     expect(wrapper.emitted("importOpenApi")).toEqual([[file]]);
+  });
+
+  it("shows one GraphQL URL and hides REST endpoint controls", async () => {
+    const panelDraft = structuredClone(draft);
+    const wrapper = mountPanel({
+      draft: panelDraft,
+      frameworkMenuOpen: false,
+      editingServiceId: null,
+    });
+    await wrapper.get("#service-api-type").setValue("GRAPHQL");
+    expect(panelDraft.apiType).toBe("GRAPHQL");
+    expect(panelDraft.endpoints).toHaveLength(1);
+    expect(panelDraft.endpoints[0]?.method).toBe("POST");
+    expect(wrapper.find("#service-graphql-url").exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Upload OpenAPI schema"]').exists()).toBe(false);
+    expect(wrapper.findAll("button").some((button) => button.text().includes("New endpoint"))).toBe(
+      false,
+    );
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().trim() === "Save")!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().trim() === "Discard")!
+      .trigger("click");
+    expect(wrapper.emitted("save")).toEqual([[]]);
+    expect(wrapper.emitted("discard")).toEqual([[]]);
   });
 
   it("uses Nuxt UI form controls while keeping the service draft editable", async () => {

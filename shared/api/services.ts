@@ -13,7 +13,6 @@ const endpointInputSchema = z.object({
   id: z.string().optional(),
   codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
-  apiType: z.literal("REST"),
   method: methodSchema,
   url: z.string().trim().min(1).max(2048),
 });
@@ -25,9 +24,10 @@ const endpointResponseSchema = endpointInputSchema.extend({
   createdAt: isoDateTimeSchema,
 });
 
-export const serviceInputSchema = z.object({
+const serviceInputFields = z.object({
   codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
+  apiType: z.enum(["REST", "GRAPHQL"]).default("REST"),
   framework: z.string().trim().min(1).max(100),
   baseUrl: z.string().trim().min(1).max(2048),
   healthCheckUrl: z.string().trim().max(2048).nullable().optional().default(null),
@@ -36,13 +36,37 @@ export const serviceInputSchema = z.object({
   active: z.boolean().optional().default(true),
   endpoints: z.array(endpointInputSchema),
 });
-export const serviceCreateRequestSchema = serviceInputSchema.extend({
-  positionX: z.number().optional(),
-  positionY: z.number().optional(),
-});
-export const serviceUpdateRequestSchema = serviceInputSchema
-  .omit({ codeKey: true })
-  .extend({ endpoints: z.array(endpointInputSchema.omit({ codeKey: true })) });
+const validateServiceApiType = <
+  T extends { apiType: "REST" | "GRAPHQL"; endpoints: { method: string }[] },
+>(
+  schema: z.ZodType<T>,
+) =>
+  schema.superRefine(({ apiType, endpoints }, context) => {
+    if (apiType === "GRAPHQL" && endpoints.length !== 1)
+      context.addIssue({
+        code: "custom",
+        path: ["endpoints"],
+        message: "Exactly one GraphQL endpoint is required",
+      });
+    if (apiType === "GRAPHQL" && endpoints[0]?.method !== "POST")
+      context.addIssue({
+        code: "custom",
+        path: ["endpoints", 0, "method"],
+        message: "GraphQL endpoint method must be POST",
+      });
+  });
+export const serviceInputSchema = validateServiceApiType(serviceInputFields);
+export const serviceCreateRequestSchema = validateServiceApiType(
+  serviceInputFields.extend({
+    positionX: z.number().optional(),
+    positionY: z.number().optional(),
+  }),
+);
+export const serviceUpdateRequestSchema = validateServiceApiType(
+  serviceInputFields
+    .omit({ codeKey: true })
+    .extend({ endpoints: z.array(endpointInputSchema.omit({ codeKey: true })) }),
+);
 export const serviceListRequestSchema = z.void();
 export const serviceListResponseSchema = z.array(
   z.object({
@@ -50,6 +74,7 @@ export const serviceListResponseSchema = z.array(
     codeKey: z.string(),
     projectId: z.string(),
     name: z.string(),
+    apiType: z.enum(["REST", "GRAPHQL"]),
     framework: z.string(),
     baseUrl: z.string(),
     healthCheckUrl: z.string().nullable(),

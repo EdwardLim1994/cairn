@@ -65,7 +65,6 @@ integration("mock API run controller with MySQL and deterministic service stubs"
       projectId,
       serviceId: "mock-run-service",
       name: "Create order",
-      apiType: "REST",
       method: "POST",
       url: "/orders",
     });
@@ -204,11 +203,11 @@ integration("mock API run controller with MySQL and deterministic service stubs"
     fetchStub.mockResolvedValue(new Response("ok", { status: 200 }));
     const services = [
       {
+        apiType: "REST" as const,
         baseUrl: "http://localhost:8081",
         endpoints: [
           {
             id: "mock-run-endpoint",
-            apiType: "REST",
             method: "GET",
             url: "/orders",
           },

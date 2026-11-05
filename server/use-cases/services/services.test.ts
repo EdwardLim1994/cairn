@@ -7,6 +7,7 @@ import { createUpdateServiceUseCase } from "./update-service";
 
 const serviceInput = {
   name: "Orders",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8081",
   healthCheckUrl: null,
@@ -79,6 +80,9 @@ describe("service endpoint use cases", () => {
       { id: "unknown", online: false },
     ]);
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+      "http://localhost:8081/actuator/health/readiness",
+    );
   });
 
   it("checks Other services with GET and resolved headers", async () => {

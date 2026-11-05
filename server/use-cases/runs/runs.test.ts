@@ -150,4 +150,74 @@ describe("run endpoint use cases", () => {
       })("missing"),
     ).rejects.toBeInstanceOf(RunNotFoundError);
   });
+
+  it("maps pluralized subgraph labels to singular OpenTelemetry service names", async () => {
+    const now = 10_000;
+    const getRunFlowData = vi.fn().mockResolvedValue({
+      run: {
+        id: "run-1",
+        projectId: "project-1",
+        mockApiId: "mock-1",
+        traceId: "trace-1",
+        status: "completed",
+        responseStatus: 200,
+        responseHeaders: null,
+        responseBody: null,
+        error: null,
+        startedAt: new Date(now - 1_000),
+        finishedAt: new Date(now - 900),
+        lastTelemetryAt: new Date(now - 2_000),
+      },
+      spans: [
+        {
+          id: 1,
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "router-span",
+          parentSpanId: null,
+          serviceName: "apollo-router",
+          operationName: "query GetCart",
+          startTime: new Date(now - 800),
+          endTime: new Date(now - 700),
+          statusCode: "OK",
+          attributes: {},
+          receivedAt: new Date(now - 600),
+        },
+        {
+          id: 2,
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "subgraph-span",
+          parentSpanId: "router-span",
+          serviceName: "cart-subgraph",
+          operationName: "POST /graphql",
+          startTime: new Date(now - 700),
+          endTime: new Date(now - 600),
+          statusCode: "OK",
+          attributes: {},
+          receivedAt: new Date(now - 500),
+        },
+      ],
+      registeredServices: [{ name: "Apollo Router" }, { name: "Carts subgraph" }],
+      failedTargetService: undefined,
+    });
+    const getFlow = createGetRunFlowUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      getRunFlowData,
+      telemetryQuietMs: () => 1_000,
+      telemetryMaxWaitMs: () => 5_000,
+      now: () => now,
+    });
+
+    await expect(getFlow("run-1")).resolves.toMatchObject({
+      edges: [
+        {
+          sourceService: "Apollo Router",
+          targetService: "Carts subgraph",
+          sourceSpanId: "router-span",
+          targetSpanId: "subgraph-span",
+        },
+      ],
+    });
+  });
 });

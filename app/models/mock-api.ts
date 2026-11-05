@@ -3,6 +3,7 @@ import type { AuthorizationTemplateInput } from "#shared/api/mock-apis";
 export type MockApiDraft = {
   id?: string;
   name: string;
+  apiType?: "REST" | "GRAPHQL";
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
   authorizationTemplateId?: string | null;
