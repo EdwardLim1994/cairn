@@ -42,6 +42,8 @@ export async function applyGraphCode(
         apiType: service.apiType,
         framework: service.framework,
         baseUrl: service.baseUrl,
+        grpcTls: service.grpcTls,
+        protoStorageKey: service.apiType === "GRPC" ? (existing?.protoStorageKey ?? null) : null,
         healthCheckUrl: service.healthCheck?.url ?? null,
         healthCheckHeaderTemplateId: null,
         healthCheckCustomHeaders: service.healthCheck?.headers ?? [],
@@ -65,8 +67,9 @@ export async function applyGraphCode(
           serviceId,
           codeKey: endpoint.key,
           name: endpoint.name,
-          method: endpoint.method,
-          url: endpoint.url,
+          method: endpoint.method ?? null,
+          url: endpoint.url ?? null,
+          rpcMethod: endpoint.rpcMethod ?? null,
         };
         if (existingEndpoint)
           await tx

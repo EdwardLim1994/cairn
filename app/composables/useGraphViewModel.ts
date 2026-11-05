@@ -8,7 +8,7 @@ type ViewModelOptions = {
   store: Store;
   mockApis: () => GraphMockApi[];
   runningMockId: () => string | null;
-  runResults?: () => Record<string, { status: string; flow?: unknown }>;
+  runResults?: () => Record<string, { status: string }>;
 };
 
 function frameworkLabel(framework: string) {
@@ -41,9 +41,9 @@ export function useGraphViewModel({
       service.endpoints.map((endpoint) => ({
         id: endpoint.id!,
         serviceId: service.id,
-        apiType: service.apiType,
+        apiType: (service.apiType ?? "REST") === "REST" ? "HTTP" : "GRPC",
         method: endpoint.method,
-        label: `${service.name}  |  ${endpoint.name} (${endpoint.method})`,
+        label: `${service.name}  |  ${endpoint.name} (${(service.apiType ?? "REST") === "REST" ? endpoint.method : "gRPC"})`,
       })),
     );
   }
@@ -57,6 +57,7 @@ export function useGraphViewModel({
       data: {
         serviceId: service.id,
         name: service.name,
+        apiType: service.apiType,
         framework: frameworkLabel(service.framework),
         online: store.serviceHealth[service.id] ?? null,
         endpoints: service.endpoints,
@@ -113,10 +114,10 @@ export function useGraphViewModel({
     const declared: Edge[] = store.serviceEdges.flatMap((edge) => {
       const target = endpointTarget(edge.targetEndpointId);
       if (!target) return [];
-      const sourceEndpoint = edge.sourceEndpointId
-        ? endpointTarget(edge.sourceEndpointId)
-        : undefined;
-      if (edge.sourceEndpointId && sourceEndpoint !== edge.sourceServiceId) return [];
+      const sourceService = store.services.find((service) => service.id === edge.sourceServiceId);
+      const sourceEndpointId =
+        edge.sourceEndpointId ?? sourceService?.endpoints.find((endpoint) => endpoint.id)?.id;
+      if (!sourceEndpointId || endpointTarget(sourceEndpointId) !== edge.sourceServiceId) return [];
       const canEdit =
         !(store.collapsedServiceEndpoints[edge.sourceServiceId] ?? false) &&
         !(store.collapsedServiceEndpoints[target] ?? false);
@@ -124,33 +125,30 @@ export function useGraphViewModel({
         (service) => service.id === edge.sourceServiceId,
       )?.name;
       const targetName = store.services.find((service) => service.id === target)?.name;
-      const observed = store.observedEdges.some(
+      const isObserved = store.observedEdges.some(
         (item) => item.sourceService === sourceName && item.targetService === targetName,
       );
       return [
         {
           id: edge.id,
           source: edge.sourceServiceId,
-          sourceHandle: edge.sourceEndpointId
-            ? endpointSourceHandle(edge.sourceEndpointId)
-            : "service-out",
+          sourceHandle: endpointSourceHandle(sourceEndpointId),
           target,
           targetHandle: endpointHandle(edge.targetEndpointId),
           updatable: canEdit,
           deletable: canEdit,
           type: "default",
-          class: observed ? "app__flow-edge app__flow-edge--observed" : "",
-          animated: observed,
+          class: isObserved ? "app__flow-edge app__flow-edge--observed" : "",
+          animated: isObserved,
         },
       ];
     });
     const mock: Edge[] = mockApis().flatMap((entry) => {
       const target = endpointTarget(entry.targetEndpointId ?? "");
       if (!entry.id || !target) return [];
-      const result = runResults?.()[entry.id];
-      const status = result?.status;
+      const status = runResults?.()[entry.id]?.status;
       const running = runningMockId() === entry.id && status === "running";
-      const completed = (status === "completed" || status === "failed") && Boolean(result?.flow);
+      const completed = status === "completed" || status === "failed";
       return [
         {
           id: `mock-${entry.id}`,
@@ -164,17 +162,26 @@ export function useGraphViewModel({
             : completed
               ? "app__flow-edge app__flow-edge--observed"
               : "",
-          animated: completed,
+          animated: running || completed,
         },
       ];
     });
     const observed: Edge[] = store.observedEdges.flatMap((edge, index) => {
       const source = store.services.find((service) => service.name === edge.sourceService)?.id;
       const target = store.services.find((service) => service.name === edge.targetService)?.id;
+      if (
+        store.serviceEdges.some((item) => {
+          const declaredSource = store.services.find(
+            (service) => service.id === item.sourceServiceId,
+          );
+          const declaredTarget = endpointTarget(item.targetEndpointId);
+          return declaredSource?.id === source && declaredTarget === target;
+        })
+      )
+        return [];
       const targetEndpointId = store.services.find((service) => service.id === target)?.endpoints[0]
         ?.id;
       if (!source || !target) return [];
-      if (declared.some((item) => item.source === source && item.target === target)) return [];
       return [
         {
           id: `observed-${index}`,

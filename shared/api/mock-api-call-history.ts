@@ -21,6 +21,8 @@ export const mockApiCallHistoryListResponseSchema = z.array(
     status: z.enum(["running", "completed", "failed"]),
     triggeredAt: isoDateTimeSchema,
     responseStatus: z.number().int().nullable(),
+    grpcStatus: z.number().int().nullable().optional(),
+    grpcStatusName: z.string().nullable().optional(),
     responseHeaders: z.record(z.string(), z.string()).nullable(),
     responseBody: z.string().nullable(),
     error: z.string().nullable(),

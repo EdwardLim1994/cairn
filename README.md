@@ -4,7 +4,9 @@
 [![Integration tests](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml)
 [![SonarCloud Scan](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml)
 
-A Nuxt single page app for editing a microservice graph, triggering registered REST calls, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+A Nuxt single page app for editing a microservice graph, triggering registered REST or unary gRPC calls, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+
+Cairn supports REST and unary gRPC services. A gRPC service stores one self-contained `.proto` file (maximum 1 MB) and exposes its unary RPC methods as endpoints. Proto files use the configured filesystem or S3 storage driver. TLS can be enabled per service; `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH` supplies custom CA roots when configured.
 
 GitHub Actions reports unit/component tests and MySQL-backed integration tests in separate workflows, so their README badges show independent status. The unit workflow also checks formatting, lint, and types. The SonarCloud workflow runs unit and component tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
@@ -19,7 +21,7 @@ GitHub Actions reports unit/component tests and MySQL-backed integration tests i
 
 After MySQL is healthy, the app container applies pending Drizzle migrations before starting Cairn. A fresh database receives all migrations; subsequent starts skip recorded migrations. Migration failures stop the container before the web server starts. Generate new migrations with `vp run db:generate`, commit the SQL and metadata, then rebuild the image. Run one app container during migration; concurrent migration runners are not supported.
 
-Open `http://localhost:3002`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3307` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
+Open `http://localhost:3003`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3308` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
 
 Register microservices in Cairn with the same `http://localhost:<port>` base URLs used by Postman. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
 
@@ -27,27 +29,35 @@ The production image contains the Nuxt `.output` bundle, a bundled migration run
 
 ## Environment
 
-| Variable                      | Purpose                                                                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                | MySQL URL. Use `localhost:3307` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
-| `MYSQL_PORT`                  | Host port for the Compose MySQL instance (Compose default `3306`; `.env.example` sets `3307`). The container still listens on port `3306`.                   |
-| `OTEL_COLLECTOR_URL`          | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
-| `PROJECT_ID`                  | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
-| `PORT`                        | Nuxt server port (default `3003`; `.env.example` sets `3002`).                                                                                               |
-| `AUTH_ENABLED`                | Enables shared operator authentication by default. Set to `false` only for trusted deployments.                                                              |
-| `AUTH_USERNAME`               | Shared operator username. Required when authentication is enabled.                                                                                           |
-| `AUTH_PASSWORD`               | Shared operator password. Required when authentication is enabled.                                                                                           |
-| `AUTH_SESSION_SECRET`         | Secret used to encrypt sessions. Required with at least 32 characters; generate with `openssl rand -hex 32`.                                                 |
-| `OUTBOUND_REQUEST_TIMEOUT_MS` | Timeout for triggered service calls (default `10000`).                                                                                                       |
-| `OUTBOUND_HOST_GATEWAY`       | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
-| `TELEMETRY_QUIET_MS`          | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
-| `TELEMETRY_MAX_WAIT_MS`       | Maximum time to wait for trace data before returning an incomplete flow (default `10000`).                                                                   |
+| Variable                                                                | Purpose                                                                                                                                                      |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                                          | MySQL URL. Use `localhost:3308` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
+| `MYSQL_PORT`                                                            | Host port for the Compose MySQL instance (Compose default `3306`; `.env.example` sets `3308`). The container still listens on port `3306`.                   |
+| `PROTO_STORAGE_DRIVER`                                                  | Proto file storage driver: `fs` (default, persisted in the `proto_data` Compose volume) or `s3`.                                                             |
+| `PROTO_STORAGE_FS_BASE`                                                 | Filesystem storage directory; Compose sets `/app/data/protos`.                                                                                               |
+| `PROTO_STORAGE_S3_ENDPOINT`                                             | S3-compatible endpoint, required with the `s3` driver.                                                                                                       |
+| `PROTO_STORAGE_S3_REGION`                                               | S3 region, required with the `s3` driver.                                                                                                                    |
+| `PROTO_STORAGE_S3_BUCKET`                                               | S3 bucket for proto files, required with the `s3` driver.                                                                                                    |
+| `PROTO_STORAGE_S3_ACCESS_KEY_ID` / `PROTO_STORAGE_S3_SECRET_ACCESS_KEY` | S3 credentials, required with the `s3` driver.                                                                                                               |
+| `CA_CERT_URL`                                                           | Optional URL for a custom CA PEM downloaded by the Compose init service before Cairn starts.                                                                 |
+| `CA_CERT_SHA256`                                                        | SHA-256 checksum required with `CA_CERT_URL`; download or checksum failure prevents app startup.                                                             |
+| `OTEL_COLLECTOR_URL`                                                    | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
+| `PROJECT_ID`                                                            | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
+| `PORT`                                                                  | Nuxt server port (default `3003`).                                                                                                                           |
+| `AUTH_ENABLED`                                                          | Enables shared operator authentication by default. Set to `false` only for trusted deployments.                                                              |
+| `AUTH_USERNAME`                                                         | Shared operator username. Required when authentication is enabled.                                                                                           |
+| `AUTH_PASSWORD`                                                         | Shared operator password. Required when authentication is enabled.                                                                                           |
+| `AUTH_SESSION_SECRET`                                                   | Secret used to encrypt sessions. Required with at least 32 characters; generate with `openssl rand -hex 32`.                                                 |
+| `OUTBOUND_REQUEST_TIMEOUT_MS`                                           | Timeout for triggered service calls (default `10000`).                                                                                                       |
+| `OUTBOUND_HOST_GATEWAY`                                                 | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
+| `TELEMETRY_QUIET_MS`                                                    | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
+| `TELEMETRY_MAX_WAIT_MS`                                                 | Maximum time to wait for trace data before returning an incomplete flow (default `10000`).                                                                   |
 
 Keep real values in the ignored `.env` file or your deployment secret store. `.env.example` contains placeholders only.
 
 ## OpenTelemetry Collector
 
-Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3002/v1/traces` and `/v1/logs` with a bearer token. If you change `PORT`, update the exporter endpoint to the same container port.
+Run the Collector separately from this Compose project and attach it and instrumented services to a Docker network where they can resolve the app as `app`. `otel-collector-config.yaml` accepts OTLP/HTTP and OTLP/gRPC input on ports `4318` and `4317`; its `otlp_http/app` exporter sends JSON to `http://app:3003/v1/traces` and `/v1/logs` with a bearer token. If you change `PORT`, update the exporter endpoint to the same container port.
 
 Create a token from **Manage access tokens** in Cairn. Set its required expiry date and copy the secret when Cairn shows it; Cairn cannot show it again. Supply the copied value as the Collector's `CAIRN_OTEL_ACCESS_TOKEN` environment secret. Do not commit the secret. The example Collector configuration reads this variable and sends it in the `Authorization` header. Generate a replacement before expiry, verify ingestion, then revoke the old token. Revocation takes effect immediately. Expired tokens stop working and remain listed as expired until revoked.
 
@@ -77,7 +87,7 @@ vp run db:migrate
 vp run dev
 ```
 
-For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3307/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3308/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
 
@@ -110,4 +120,4 @@ The **Shareable authorization templates** section supports **Bearer token**, **B
 
 Bearer, Basic, and OAuth send an `Authorization` header; API key sends the configured key as a request header. A raw header template or custom header with the same name, ignoring case, makes that API not ready until the conflict is removed. Authorization secrets are masked while editing and are stored with project settings in MySQL; this does not encrypt them or restrict access from trusted Cairn operators. Postman collection authorization is not imported and remains reported as an unsupported feature.
 
-Services can use REST endpoints or one GraphQL endpoint. GraphQL mock APIs store `query`, JSON `variables`, and optional `operationName` in the request field. The editor checks GraphQL syntax without a service schema; schema-aware validation and autocomplete remain deferred. Postman import remains REST-only.
+Mock API request bodies use a JSON-aware CodeMirror editor with formatting, syntax diagnostics, placeholder highlighting, and shared-variable autocomplete. GraphQL request syntax and chained API calls remain future enhancements.

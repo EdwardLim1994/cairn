@@ -8,7 +8,7 @@ export function graphCodeCompletions(context: CompletionContext) {
     match[1] === "framework"
       ? ["Spring Boot", ".NET", "Other"]
       : match[1] === "apiType"
-        ? ["REST"]
+        ? ["REST", "GRPC"]
         : ["GET", "POST", "PUT", "PATCH", "DELETE"];
   return {
     from: context.pos - match[2]!.length,

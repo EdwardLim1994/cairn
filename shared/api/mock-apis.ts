@@ -11,11 +11,11 @@ export {
 } from "./common";
 
 const headerSchema = z.object({ name: z.string(), value: z.string() });
-const apiTypeSchema = z.enum(["REST", "GRAPHQL"]).default("REST");
+const mockApiTypeSchema = z.enum(["HTTP", "GRPC"]);
 export const readinessReasonSchema = z.object({ code: z.string(), message: z.string() });
 const mockApiInputFields = z.object({
   name: z.string().trim().min(1).max(255),
-  apiType: apiTypeSchema,
+  apiType: mockApiTypeSchema.default("HTTP"),
   targetEndpointId: z.string().min(1).nullable().default(null),
   description: z.string().optional().default(""),
   pathParameters: z.record(z.string(), z.string()).optional().default({}),
@@ -49,7 +49,7 @@ export const mockApiListResponseSchema = z.array(
     id: z.string(),
     projectId: z.string(),
     name: z.string(),
-    apiType: z.enum(["REST", "GRAPHQL"]),
+    apiType: mockApiTypeSchema.default("HTTP"),
     targetEndpointId: z.string().nullable(),
     headerTemplateId: z.string().nullable(),
     authorizationTemplateId: z.string().nullable().optional(),
@@ -71,6 +71,8 @@ export const mockApiRunResponseSchema = z.object({
   traceId: z.string(),
   status: z.enum(["completed", "failed"]),
   responseStatus: z.number().int().nullable(),
+  grpcStatus: z.number().int().nullable().optional(),
+  grpcStatusName: z.string().nullable().optional(),
   responseHeaders: z.record(z.string(), z.string()).nullable(),
   responseBody: z.string().nullable(),
   error: z.string().nullable(),

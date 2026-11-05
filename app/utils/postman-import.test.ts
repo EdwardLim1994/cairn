@@ -117,17 +117,17 @@ describe("Postman path parameter import", () => {
       }),
       [
         {
-          apiType: "GRAPHQL",
-          baseUrl: "http://localhost:8080",
-          endpoints: [{ id: "graphql", method: "POST", url: "/graphql" }],
-        },
-        {
           apiType: "REST",
           baseUrl: "http://localhost:8080",
           endpoints: [
             { id: "orders", method: "GET", url: "/orders" },
             { id: "upload", method: "POST", url: "/upload" },
           ],
+        },
+        {
+          apiType: "GRPC",
+          baseUrl: "http://localhost:8080",
+          endpoints: [{ id: "grpc", method: null, url: "/graphql" }],
         },
       ],
     );
@@ -137,7 +137,7 @@ describe("Postman path parameter import", () => {
     ).toBe(true);
     expect(result.warnings).toHaveLength(4);
     expect(result.warnings.join("\n")).toContain("URL did not match");
-    expect(result.warnings.join("\n")).toContain("matching endpoint belongs to a GraphQL service");
+    expect(result.warnings.join("\n")).toContain("matching endpoint is not REST");
     expect(result.warnings.join("\n")).toContain("HTTP method POST");
     expect(result.warnings.join("\n")).toContain("request body is not JSON");
   });

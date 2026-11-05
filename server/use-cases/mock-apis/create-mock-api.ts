@@ -8,7 +8,7 @@ export function createCreateMockApiUseCase(dependencies: {
   findMockApiEndpoint: (
     projectId: string,
     endpointId: string,
-  ) => Promise<{ id: string; url: string; apiType: "REST" | "GRAPHQL" } | undefined>;
+  ) => Promise<{ id: string; url: string | null; serviceApiType: "REST" | "GRPC" } | undefined>;
   createMockApi: (id: string, projectId: string, input: MockApiInput) => Promise<void>;
   newId?: () => string;
 }) {
@@ -19,11 +19,12 @@ export function createCreateMockApiUseCase(dependencies: {
       : undefined;
     if (input.targetEndpointId && !endpoint)
       throw new MockApiEndpointError("Selected endpoint is not in this project");
-    if (endpoint && endpoint.apiType !== input.apiType)
-      throw new MockApiEndpointError("Mock API type must match service API type");
     if (!endpoint && input.active)
       throw new MockApiEndpointError("An API without an endpoint must be inactive");
-    if (endpoint) validateEndpointPathParameters(input.pathParameters, endpoint.url);
+    if (endpoint && endpoint.serviceApiType !== (input.apiType === "HTTP" ? "REST" : "GRPC"))
+      throw new MockApiEndpointError("Mock API type must match the selected service endpoint");
+    if (input.apiType === "HTTP" && endpoint?.url)
+      validateEndpointPathParameters(input.pathParameters, endpoint.url);
     const id = (dependencies.newId ?? randomUUID)();
     await dependencies.createMockApi(id, projectId, input);
     return { id };

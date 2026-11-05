@@ -4,13 +4,15 @@ import { Handle, Position } from "@vue-flow/core";
 type Endpoint = {
   id?: string;
   name: string;
-  method: string;
+  method: string | null;
+  rpcMethod: string | null;
 };
 
 defineProps<{
   data: {
     serviceId: string;
     name: string;
+    apiType: "REST" | "GRPC";
     framework: string;
     online: boolean | null;
     endpoints: Endpoint[];
@@ -27,13 +29,6 @@ const emit = defineEmits<{
 
 <template>
   <article class="app__graph-node--service app__graph-node relative rounded-2xl">
-    <Handle
-      id="service-out"
-      type="source"
-      :position="Position.Right"
-      :connectable="false"
-      class="app__service-source app__service-source--hidden"
-    />
     <template v-if="data.endpointsCollapsed">
       <template v-for="endpoint in data.endpoints" :key="endpoint.id">
         <Handle
@@ -153,9 +148,13 @@ const emit = defineEmits<{
       />
       <span
         class="rounded px-1 py-0.5 font-mono text-[9px]"
-        :class="`app__method-tag--${endpoint.method.toLowerCase()}`"
+        :class="
+          data.apiType === 'REST'
+            ? `app__method-tag--${endpoint.method?.toLowerCase()}`
+            : 'app__method-tag--grpc'
+        "
       >
-        {{ endpoint.method }}
+        {{ data.apiType === "REST" ? endpoint.method : "gRPC" }}
       </span>
       <button
         type="button"

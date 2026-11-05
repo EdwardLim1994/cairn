@@ -59,6 +59,21 @@ const nuxtUiStubs = {
       return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
     },
   }),
+  UIcon: defineComponent({ setup: () => () => h("span") }),
+  UCheckbox: defineComponent({
+    props: { modelValue: Boolean },
+    emits: ["update:modelValue"],
+    setup(props, { emit, attrs }) {
+      return () =>
+        h("input", {
+          ...attrs,
+          type: "checkbox",
+          checked: props.modelValue,
+          onChange: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).checked),
+        });
+    },
+  }),
   UInput: defineComponent({
     inheritAttrs: false,
     props: {
@@ -148,9 +163,11 @@ function mountPanel(props: Record<string, unknown>) {
 
 const draft = {
   name: "Orders",
-  apiType: "REST" as "REST" | "GRAPHQL",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  grpcTls: false,
+  protoContent: null,
   healthCheckUrl: null,
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
@@ -161,6 +178,7 @@ const draft = {
       name: "List orders",
       method: "GET" as const,
       url: "/orders",
+      rpcMethod: null,
     },
   ],
 };
@@ -192,7 +210,8 @@ describe("ServiceSettingsPanel", () => {
   });
 
   it("renders service fields and endpoint details and supports framework editing", async () => {
-    const panelDraft = structuredClone(draft);
+    const panelDraft: Omit<typeof draft, "apiType"> & { apiType: "REST" | "GRPC" } =
+      structuredClone(draft);
     const wrapper = mountPanel({
       draft: panelDraft,
       frameworkMenuOpen: false,
@@ -334,32 +353,28 @@ describe("ServiceSettingsPanel", () => {
     expect(wrapper.emitted("importOpenApi")).toEqual([[file]]);
   });
 
-  it("shows one GraphQL URL and hides REST endpoint controls", async () => {
-    const panelDraft = structuredClone(draft);
+  it("shows gRPC controls and emits uploaded proto files", async () => {
+    const panelDraft: Omit<typeof draft, "apiType"> & { apiType: "REST" | "GRPC" } =
+      structuredClone(draft);
     const wrapper = mountPanel({
       draft: panelDraft,
       frameworkMenuOpen: false,
       editingServiceId: null,
     });
-    await wrapper.get("#service-api-type").setValue("GRAPHQL");
-    expect(panelDraft.apiType).toBe("GRAPHQL");
-    expect(panelDraft.endpoints).toHaveLength(1);
-    expect(panelDraft.endpoints[0]?.method).toBe("POST");
-    expect(wrapper.find("#service-graphql-url").exists()).toBe(true);
-    expect(wrapper.find('[aria-label="Upload OpenAPI schema"]').exists()).toBe(false);
-    expect(wrapper.findAll("button").some((button) => button.text().includes("New endpoint"))).toBe(
-      false,
-    );
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text().trim() === "Save")!
-      .trigger("click");
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text().trim() === "Discard")!
-      .trigger("click");
-    expect(wrapper.emitted("save")).toEqual([[]]);
-    expect(wrapper.emitted("discard")).toEqual([[]]);
+    await wrapper.get("#service-api-type").setValue("GRPC");
+    expect(panelDraft.apiType).toBe("GRPC");
+    expect(wrapper.text()).toContain("Target address");
+    expect(wrapper.text()).toContain("Use TLS");
+    expect(wrapper.find('input[aria-label="Upload proto file"]').exists()).toBe(true);
+    expect(wrapper.find('input[aria-label="Upload OpenAPI schema"]').exists()).toBe(false);
+
+    const file = new File(['syntax = "proto3";'], "service.proto", { type: "text/plain" });
+    Object.defineProperty(wrapper.get('input[aria-label="Upload proto file"]').element, "files", {
+      configurable: true,
+      value: [file],
+    });
+    await wrapper.get('input[aria-label="Upload proto file"]').trigger("change");
+    expect(wrapper.emitted("importProto")).toEqual([[file]]);
   });
 
   it("uses Nuxt UI form controls while keeping the service draft editable", async () => {

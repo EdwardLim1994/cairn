@@ -8,17 +8,19 @@ const outboundConnectionSchema = z.object({ serviceKey: keySchema, endpointKey: 
 const endpointSchema = z.object({
   key: keySchema,
   name: z.string().trim().min(1).max(255),
-  method: methodSchema,
-  url: z.string().trim().min(1).max(2048),
+  method: methodSchema.nullable().optional(),
+  url: z.string().trim().min(1).max(2048).nullable().optional(),
+  rpcMethod: z.string().trim().min(1).max(512).nullable().optional(),
   outboundConnections: z.array(outboundConnectionSchema),
 });
 const serviceSchema = z
   .object({
     key: keySchema,
     name: z.string().trim().min(1).max(255),
-    apiType: z.enum(["REST", "GRAPHQL"]).default("REST"),
+    apiType: z.enum(["REST", "GRPC"]).default("REST"),
     framework: frameworkSchema,
-    baseUrl: z.url().refine((url) => /^https?:\/\//i.test(url), "Expected HTTP URL"),
+    baseUrl: z.string().trim().min(1).max(2048),
+    grpcTls: z.boolean().default(false),
     healthCheck: z
       .object({
         url: z
@@ -35,19 +37,33 @@ const serviceSchema = z
       .optional(),
     endpoints: z.array(endpointSchema),
   })
-  .superRefine(({ apiType, endpoints }, context) => {
-    if (apiType === "GRAPHQL" && endpoints.length !== 1)
-      context.addIssue({
-        code: "custom",
-        path: ["endpoints"],
-        message: "Exactly one GraphQL endpoint is required",
-      });
-    if (apiType === "GRAPHQL" && endpoints[0]?.method !== "POST")
-      context.addIssue({
-        code: "custom",
-        path: ["endpoints", 0, "method"],
-        message: "GraphQL endpoint method must be POST",
-      });
+  .superRefine((service, context) => {
+    if (service.apiType === "REST" && !/^https?:\/\//i.test(service.baseUrl))
+      context.addIssue({ code: "custom", path: ["baseUrl"], message: "Expected HTTP URL" });
+    if (service.apiType === "GRPC") {
+      const match = /^(?:\[[^\]]+\]|[^:/?#\s]+):(\d{1,5})$/.exec(service.baseUrl);
+      const port = match ? Number(match[1]) : 0;
+      if (!match || port < 1 || port > 65535)
+        context.addIssue({
+          code: "custom",
+          path: ["baseUrl"],
+          message: "Expected host:port gRPC target",
+        });
+    }
+    service.endpoints.forEach((endpoint, index) => {
+      if (service.apiType === "REST" && (!endpoint.method || !endpoint.url || endpoint.rpcMethod))
+        context.addIssue({
+          code: "custom",
+          path: ["endpoints", index],
+          message: "REST endpoints need method and URL",
+        });
+      if (service.apiType === "GRPC" && (!endpoint.rpcMethod || endpoint.method || endpoint.url))
+        context.addIssue({
+          code: "custom",
+          path: ["endpoints", index],
+          message: "gRPC endpoints need an RPC method",
+        });
+    });
   });
 
 export const graphCodeManifestSchema = z

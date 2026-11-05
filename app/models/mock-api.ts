@@ -3,7 +3,7 @@ import type { AuthorizationTemplateInput } from "#shared/api/mock-apis";
 export type MockApiDraft = {
   id?: string;
   name: string;
-  apiType?: "REST" | "GRAPHQL";
+  apiType: "HTTP" | "GRPC";
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
   authorizationTemplateId?: string | null;
@@ -44,6 +44,8 @@ export type MockApiRunResult = {
   id: string;
   status: string;
   responseStatus: number | null;
+  grpcStatus?: number | null;
+  grpcStatusName?: string | null;
   responseBody: string | null;
   error: string | null;
   traceId: string;

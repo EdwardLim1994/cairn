@@ -3,12 +3,12 @@ import { findVariableReferences } from "#shared/utils/environment-variables";
 
 type Endpoint = {
   id?: string;
-  method: string;
-  url: string;
+  method: string | null;
+  url: string | null;
 };
 
 type Service = {
-  apiType: "REST" | "GRAPHQL";
+  apiType: "REST" | "GRPC";
   baseUrl: string;
   endpoints: Endpoint[];
 };
@@ -27,8 +27,8 @@ type PostmanRequest = {
 type RecordValue = Record<string, unknown>;
 
 export type ImportedMockApi = {
-  apiType: "REST";
   name: string;
+  apiType: "HTTP";
   targetEndpointId: string | null;
   description: string;
   requestJson: string;
@@ -120,6 +120,7 @@ function postmanText(value: unknown) {
 }
 
 function matchesEndpointUrl(requestValue: string, service: Service, endpoint: Endpoint) {
+  if (!endpoint.url) return false;
   try {
     const requestUrl = new URL(requestValue);
     const endpointUrl = new URL(
@@ -148,6 +149,7 @@ function matchesEndpointUrl(requestValue: string, service: Service, endpoint: En
 }
 
 function routeParameters(requestValue: string, service: Service, endpoint: Endpoint) {
+  if (!endpoint.url) return {};
   const requestUrl = new URL(requestValue);
   const endpointUrl = new URL(
     endpoint.url,
@@ -327,17 +329,19 @@ function matchRequest(
   const urlMatches = endpoints.filter(({ service, endpoint }) =>
     matchesEndpointUrl(url, service, endpoint),
   );
+  const restMatches = urlMatches.filter(
+    ({ service, endpoint }) => (service.apiType ?? "REST") === "REST" && endpoint.method,
+  );
   if (request.unsupportedBody)
     return { warning: `Skipped "${request.name}": request body is not JSON.` };
-  const restMatches = urlMatches.filter(({ service }) => service.apiType === "REST");
   const matched = restMatches.find(
-    ({ endpoint }) => endpoint.method.toUpperCase() === request.method,
+    ({ endpoint }) => endpoint.method?.toUpperCase() === request.method,
   );
   const selected = matched ?? restMatches[0];
   const pathParameters = selected ? routeParameters(url, selected.service, selected.endpoint) : {};
   const draft: ImportedMockApi = {
-    apiType: "REST",
     name: request.name,
+    apiType: "HTTP",
     targetEndpointId: matched?.endpoint.id ?? null,
     description: "",
     requestJson: request.requestJson,
@@ -361,7 +365,7 @@ function matchRequest(
   if (!matched) {
     let reason = `HTTP method ${request.method} did not match the endpoint`;
     if (!urlMatches.length) reason = "URL did not match a registered REST endpoint";
-    else if (!restMatches.length) reason = "matching endpoint belongs to a GraphQL service";
+    else if (!restMatches.length) reason = "matching endpoint is not REST";
     warnings.push(`${reason}.`);
   }
   return {

@@ -55,9 +55,14 @@ function validateImportFields(input: Record<string, unknown>) {
 
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
-  const apiType = input.apiType === undefined ? "REST" : input.apiType;
-  if (apiType !== "REST" && apiType !== "GRAPHQL")
+  const requestedApiType = input.apiType === undefined ? "HTTP" : input.apiType;
+  if (
+    typeof requestedApiType !== "string" ||
+    !["REST", "HTTP", "GRAPHQL", "GRPC"].includes(requestedApiType)
+  )
     throw createError({ statusCode: 400, statusMessage: "Unsupported mock API type" });
+  // GraphQL requests are transported as HTTP POST requests to the router endpoint.
+  const apiType = requestedApiType === "GRPC" ? "GRPC" : "HTTP";
   const targetEndpointId = input.targetEndpointId ?? null;
   if (targetEndpointId !== null && (typeof targetEndpointId !== "string" || !targetEndpointId))
     throw createError({ statusCode: 400, statusMessage: "Service endpoint is invalid" });

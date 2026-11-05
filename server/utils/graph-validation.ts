@@ -5,16 +5,21 @@ export type EndpointInput = {
   id?: string;
   codeKey?: string;
   name: string;
-  method: string;
-  url: string;
+  method?: string | null;
+  url?: string | null;
+  rpcMethod?: string | null;
 };
 
 export type ServiceInput = {
   codeKey?: string;
   name: string;
-  apiType: "REST" | "GRAPHQL";
+  apiType: "REST" | "GRPC";
   framework: string;
   baseUrl: string;
+  grpcTls: boolean;
+  protoContent?: string | null;
+  protoFileName?: string | null;
+  clearProto?: boolean;
   healthCheckUrl: string | null;
   healthCheckHeaderTemplateId: string | null;
   healthCheckCustomHeaders: Array<{ name: string; value: string }>;
@@ -77,27 +82,47 @@ function endpointPath(value: unknown): string {
   return text;
 }
 
-function endpoint(value: unknown): EndpointInput {
+function endpoint(value: unknown, apiType: "REST" | "GRPC"): EndpointInput {
   const input = record(value, "Endpoint");
+  const common = {
+    id: typeof input.id === "string" ? input.id : undefined,
+    codeKey: optionalKey(input.codeKey, "Endpoint key"),
+    name: requiredText(input.name, "Endpoint name"),
+  };
+  if (apiType === "GRPC")
+    return {
+      ...common,
+      method: null,
+      url: null,
+      rpcMethod: requiredText(input.rpcMethod, "RPC method", 512),
+    };
   const method = requiredText(input.method, "Endpoint method", 10).toUpperCase();
   if (!methods.has(method))
     throw createError({ statusCode: 400, statusMessage: "Unsupported REST method" });
   return {
-    id: typeof input.id === "string" ? input.id : undefined,
-    codeKey: optionalKey(input.codeKey, "Endpoint key"),
-    name: requiredText(input.name, "Endpoint name"),
+    ...common,
     method,
     url: endpointPath(input.url),
+    rpcMethod: null,
   };
 }
 
 export function serviceInput(value: unknown): ServiceInput {
   const input = record(value, "Service");
-  const apiType = input.apiType === undefined ? "REST" : input.apiType;
-  if (apiType !== "REST" && apiType !== "GRAPHQL")
-    throw createError({ statusCode: 400, statusMessage: "Unsupported service API type" });
   if (!Array.isArray(input.endpoints))
     throw createError({ statusCode: 400, statusMessage: "Endpoints must be an array" });
+  if (input.apiType !== undefined && input.apiType !== "REST" && input.apiType !== "GRPC")
+    throw createError({ statusCode: 400, statusMessage: "Service API type must be REST or gRPC" });
+  const apiType = input.apiType === "GRPC" ? "GRPC" : "REST";
+  const baseUrl =
+    apiType === "REST"
+      ? httpUrl(input.baseUrl, "Base URL")
+      : requiredText(input.baseUrl, "gRPC target", 2048);
+  if (apiType === "GRPC" && !/^(?:\[[^\]]+\]|[^:/?#\s]+):\d{1,5}$/.test(baseUrl))
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Target address must use host:port format",
+    });
   let healthCheckUrl: string | null = null;
   if (input.healthCheckUrl != null && input.healthCheckUrl !== "") {
     const value = requiredText(input.healthCheckUrl, "Health-check URL", 2048);
@@ -126,25 +151,26 @@ export function serviceInput(value: unknown): ServiceInput {
       statusCode: 400,
       statusMessage: "Health-check header template is invalid",
     });
-  const endpoints = input.endpoints.map(endpoint);
-  if (apiType === "GRAPHQL" && endpoints.length !== 1)
-    throw createError({
-      statusCode: 400,
-      statusMessage: "Exactly one GraphQL endpoint is required",
-    });
-  if (apiType === "GRAPHQL" && endpoints[0]?.method !== "POST")
-    throw createError({ statusCode: 400, statusMessage: "GraphQL endpoint method must be POST" });
   return {
     codeKey: optionalKey(input.codeKey, "Service key"),
     name: requiredText(input.name, "Service name"),
     apiType,
     framework: requiredText(input.framework, "Framework", 100),
-    baseUrl: httpUrl(input.baseUrl, "Base URL"),
+    baseUrl,
+    grpcTls: Boolean(input.grpcTls),
+    protoContent:
+      typeof input.protoContent === "string"
+        ? input.protoContent
+        : input.protoContent === null
+          ? null
+          : undefined,
+    protoFileName: typeof input.protoFileName === "string" ? input.protoFileName : null,
+    clearProto: input.clearProto === true,
     healthCheckUrl,
     healthCheckHeaderTemplateId: typeof templateId === "string" && templateId ? templateId : null,
     healthCheckCustomHeaders: healthCheckCustomHeaders as Array<{ name: string; value: string }>,
     active: input.active === undefined ? true : Boolean(input.active),
-    endpoints,
+    endpoints: input.endpoints.map((value) => endpoint(value, apiType)),
   };
 }
 

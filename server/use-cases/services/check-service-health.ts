@@ -28,11 +28,11 @@ export function createCheckServiceHealthUseCase(dependencies: {
     return Promise.all(
       services.map(async (service) => {
         const framework = service.framework.toLowerCase();
-        const custom = framework === "other";
-        const path = custom ? service.healthCheckUrl : healthPath(framework);
+        const customUrl = service.healthCheckUrl?.trim();
+        const path = customUrl || healthPath(framework);
         if (!path) return { id: service.id, online: false };
         try {
-          const headers = custom
+          const headers = customUrl
             ? resolveHeaderRows(
                 service.headerTemplateHeaders ?? [],
                 service.healthCheckCustomHeaders ?? [],

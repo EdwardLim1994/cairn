@@ -1,8 +1,9 @@
 export type ServiceEndpointDraft = {
   id?: string;
   name: string;
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  url: string;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  url?: string;
+  rpcMethod?: string;
 };
 
 export type OpenApiImportResult = {
@@ -74,7 +75,9 @@ export async function parseOpenApiEndpoints(
   }
 
   const knownKeys = new Set(
-    existingEndpoints.map(({ method, url }) => `${method.toUpperCase()} ${normalizePath(url)}`),
+    existingEndpoints.flatMap(({ method, url }) =>
+      method && url ? [`${method.toUpperCase()} ${normalizePath(url)}`] : [],
+    ),
   );
   const endpoints: ServiceEndpointDraft[] = [];
   const warnings: string[] = [];

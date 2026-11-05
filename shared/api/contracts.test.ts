@@ -32,9 +32,10 @@ const validService = {
   codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
-  apiType: "REST",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  grpcTls: false,
   healthCheckUrl: null,
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
@@ -47,7 +48,6 @@ const validMockApi = {
   id: "mock-1",
   projectId: "project-1",
   name: "List orders",
-  apiType: "REST",
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],
@@ -325,6 +325,7 @@ describe("shared API contracts", () => {
             apiType: "REST",
             framework: "Spring Boot",
             baseUrl: "http://localhost:8080",
+            grpcTls: false,
             healthCheckUrl: null,
             healthCheckHeaderTemplateId: null,
             healthCheckCustomHeaders: [],
@@ -345,10 +346,19 @@ describe("shared API contracts", () => {
   it("covers service create, list, and health response contracts", () => {
     expect(
       serviceCreateRequestSchema.safeParse({
+        apiType: "GRPC",
+        name: "Orders",
+        framework: "Other",
+        baseUrl: "localhost:50051",
+        endpoints: [{ name: "Get order", rpcMethod: "/orders.v1.Orders/Get" }],
+      }).success,
+    ).toBe(true);
+    expect(
+      serviceCreateRequestSchema.safeParse({
         name: "Orders",
         framework: "Spring Boot",
         baseUrl: "http://localhost:8080",
-        endpoints: [{ name: "List orders", apiType: "REST", method: "GET", url: "/orders" }],
+        endpoints: [{ name: "List orders", method: "GET", url: "/orders" }],
       }).success,
     ).toBe(true);
     expect(
@@ -367,6 +377,7 @@ describe("shared API contracts", () => {
       apiType: "REST",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8080",
+      grpcTls: false,
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],

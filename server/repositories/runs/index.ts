@@ -17,8 +17,8 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
   const [target] = await getDb()
     .select({
       mockApiId: mockApis.id,
-      active: mockApis.active,
       apiType: mockApis.apiType,
+      active: mockApis.active,
       targetEndpointId: mockApis.targetEndpointId,
       headerTemplateId: mockApis.headerTemplateId,
       authorizationTemplateId: mockApis.authorizationTemplateId,
@@ -31,12 +31,14 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
       endpointId: serviceEndpoints.id,
       method: serviceEndpoints.method,
       endpointUrl: serviceEndpoints.url,
-      targetApiType: services.apiType,
+      rpcMethod: serviceEndpoints.rpcMethod,
       url: serviceEndpoints.url,
       requestJson: mockApis.requestJson,
       pathParameters: mockApis.pathParameters,
       mockApiName: mockApis.name,
       baseUrl: services.baseUrl,
+      grpcTls: services.grpcTls,
+      protoStorageKey: services.protoStorageKey,
       serviceName: services.name,
     })
     .from(mockApis)
@@ -115,6 +117,8 @@ export async function finishRun(
   result: {
     status: "completed" | "failed";
     responseStatus?: number | null;
+    grpcStatus?: number | null;
+    grpcStatusName?: string | null;
     responseHeaders?: Record<string, string> | null;
     responseBody?: string | null;
     error: string | null;
@@ -188,6 +192,8 @@ export async function listMockApiCallHistory(projectId: string) {
     ...history,
     triggeredAt: history.triggeredAt.toISOString(),
     responseStatus: run.responseStatus,
+    grpcStatus: run.grpcStatus,
+    grpcStatusName: run.grpcStatusName,
     responseHeaders: run.responseHeaders,
     responseBody: run.responseBody,
     error: run.error,

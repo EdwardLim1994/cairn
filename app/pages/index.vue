@@ -78,6 +78,10 @@ const serviceDraft = ref<ServiceDraft>({
   apiType: "REST",
   framework: "",
   baseUrl: "http://localhost:3000",
+  grpcTls: false,
+  protoContent: null,
+  protoFileName: null,
+  clearProto: false,
   active: true,
   endpoints: [{ name: "", method: "GET", url: "/" }],
 });
@@ -357,9 +361,9 @@ async function openMockPanel(focusMockApiId?: string) {
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
 }
-function addMockDraft() {
+function addMockDraft(apiType: "HTTP" | "GRPC") {
   registeredMockApisOpen.value = true;
-  mockApiViewModel.addMockDraft();
+  mockApiViewModel.addMockDraft(apiType);
 }
 function endpointPathParameterNames(entry: MockApi) {
   return mockApiViewModel.endpointPathParameterNames(entry);
@@ -464,7 +468,9 @@ function adjustLogsPanelHeight(delta: number) {
 
 const servicesForSelect = computed(() => graphViewModel.serviceEndpointOptions());
 const endpointDetails = computed(() =>
-  services.value.flatMap((service) => service.endpoints.map(({ id, url }) => ({ id, url }))),
+  services.value.flatMap((service) =>
+    service.endpoints.map(({ id, url }) => ({ id, url, apiType: service.apiType })),
+  ),
 );
 
 function openGraphAsCode() {
@@ -602,6 +608,8 @@ onUnmounted(() => {
       @add-outbound-call="addOutboundCall"
       @remove-outbound-call="removeOutboundCall"
       @import-open-api="serviceViewModel.importOpenApiFile"
+      @import-proto="serviceViewModel.importProtoFile"
+      @remove-proto="serviceViewModel.removeProtoFile"
       @save="saveService"
       @discard="closeSettings"
       @remove-service="handleServiceDelete"

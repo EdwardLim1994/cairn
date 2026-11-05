@@ -22,6 +22,7 @@ export function serializeGraphCode(
         apiType: service.apiType,
         framework: service.framework,
         baseUrl: service.baseUrl,
+        ...(service.apiType === "GRPC" ? { grpcTls: service.grpcTls } : {}),
         ...(service.healthCheckUrl
           ? {
               healthCheck: {
@@ -35,6 +36,7 @@ export function serializeGraphCode(
           name: endpoint.name,
           method: endpoint.method,
           url: endpoint.url,
+          rpcMethod: endpoint.rpcMethod,
           outboundConnections: edges
             .filter((edge) => edge.sourceEndpointId === endpoint.id)
             .flatMap((edge) => {

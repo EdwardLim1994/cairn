@@ -33,6 +33,21 @@ const nuxtUiStubs = {
       return () => h("button", { ...attrs, type: props.type ?? "button" }, slots.default?.());
     },
   }),
+  UIcon: defineComponent({ setup: () => () => h("span") }),
+  UCheckbox: defineComponent({
+    props: { modelValue: Boolean },
+    emits: ["update:modelValue"],
+    setup(props, { emit, attrs }) {
+      return () =>
+        h("input", {
+          ...attrs,
+          type: "checkbox",
+          checked: props.modelValue,
+          onChange: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).checked),
+        });
+    },
+  }),
   UInput: defineComponent({
     inheritAttrs: false,
     props: { modelValue: String, placeholder: String, required: Boolean, ui: Object },
@@ -90,6 +105,8 @@ const service = {
   apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  grpcTls: false,
+  protoFileName: null,
   healthCheckUrl: "/ready",
   healthCheckHeaderTemplateId: "template-1",
   healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
@@ -106,6 +123,7 @@ const service = {
       name: "List orders",
       method: "GET",
       url: "/orders",
+      rpcMethod: null,
       createdAt: "2025-01-01T00:00:00.000Z",
     },
   ],
@@ -116,8 +134,21 @@ describe("service view model", () => {
 
   function setup() {
     const calls: { url: string; options: ApiTransportOptions }[] = [];
+    let protoParseResponse: {
+      methods: Array<{ name: string; rpcMethod: string }>;
+      streamingMethods: string[];
+      unresolvedImports: string[];
+    } = {
+      methods: [
+        { name: "demo.Echo.Get", rpcMethod: "/demo.Echo/Get" },
+        { name: "demo.Echo.Create", rpcMethod: "/demo.Echo/Create" },
+      ],
+      streamingMethods: ["/demo.Echo/Stream"],
+      unresolvedImports: [],
+    };
     const apiClient = createApiClient(async (url, options) => {
       calls.push({ url, options });
+      if (url === "/api/services/proto-parse") return protoParseResponse;
       return { id: "service-1" };
     });
     const draft = ref<ServiceDraft>({
@@ -125,6 +156,10 @@ describe("service view model", () => {
       apiType: "REST",
       framework: "Spring Boot",
       baseUrl: "http://localhost:8080",
+      grpcTls: false,
+      protoContent: null,
+      protoFileName: null,
+      clearProto: false,
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],
@@ -155,7 +190,16 @@ describe("service view model", () => {
       },
       onImportWarnings: (warnings: string[]) => warningBatches.push(warnings),
     };
-    return { vm: useServiceViewModel(options), ...options, calls, events, errors, warningBatches };
+    return {
+      vm: useServiceViewModel(options),
+      ...options,
+      calls,
+      events,
+      errors,
+      warningBatches,
+      setProtoParseResponse: (response: typeof protoParseResponse) =>
+        (protoParseResponse = response),
+    };
   }
 
   it("creates default drafts, starts add flow, edits services, and resolves endpoint owners", () => {
@@ -165,6 +209,10 @@ describe("service view model", () => {
       apiType: "REST",
       framework: "",
       baseUrl: "http://localhost:3000",
+      grpcTls: false,
+      protoContent: null,
+      protoFileName: null,
+      clearProto: false,
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],
@@ -195,6 +243,38 @@ describe("service view model", () => {
     context.vm.removeEndpoint(0);
     expect(context.draft.value.endpoints).toHaveLength(1);
     expect(context.draft.value.endpoints[0]?.url).toBe("/");
+  });
+
+  it("imports unary methods, skips duplicates and streaming methods, and preserves drafts on import errors", async () => {
+    const context = setup();
+    context.draft.value.apiType = "GRPC";
+    context.draft.value.baseUrl = "localhost:50051";
+    context.draft.value.endpoints = [
+      { id: "endpoint-1", name: "Existing", rpcMethod: "/demo.Echo/Get" },
+    ];
+    const file = new File(['syntax = "proto3";'], "service.proto");
+    await context.vm.importProtoFile(file);
+
+    expect(context.draft.value.endpoints).toEqual([
+      { id: "endpoint-1", name: "Existing", rpcMethod: "/demo.Echo/Get" },
+      { name: "demo.Echo.Create", rpcMethod: "/demo.Echo/Create" },
+    ]);
+    expect(context.draft.value.protoContent).toBe('syntax = "proto3";');
+    expect(context.warningBatches.at(-1)).toEqual([
+      "Skipped streaming method /demo.Echo/Stream.",
+      "Skipped duplicate /demo.Echo/Get: this endpoint is already registered.",
+    ]);
+
+    const before = context.draft.value.endpoints.map((endpoint) => ({ ...endpoint }));
+    context.setProtoParseResponse({
+      methods: [],
+      streamingMethods: [],
+      unresolvedImports: ["common.proto"],
+    });
+    await context.vm.importProtoFile(new File(['import "common.proto";'], "service.proto"));
+    expect(context.draft.value.endpoints).toEqual(before);
+    expect(context.draft.value.protoContent).toBe('syntax = "proto3";');
+    expect(context.errors.at(-1)).toContain("common.proto");
   });
 
   it("saves new and existing services through the API client and refreshes the graph", async () => {

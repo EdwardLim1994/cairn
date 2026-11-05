@@ -7,9 +7,13 @@ type ApiClient = ReturnType<typeof createApiClient>;
 type EndpointDraft = ServiceEndpointDraft & { requestJson?: unknown };
 export type ServiceDraft = {
   name: string;
-  apiType: "REST" | "GRAPHQL";
+  apiType: "REST" | "GRPC";
   framework: string;
   baseUrl: string;
+  grpcTls: boolean;
+  protoContent: string | null;
+  protoFileName: string | null;
+  clearProto: boolean;
   healthCheckUrl: string | null;
   healthCheckHeaderTemplateId: string | null;
   healthCheckCustomHeaders: Array<{ name: string; value: string }>;
@@ -40,6 +44,10 @@ function newServiceDraft(): ServiceDraft {
     apiType: "REST",
     framework: "",
     baseUrl: "http://localhost:3000",
+    grpcTls: false,
+    protoContent: null,
+    protoFileName: null,
+    clearProto: false,
     healthCheckUrl: null,
     healthCheckHeaderTemplateId: null,
     healthCheckCustomHeaders: [],
@@ -72,6 +80,10 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
       apiType: service.apiType,
       framework: options.frameworkLabel(service.framework),
       baseUrl: service.baseUrl,
+      grpcTls: service.grpcTls,
+      protoContent: null,
+      protoFileName: service.protoFileName,
+      clearProto: false,
       healthCheckUrl: service.healthCheckUrl,
       healthCheckHeaderTemplateId: service.healthCheckHeaderTemplateId,
       healthCheckCustomHeaders: service.healthCheckCustomHeaders.map((header) => ({ ...header })),
@@ -79,6 +91,8 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
       endpoints: service.endpoints.map((endpoint) => ({
         ...endpoint,
         method: endpoint.method as EndpointDraft["method"],
+        url: endpoint.url ?? undefined,
+        rpcMethod: endpoint.rpcMethod ?? undefined,
       })),
     };
     options.dialogOpen.value = true;
@@ -92,7 +106,11 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   function addEndpoint() {
-    options.draft.value.endpoints.push({ name: "", method: "GET", url: "/" });
+    options.draft.value.endpoints.push(
+      options.draft.value.apiType === "GRPC"
+        ? { name: "", rpcMethod: "" }
+        : { name: "", method: "GET", url: "/" },
+    );
   }
 
   function removeEndpoint(index: number) {
@@ -100,6 +118,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   async function importOpenApiFile(file: File) {
+    if (options.draft.value.apiType !== "REST") return;
     try {
       const result = await parseOpenApiEndpoints(await file.text(), options.draft.value.endpoints);
       const starter = initialNewServiceEndpoint;
@@ -122,6 +141,68 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
       options.onError(cause instanceof Error ? cause.message : "Could not import OpenAPI document");
       return undefined;
     }
+  }
+
+  async function importProtoFile(file: File) {
+    if (options.draft.value.apiType !== "GRPC") return;
+    try {
+      const content = await file.text();
+      const result = await options.apiClient.parseProto(content);
+      if (result.unresolvedImports.length) {
+        options.onError(`Proto imports are not supported: ${result.unresolvedImports.join(", ")}`);
+        return undefined;
+      }
+      if (!result.methods.length) {
+        options.onError("Proto file contains no unary methods");
+        options.onImportWarnings(
+          result.streamingMethods.map((method) => `Skipped streaming method ${method}.`),
+        );
+        return undefined;
+      }
+      const existing = new Set(
+        options.draft.value.endpoints.flatMap((endpoint) =>
+          endpoint.rpcMethod ? [endpoint.rpcMethod] : [],
+        ),
+      );
+      const warnings = result.streamingMethods.map(
+        (method) => `Skipped streaming method ${method}.`,
+      );
+      const imported = result.methods.filter((method) => {
+        if (!existing.has(method.rpcMethod)) return true;
+        warnings.push(
+          `Skipped duplicate ${method.rpcMethod}: this endpoint is already registered.`,
+        );
+        return false;
+      });
+      const starter = initialNewServiceEndpoint;
+      if (
+        imported.length &&
+        starter &&
+        options.draft.value.endpoints.includes(starter) &&
+        !starter.id &&
+        !starter.name.trim() &&
+        !starter.rpcMethod
+      ) {
+        options.draft.value.endpoints.splice(options.draft.value.endpoints.indexOf(starter), 1);
+      }
+      options.draft.value.endpoints.push(...imported);
+      options.draft.value.protoContent = content;
+      options.draft.value.protoFileName = file.name;
+      options.draft.value.clearProto = false;
+      initialNewServiceEndpoint = null;
+      options.onError("");
+      options.onImportWarnings(warnings);
+      return result;
+    } catch (cause) {
+      options.onError(cause instanceof Error ? cause.message : "Could not import proto file");
+      return undefined;
+    }
+  }
+
+  function removeProtoFile() {
+    options.draft.value.protoContent = null;
+    options.draft.value.protoFileName = null;
+    options.draft.value.clearProto = Boolean(options.editingServiceId.value);
   }
 
   async function saveService() {
@@ -171,6 +252,8 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
     addEndpoint,
     removeEndpoint,
     importOpenApiFile,
+    importProtoFile,
+    removeProtoFile,
     saveService,
     deleteService,
   };

@@ -14,13 +14,13 @@ describe("graph input validation", () => {
         name: " Orders ",
         framework: "Spring Boot",
         baseUrl: "http://localhost:8081",
-        endpoints: [{ name: "Get orders", apiType: "REST", method: "get", url: "/orders/{id}" }],
+        endpoints: [{ name: "Get orders", method: "get", url: "/orders/{id}" }],
       }),
     ).toMatchObject({
       name: "Orders",
       apiType: "REST",
       active: true,
-      endpoints: [{ name: "Get orders", method: "GET", url: "/orders/{id}" }],
+      endpoints: [{ name: "Get orders", method: "GET", url: "/orders/{id}", rpcMethod: null }],
     });
   });
 
@@ -42,7 +42,7 @@ describe("graph input validation", () => {
         name: "x",
         framework: "Spring Boot",
         baseUrl: "http://localhost",
-        endpoints: [{ name: "x", apiType: "REST", method: "TRACE", url: "/" }],
+        endpoints: [{ name: "x", method: "TRACE", url: "/" }],
       }),
     ).toThrow("Unsupported REST method");
     expect(() =>
@@ -51,38 +51,39 @@ describe("graph input validation", () => {
         framework: "Spring Boot",
         baseUrl: "http://localhost",
         apiType: "GRAPHQL",
-        endpoints: [{ name: "GraphQL", method: "GET", url: "/graphql" }],
+        endpoints: [],
       }),
-    ).toThrow("GraphQL endpoint method must be POST");
+    ).toThrow("Service API type must be REST or gRPC");
+  });
+
+  it("validates gRPC targets and fully qualified method paths", () => {
+    expect(
+      serviceInput({
+        name: "Orders",
+        apiType: "GRPC",
+        framework: "Other",
+        baseUrl: "localhost:50051",
+        endpoints: [{ name: "Get order", rpcMethod: "/orders.v1.Orders/Get" }],
+      }),
+    ).toMatchObject({
+      apiType: "GRPC",
+      baseUrl: "localhost:50051",
+      endpoints: [{ method: null, url: null, rpcMethod: "/orders.v1.Orders/Get" }],
+    });
+    expect(() =>
+      serviceInput({
+        name: "Orders",
+        apiType: "GRPC",
+        framework: "Other",
+        baseUrl: "localhost",
+        endpoints: [],
+      }),
+    ).toThrow("Target address must use host:port format");
   });
 
   it("validates finite numbers and falls back for omitted values", () => {
     expect(finiteNumber(undefined, "x", 12)).toBe(12);
     expect(finiteNumber("2.5", "x", 0)).toBe(2.5);
     expect(() => finiteNumber("NaN", "x", 0)).toThrow("x must be a finite number");
-  });
-
-  it("requires exactly one POST endpoint for GraphQL services", () => {
-    const base = {
-      name: "GraphQL",
-      apiType: "GRAPHQL",
-      framework: "Other",
-      baseUrl: "http://localhost:8080",
-    };
-    expect(
-      serviceInput({ ...base, endpoints: [{ name: "GraphQL", method: "POST", url: "/graphql" }] }),
-    ).toMatchObject({ apiType: "GRAPHQL", endpoints: [{ method: "POST" }] });
-    expect(() => serviceInput({ ...base, endpoints: [] })).toThrow(
-      "Exactly one GraphQL endpoint is required",
-    );
-    expect(() =>
-      serviceInput({
-        ...base,
-        endpoints: [
-          { name: "GraphQL", method: "POST", url: "/graphql" },
-          { name: "Extra", method: "POST", url: "/extra" },
-        ],
-      }),
-    ).toThrow("Exactly one GraphQL endpoint is required");
   });
 });

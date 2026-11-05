@@ -149,7 +149,11 @@ function toggleEntry(id: string) {
               </h4>
               <p class="mb-2 text-xs text-[var(--muted)]">
                 {{
-                  entry.responseStatus === null ? "No HTTP status" : `HTTP ${entry.responseStatus}`
+                  entry.grpcStatusName
+                    ? `gRPC ${entry.grpcStatusName}`
+                    : entry.responseStatus === null
+                      ? "No HTTP status"
+                      : `HTTP ${entry.responseStatus}`
                 }}
               </p>
               <pre

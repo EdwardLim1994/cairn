@@ -4,9 +4,10 @@ import { mergeHeaderRows, resolveHeaderRows, type HeaderRow } from "./headers";
 
 export type ReadinessReason = { code: string; message: string };
 export type MockApiReadinessInput = {
-  apiType?: "REST" | "GRAPHQL";
-  targetApiType?: "REST" | "GRAPHQL" | null;
+  apiType?: "REST" | "HTTP" | "GRAPHQL" | "GRPC";
+  targetApiType?: "REST" | "GRAPHQL" | "GRPC" | null;
   targetEndpointId: string | null;
+  endpointApiType?: "REST" | "GRAPHQL" | "GRPC" | null;
   headerTemplateId?: string | null;
   headerTemplateExists?: boolean;
   authorizationTemplateId?: string | null;
@@ -126,11 +127,20 @@ export function evaluateMockApiReadiness(
   variables: Map<string, string>,
 ) {
   const reasons: ReadinessReason[] = [];
-  if (!endpointUrl) {
+  const expectedEndpointApiType =
+    api.apiType === "GRPC" ? "GRPC" : api.apiType === "GRAPHQL" ? "GRAPHQL" : "REST";
+  if (!api.targetEndpointId) {
     reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
-  } else {
+  } else if (api.endpointApiType && api.endpointApiType !== expectedEndpointApiType) {
+    reasons.push({
+      code: "endpoint-type-mismatch",
+      message: "Mock API type must match the selected service endpoint",
+    });
+  } else if (api.apiType !== "GRPC" && !endpointUrl) {
+    reasons.push({ code: "endpoint-missing", message: "Select a REST endpoint" });
+  } else if (api.apiType !== "GRPC" && endpointUrl) {
     addPathParameterReasons(api, endpointUrl, variables, reasons);
-    if (api.apiType && api.targetApiType && api.apiType !== api.targetApiType)
+    if (api.apiType && api.targetApiType && expectedEndpointApiType !== api.targetApiType)
       reasons.push({
         code: "api-type-mismatch",
         message: "Mock API type must match service API type",

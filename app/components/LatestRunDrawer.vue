@@ -23,7 +23,7 @@ function prettyResponse(value: string | null) {
       <div class="flex items-center gap-2.5">
         <strong class="text-xs">Latest run</strong>
         <span :class="`app__run-state--${result.status}`">
-          {{ result.status }} | {{ result.responseStatus ?? "-" }}
+          {{ result.status }} | {{ result.grpcStatusName ?? result.responseStatus ?? "-" }}
         </span>
       </div>
       <UButton

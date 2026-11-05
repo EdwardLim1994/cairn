@@ -11,7 +11,10 @@ import {
   serviceEndpoints,
   services,
 } from "../../db/schema";
-import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
+import {
+  evaluateMockApiReadiness,
+  type MockApiReadinessInput,
+} from "#shared/utils/mock-api-readiness";
 import { deactivateInvalidMockApis } from "./reconcile-readiness";
 
 type Database = MySql2Database<typeof schema>;
@@ -87,7 +90,7 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
         .select({
           api: mockApis,
           endpointUrl: serviceEndpoints.url,
-          targetApiType: services.apiType,
+          endpointApiType: services.apiType,
           templateId: headerTemplates.id,
           templateHeaders: headerTemplates.headers,
           authorizationTemplateType: authorizationTemplates.type,
@@ -130,7 +133,7 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
         async ({
           api,
           endpointUrl,
-          targetApiType,
+          endpointApiType,
           templateId,
           templateHeaders,
           authorizationTemplateType,
@@ -141,10 +144,10 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
             authorizationTemplateType && authorizationTemplateConfig
               ? { type: authorizationTemplateType, config: authorizationTemplateConfig }
               : null;
-          const readinessInput = {
+          const readinessInput: MockApiReadinessInput = {
             targetEndpointId: api.targetEndpointId,
-            apiType: api.apiType as "REST" | "GRAPHQL",
-            targetApiType: targetApiType as "REST" | "GRAPHQL" | null,
+            apiType: api.apiType as MockApiReadinessInput["apiType"],
+            endpointApiType: endpointApiType as MockApiReadinessInput["endpointApiType"],
             headerTemplateId: api.headerTemplateId,
             headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
             authorizationTemplateId: api.authorizationTemplateId,
@@ -186,7 +189,11 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
 
 export async function findMockApiEndpoint(projectId: string, endpointId: string) {
   const [endpoint] = await getDb()
-    .select({ id: serviceEndpoints.id, url: serviceEndpoints.url, apiType: services.apiType })
+    .select({
+      id: serviceEndpoints.id,
+      url: serviceEndpoints.url,
+      serviceApiType: services.apiType,
+    })
     .from(serviceEndpoints)
     .innerJoin(services, eq(serviceEndpoints.serviceId, services.id))
     .where(and(eq(serviceEndpoints.id, endpointId), eq(serviceEndpoints.projectId, projectId)));

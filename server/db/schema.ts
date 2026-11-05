@@ -39,6 +39,9 @@ export const services = mysqlTable(
     apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
     framework: varchar("framework", { length: 100 }).notNull(),
     baseUrl: text("base_url").notNull(),
+    grpcTls: boolean("grpc_tls").notNull().default(false),
+    protoStorageKey: varchar("proto_storage_key", { length: 512 }),
+    protoFileName: varchar("proto_file_name", { length: 255 }),
     healthCheckUrl: text("health_check_url"),
     healthCheckHeaderTemplateId: varchar("health_check_header_template_id", {
       length: 36,
@@ -70,8 +73,9 @@ export const serviceEndpoints = mysqlTable(
       .notNull()
       .$defaultFn(() => randomUUID()),
     name: varchar("name", { length: 255 }).notNull(),
-    method: varchar("method", { length: 10 }).notNull(),
-    url: text("url").notNull(),
+    method: varchar("method", { length: 10 }),
+    url: text("url"),
+    rpcMethod: varchar("rpc_method", { length: 512 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -256,6 +260,8 @@ export const runs = mysqlTable(
     traceId: varchar("trace_id", { length: 32 }).notNull(),
     status: mysqlEnum("status", ["running", "completed", "failed"]).notNull().default("running"),
     responseStatus: int("response_status"),
+    grpcStatus: int("grpc_status"),
+    grpcStatusName: varchar("grpc_status_name", { length: 64 }),
     responseHeaders: json("response_headers").$type<Record<string, string>>(),
     responseBody: text("response_body"),
     error: text("error"),

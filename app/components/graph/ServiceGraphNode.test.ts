@@ -82,13 +82,7 @@ describe("ServiceGraphNode", () => {
 
     expect(
       wrapper.findAll("[data-handle]").map((handle) => handle.attributes("data-handle")),
-    ).toEqual([
-      "service-out",
-      "in:endpoint-1",
-      "out:endpoint-1",
-      "in:endpoint-2",
-      "out:endpoint-2",
-    ]);
-    expect(wrapper.findAll('[data-connectable="false"]')).toHaveLength(5);
+    ).toEqual(["in:endpoint-1", "out:endpoint-1", "in:endpoint-2", "out:endpoint-2"]);
+    expect(wrapper.findAll('[data-connectable="false"]')).toHaveLength(4);
   });
 });

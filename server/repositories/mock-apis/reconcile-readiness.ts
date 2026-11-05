@@ -9,7 +9,10 @@ import {
   serviceEndpoints,
   services,
 } from "../../db/schema";
-import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
+import {
+  evaluateMockApiReadiness,
+  type MockApiReadinessInput,
+} from "#shared/utils/mock-api-readiness";
 
 type Database = MySql2Database<typeof schema>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -21,7 +24,7 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
       .select({
         api: mockApis,
         endpointUrl: serviceEndpoints.url,
-        targetApiType: services.apiType,
+        endpointApiType: services.apiType,
         templateHeaders: headerTemplates.headers,
         templateId: headerTemplates.id,
         authorizationTemplateType: authorizationTemplates.type,
@@ -62,7 +65,7 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
     ({
       api,
       endpointUrl,
-      targetApiType,
+      endpointApiType,
       templateHeaders,
       templateId,
       authorizationTemplateType,
@@ -76,8 +79,8 @@ export async function deactivateInvalidMockApis(tx: Transaction, projectId: stri
       const readiness = evaluateMockApiReadiness(
         {
           ...api,
-          apiType: api.apiType as "REST" | "GRAPHQL",
-          targetApiType: targetApiType as "REST" | "GRAPHQL" | null,
+          apiType: api.apiType as MockApiReadinessInput["apiType"],
+          endpointApiType: endpointApiType as MockApiReadinessInput["endpointApiType"],
           headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
           authorizationTemplateExists:
             !api.authorizationTemplateId || Boolean(authorizationTemplateExists),

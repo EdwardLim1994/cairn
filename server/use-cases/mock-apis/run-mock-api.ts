@@ -8,15 +8,17 @@ import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 import { resolveHeaderRows } from "../../utils/headers";
 import { resolveStaticAuthorizationHeaders } from "../../utils/authorization";
 import { getOAuthAccessToken } from "../../utils/oauth-client";
+import { invokeUnaryGrpc } from "../../utils/grpc-client";
+import { getProtoFile } from "../../utils/proto-storage";
 
 type ExecutionTarget = {
+  apiType?: "HTTP" | "GRPC";
   mockApiId: string;
   endpointId: string | null;
-  apiType: "REST" | "GRAPHQL";
-  targetApiType: "REST" | "GRAPHQL" | null;
   targetEndpointId: string | null;
   endpointUrl: string | null;
   method: string | null;
+  rpcMethod: string | null;
   url: string | null;
   requestJson: unknown;
   pathParameters: Record<string, string> | null;
@@ -34,6 +36,8 @@ type ExecutionTarget = {
   mockApiName: string;
   baseUrl: string | null;
   serviceName: string | null;
+  grpcTls: boolean;
+  protoStorageKey: string | null;
 };
 
 async function authorizationHeader(
@@ -79,10 +83,9 @@ function createFetchOptions(
   requestBody: unknown,
   headers: Headers,
   signal: AbortSignal,
-  forceJson = false,
 ): RequestInit {
   if (method === "GET") return { method, headers, signal };
-  if (forceJson || !headers.has("content-type")) headers.set("content-type", "application/json");
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
   return {
     method,
     headers,
@@ -110,6 +113,8 @@ export function createRunMockApiUseCase(dependencies: {
     result: {
       status: "completed" | "failed";
       responseStatus?: number | null;
+      grpcStatus?: number | null;
+      grpcStatusName?: string | null;
       responseHeaders?: Record<string, string> | null;
       responseBody?: string | null;
       error: string | null;
@@ -137,6 +142,7 @@ export function createRunMockApiUseCase(dependencies: {
     const target = await dependencies.getTarget(projectId, id);
     if (!target) throw new MockApiNotFoundError("Mock API not found");
     if (!target.active) throw new MockApiNotReadyError("Mock API is inactive");
+    const apiType = target.apiType ?? "HTTP";
 
     const variables = new Map(
       (await dependencies.getVariables(projectId)).map(({ name, value }) => [name, value]),
@@ -144,8 +150,6 @@ export function createRunMockApiUseCase(dependencies: {
     const readiness = evaluateMockApiReadiness(
       {
         targetEndpointId: target.targetEndpointId,
-        apiType: target.apiType,
-        targetApiType: target.targetApiType,
         headerTemplateId: target.headerTemplateId,
         headerTemplateExists: target.headerTemplateExists,
         authorizationTemplateId: target.authorizationTemplateId,
@@ -155,6 +159,7 @@ export function createRunMockApiUseCase(dependencies: {
         requestJson: target.requestJson,
         customHeaders: target.customHeaders,
         active: target.active,
+        apiType,
       },
       target.endpointUrl,
       target.headerTemplateHeaders ?? [],
@@ -162,7 +167,12 @@ export function createRunMockApiUseCase(dependencies: {
     );
     if (readiness.status !== "ready")
       throw new MockApiNotReadyError(readiness.reasons.map(({ message }) => message).join("; "));
-    if (!target.method || !target.url || !target.baseUrl || !target.serviceName)
+    if (
+      !target.baseUrl ||
+      !target.serviceName ||
+      (apiType === "HTTP" && (!target.method || !target.url)) ||
+      (apiType === "GRPC" && !target.rpcMethod)
+    )
       throw new MockApiNotReadyError("Selected service endpoint is unavailable");
 
     const runId = (dependencies.newRunId ?? randomUUID)();
@@ -171,9 +181,12 @@ export function createRunMockApiUseCase(dependencies: {
       spanId: randomBytes(8).toString("hex"),
     };
     const timeoutMs = dependencies.timeoutMs();
+    const grpcTarget = getOutboundUrl(`http://${target.baseUrl}`, `http://${target.baseUrl}`).host;
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    let targetUrl = getOutboundUrl(target.url, target.baseUrl).toString();
+    let targetUrl =
+      apiType === "GRPC" ? grpcTarget : getOutboundUrl(target.url!, target.baseUrl).toString();
+    const methodName = apiType === "GRPC" ? "GRPC" : target.method!;
     const logFailure = async (message: string, responseStatus: number | null) => {
       try {
         await dependencies.addFailureLog({
@@ -183,7 +196,7 @@ export function createRunMockApiUseCase(dependencies: {
           mockApiName: target.mockApiName,
           mockApiId: id,
           runId,
-          method: target.method!,
+          method: methodName,
           url: targetUrl,
           responseStatus,
           message,
@@ -194,10 +207,16 @@ export function createRunMockApiUseCase(dependencies: {
     };
 
     try {
-      const resolvedPath = resolveEndpointPath(target.url, target.pathParameters ?? {}, variables);
-      targetUrl = getOutboundUrl(resolvedPath, target.baseUrl).toString();
+      const resolvedPath =
+        apiType === "HTTP"
+          ? resolveEndpointPath(target.url!, target.pathParameters ?? {}, variables)
+          : target.rpcMethod!;
+      targetUrl =
+        apiType === "HTTP" ? getOutboundUrl(resolvedPath, target.baseUrl).toString() : grpcTarget;
       const requestBody =
-        target.method === "GET" ? null : resolveJsonVariables(target.requestJson, variables);
+        apiType === "HTTP" && target.method === "GET"
+          ? null
+          : resolveJsonVariables(target.requestJson, variables);
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
@@ -207,30 +226,55 @@ export function createRunMockApiUseCase(dependencies: {
         runId,
         traceId,
         target.mockApiName,
-        target.method,
+        methodName,
         targetUrl,
         requestBody,
       );
-      const authorization = await authorizationHeader(
-        target,
-        projectId,
-        variables,
-        dependencies.fetch,
-        timeoutMs,
-      );
+      const authorization =
+        apiType === "HTTP"
+          ? await authorizationHeader(target, projectId, variables, dependencies.fetch, timeoutMs)
+          : [];
       if (typeof authorization === "string") headers.set("Authorization", authorization);
       else for (const [name, value] of authorization) headers.set(name, value);
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       timeout = setTimeout(() => controller.abort(), timeoutMs);
+      if (apiType === "GRPC") {
+        if (!target.protoStorageKey)
+          throw new Error("Selected gRPC service has no stored proto file");
+        const proto = await getProtoFile(target.protoStorageKey);
+        if (!proto) throw new Error("Stored gRPC proto file is unavailable");
+        const response = await invokeUnaryGrpc({
+          proto,
+          rpcMethod: target.rpcMethod!,
+          target: grpcTarget,
+          tls: target.grpcTls,
+          request: requestBody,
+          traceparent: `00-${traceId}-${spanId}-01`,
+          timeoutMs,
+        });
+        const responseBody = JSON.stringify(response);
+        await dependencies.finishRun(runId, {
+          status: "completed",
+          responseBody,
+          grpcStatus: 0,
+          grpcStatusName: "OK",
+          error: null,
+        });
+        return {
+          id: runId,
+          traceId,
+          status: "completed",
+          responseStatus: null,
+          responseHeaders: null,
+          responseBody,
+          grpcStatus: 0,
+          grpcStatusName: "OK",
+          error: null,
+        };
+      }
       const response = await dependencies.fetch(
         targetUrl,
-        createFetchOptions(
-          target.method,
-          requestBody,
-          headers,
-          controller.signal,
-          target.apiType === "GRAPHQL",
-        ),
+        createFetchOptions(target.method!, requestBody, headers, controller.signal),
       );
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());
@@ -255,8 +299,25 @@ export function createRunMockApiUseCase(dependencies: {
       };
     } catch (cause) {
       const message = failureMessage(cause, controller.signal.aborted, timeoutMs);
-      await dependencies.finishRun(runId, { status: "failed", error: message });
-      await logFailure(message, null);
+      const grpcStatus =
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        typeof cause.code === "number"
+          ? cause.code
+          : null;
+      const grpcStatusName =
+        grpcStatus === null
+          ? null
+          : typeof cause === "object" && cause !== null && "code" in cause
+            ? String(cause.code)
+            : null;
+      await dependencies.finishRun(runId, {
+        status: "failed",
+        error: message,
+        ...(apiType === "GRPC" ? { grpcStatus, grpcStatusName } : {}),
+      });
+      await logFailure(message, grpcStatus);
       return {
         id: runId,
         traceId,
@@ -265,6 +326,7 @@ export function createRunMockApiUseCase(dependencies: {
         responseHeaders: null,
         responseBody: null,
         error: message,
+        ...(apiType === "GRPC" ? { grpcStatus, grpcStatusName } : {}),
       };
     } finally {
       if (timeout) clearTimeout(timeout);

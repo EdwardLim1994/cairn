@@ -63,7 +63,7 @@ export function useMockApiViewModel(options: {
             id,
             url,
             method,
-            apiType: service.apiType,
+            apiType: service.apiType ?? "REST",
             baseUrl: service.baseUrl,
           })),
         ),
@@ -72,11 +72,16 @@ export function useMockApiViewModel(options: {
     retryUnmatchedImports,
   );
   function endpointPathParameterNames(entry: MockApiDraft) {
+    if ((entry.apiType ?? "HTTP") !== "HTTP") return [];
     const endpoint = options
       .services()
-      .flatMap((service) => service.endpoints)
-      .find((item) => item.id === entry.targetEndpointId);
-    return endpoint
+      .find(
+        (service) =>
+          (service.apiType ?? "REST") === "REST" &&
+          service.endpoints.some((item) => item.id === entry.targetEndpointId),
+      )
+      ?.endpoints.find((item) => item.id === entry.targetEndpointId);
+    return endpoint?.url
       ? [
           ...(endpoint.url.split(/[?#]/, 1)[0] ?? endpoint.url).matchAll(
             /\{([A-Za-z_][\w-]*)(?::[^{}]+)?\}|:([A-Za-z_][\w-]*)/g,
@@ -105,16 +110,17 @@ export function useMockApiViewModel(options: {
     }
   }
 
-  function addMockDraft() {
+  function addMockDraft(apiType: MockApiDraft["apiType"] = "HTTP") {
+    const serviceApiType = apiType === "HTTP" ? "REST" : "GRPC";
     const endpointId = options
       .services()
-      .filter((service) => service.apiType === "REST")
+      .filter((service) => (service.apiType ?? "REST") === serviceApiType)
       .flatMap((service) => service.endpoints)
       .find((item) => item.id)?.id;
     const entry: MockApiDraft = {
       id: `draft-${crypto.randomUUID()}`,
       name: "",
-      apiType: "REST",
+      apiType,
       targetEndpointId: endpointId ?? null,
       description: "",
       requestJson: "{}",
@@ -122,7 +128,7 @@ export function useMockApiViewModel(options: {
       customHeaders: [],
       active: Boolean(endpointId),
     };
-    setMockEndpoint(entry);
+    if (apiType === "HTTP") setMockEndpoint(entry);
     options.store.addMockDraft(entry);
     return entry;
   }

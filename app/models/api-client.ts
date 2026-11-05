@@ -52,6 +52,8 @@ import {
   serviceIdRequestSchema,
   serviceListRequestSchema,
   serviceListResponseSchema,
+  protoParseRequestSchema,
+  protoParseResponseSchema,
   serviceUpdateRequestSchema,
   serviceUpdateResponseSchema,
 } from "#shared/api/services";
@@ -97,6 +99,14 @@ export function createApiClient(transport: ApiTransport) {
       ),
     listServices: () =>
       send("/api/services", "GET", undefined, serviceListRequestSchema, serviceListResponseSchema),
+    parseProto: (content: string) =>
+      send(
+        "/api/services/proto-parse",
+        "POST",
+        { content },
+        protoParseRequestSchema,
+        protoParseResponseSchema,
+      ),
     createService: (input: z.input<typeof serviceCreateRequestSchema>) =>
       send("/api/services", "POST", input, serviceCreateRequestSchema, serviceCreateResponseSchema),
     updateService: (rawId: string, input: z.input<typeof serviceUpdateRequestSchema>) => {

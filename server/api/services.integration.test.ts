@@ -1,8 +1,17 @@
 import { eq } from "drizzle-orm";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
-import { environmentVariables, graphNodePositions, headerTemplates, projects } from "../db/schema";
+import {
+  environmentVariables,
+  graphNodePositions,
+  headerTemplates,
+  projects,
+  services as servicesTable,
+} from "../db/schema";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
 const integration = describe.skipIf(!connectionString);
@@ -15,11 +24,16 @@ integration("service REST controllers with MySQL", () => {
   let updateRoute: (event: never) => Promise<unknown>;
   let deleteRoute: (event: never) => Promise<unknown>;
   let healthRoute: (event: never) => Promise<unknown>;
+  let storageDirectory: string;
+  let protoStorage: typeof import("../utils/proto-storage");
 
   beforeAll(async () => {
     process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
+    storageDirectory = await mkdtemp(join(tmpdir(), "cairn-service-protos-"));
+    process.env.PROTO_STORAGE_DRIVER = "fs";
+    process.env.PROTO_STORAGE_FS_BASE = storageDirectory;
     const runtime = globalThis as unknown as {
       defineEventHandler: <T>(handler: T) => T;
       readBody: (event: { context: { body?: unknown } }) => Promise<unknown>;
@@ -39,6 +53,7 @@ integration("service REST controllers with MySQL", () => {
     updateRoute = (await import("./services/[id].put")).default as typeof updateRoute;
     deleteRoute = (await import("./services/[id].delete")).default as typeof deleteRoute;
     healthRoute = (await import("./services/health.get")).default as typeof healthRoute;
+    protoStorage = await import("../utils/proto-storage");
   });
 
   beforeEach(async () => {
@@ -48,6 +63,7 @@ integration("service REST controllers with MySQL", () => {
 
   afterAll(async () => {
     await getDb().delete(projects).where(eq(projects.id, projectId));
+    await rm(storageDirectory, { recursive: true, force: true });
     await closeDb();
   });
 
@@ -121,6 +137,62 @@ integration("service REST controllers with MySQL", () => {
       name: "Orders updated",
       endpoints: [{ codeKey: "list-orders", name: "List all orders" }],
     });
+  });
+
+  it("persists proto files across list reloads, replaces old versions, and removes files on delete", async () => {
+    const firstProto = 'syntax = "proto3"; package demo; service Echo {}';
+    const secondProto =
+      'syntax = "proto3"; package demo; service Echo { rpc Get(Request) returns (Reply); }';
+    const created = (await createRoute({
+      context: {
+        body: {
+          name: "Echo",
+          apiType: "GRPC",
+          framework: "Other",
+          baseUrl: "localhost:50051",
+          grpcTls: true,
+          protoContent: firstProto,
+          endpoints: [{ name: "Get", rpcMethod: "/demo.Echo/Get" }],
+        },
+      },
+    } as never)) as { id: string };
+    const endpointId = (
+      (await listRoute({} as never)) as Array<{ id: string; endpoints: Array<{ id: string }> }>
+    )[0]!.endpoints[0]!.id;
+    const [firstRow] = await getDb()
+      .select({ protoStorageKey: servicesTable.protoStorageKey })
+      .from(servicesTable)
+      .where(eq(servicesTable.id, created.id));
+    expect(firstRow?.protoStorageKey).toBeTruthy();
+    expect(await protoStorage.getProtoFile(firstRow!.protoStorageKey!)).toBe(firstProto);
+
+    await updateRoute({
+      context: {
+        params: { id: created.id },
+        body: {
+          name: "Echo",
+          apiType: "GRPC",
+          framework: "Other",
+          baseUrl: "localhost:50051",
+          grpcTls: true,
+          protoContent: secondProto,
+          endpoints: [{ id: endpointId, name: "Get", rpcMethod: "/demo.Echo/Get" }],
+        },
+      },
+    } as never);
+    const [secondRow] = await getDb()
+      .select({ protoStorageKey: servicesTable.protoStorageKey })
+      .from(servicesTable)
+      .where(eq(servicesTable.id, created.id));
+    expect(secondRow?.protoStorageKey).not.toBe(firstRow?.protoStorageKey);
+    expect(await protoStorage.getProtoFile(secondRow!.protoStorageKey!)).toBe(secondProto);
+    expect(await protoStorage.getProtoFile(firstRow!.protoStorageKey!)).toBeNull();
+    await expect(
+      deleteRoute({ context: { params: { id: created.id } } } as never),
+    ).resolves.toEqual({
+      id: created.id,
+    });
+    expect(await protoStorage.getProtoFile(secondRow!.protoStorageKey!)).toBeNull();
   });
 
   it("rejects duplicate code keys", async () => {

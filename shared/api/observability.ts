@@ -32,6 +32,8 @@ export const runGetResponseSchema = z.object({
   traceId: z.string(),
   status: z.enum(["running", "completed", "failed"]),
   responseStatus: z.number().int().nullable(),
+  grpcStatus: z.number().int().nullable().optional(),
+  grpcStatusName: z.string().nullable().optional(),
   responseHeaders: z.record(z.string(), z.string()).nullable(),
   responseBody: z.string().nullable(),
   error: z.string().nullable(),
