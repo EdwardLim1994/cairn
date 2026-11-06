@@ -33,9 +33,14 @@ const brokerOptions = [
 ];
 
 function connectionUrl(destination: Destination) {
-  return destination.broker === "kafka"
-    ? destination.connection.brokers
-    : `${destination.connection.tls ? "amqps" : "amqp"}://${destination.connection.host}:${destination.connection.port}${destination.connection.virtualHost}`;
+  if (destination.broker === "kafka") return destination.connection.brokers;
+  const protocol = destination.connection.tls ? "amqps" : "amqp";
+  return `${protocol}://${destination.connection.host}:${destination.connection.port}${destination.connection.virtualHost}`;
+}
+
+function toggleTopic(id: string, expanded: boolean) {
+  if (expanded) expandedTopicId.value = id;
+  else if (expandedTopicId.value === id) expandedTopicId.value = null;
 }
 
 watch(
@@ -80,8 +85,8 @@ function save() {
           : { projectId: props.destinations[0]?.projectId ?? "local", health: null }),
       };
     }
-    const address = url.value.match(
-      /^(?:amqps?:\/\/)?(?:[^/@]+@)?\[?([^\]/:]+|::1)\]?(?::(\d+))?(\/.*)?$/,
+    const address = /^(?:amqps?:\/\/)?(?:[^/@]+@)?\[?([^\]/:]+|::1)\]?(?::(\d+))?(\/.*)?$/.exec(
+      url.value,
     );
     const connection =
       old?.broker === "rabbitmq" ? old.connection : { port: 5672, virtualHost: "/", tls: false };
@@ -151,23 +156,23 @@ function handleOpenChange(value: boolean) {
       </UButton>
     </template>
     <template #body>
-      <label class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1">
         <span class="text-[10px] font-medium text-[var(--muted)]">Message queue name</span>
         <UInput v-model="queueName" aria-label="Message queue name" required />
-      </label>
+      </div>
       <div class="flex gap-2.5 max-[720px]:flex-col">
-        <label class="min-w-0 flex flex-1 flex-col gap-1">
+        <div class="min-w-0 flex flex-1 flex-col gap-1">
           <span class="text-[10px] font-medium text-[var(--muted)]">Message queue type</span>
           <USelect v-model="broker" :items="brokerOptions" aria-label="Message queue type" />
-        </label>
-        <label class="min-w-0 flex flex-1 flex-col gap-1">
+        </div>
+        <div class="min-w-0 flex flex-1 flex-col gap-1">
           <span class="text-[10px] font-medium text-[var(--muted)]">URL</span>
           <UInput
             v-model="url"
             aria-label="Message queue URL"
             :placeholder="broker === 'kafka' ? 'localhost:9092' : 'amqp://localhost:5672/'"
           />
-        </label>
+        </div>
       </div>
       <div class="mt-1 flex items-center justify-between gap-2">
         <strong class="text-xs">Topics</strong>
@@ -180,23 +185,17 @@ function handleOpenChange(value: boolean) {
         :subtitle="topic.codeKey"
         :delete-label="`Remove ${topic.name || `Topic ${index + 1}`}`"
         :open="expandedTopicId === topic.id"
-        @toggle="
-          expandedTopicId = $event
-            ? topic.id
-            : expandedTopicId === topic.id
-              ? null
-              : expandedTopicId
-        "
+        @toggle="toggleTopic(topic.id, $event)"
         @delete="topics.splice(index, 1)"
       >
-        <label class="flex flex-col gap-1">
+        <div class="flex flex-col gap-1">
           <span class="text-[10px] font-medium text-[var(--muted)]">Name</span>
           <UInput v-model="topic.name" :aria-label="`Topic ${index + 1} name`" required />
-        </label>
-        <label class="flex flex-col gap-1">
+        </div>
+        <div class="flex flex-col gap-1">
           <span class="text-[10px] font-medium text-[var(--muted)]">Stable code key</span>
           <UInput v-model="topic.codeKey" :aria-label="`Topic ${index + 1} code key`" required />
-        </label>
+        </div>
       </SettingsAccordionCard>
       <p
         v-if="!topics.length"

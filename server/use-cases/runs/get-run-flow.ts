@@ -21,6 +21,102 @@ function normalizeServiceName(name: string, registeredServices: Array<{ name: st
   );
 }
 
+function spanEdges(spans: RunFlowData["spans"], services: RunFlowData["registeredServices"]) {
+  const bySpanId = new Map(spans.map((span) => [span.spanId, span]));
+  const edges = new Map<
+    string,
+    {
+      sourceService: string;
+      targetService: string;
+      sourceSpanId: string;
+      targetSpanId: string;
+    }
+  >();
+  for (const span of spans) {
+    const parent = span.parentSpanId ? bySpanId.get(span.parentSpanId) : undefined;
+    if (!parent || parent.serviceName === span.serviceName) continue;
+    edges.set(`${parent.serviceName}\0${span.serviceName}`, {
+      sourceService: normalizeServiceName(parent.serviceName, services),
+      targetService: normalizeServiceName(span.serviceName, services),
+      sourceSpanId: parent.spanId,
+      targetSpanId: span.spanId,
+    });
+  }
+  return [...edges.values()];
+}
+
+function spanErrors(spans: RunFlowData["spans"], services: RunFlowData["registeredServices"]) {
+  const errors = new Set<string>();
+  for (const span of spans) {
+    const status = Number(
+      span.attributes["http.response.status_code"] ?? span.attributes["http.status_code"],
+    );
+    if (span.statusCode === "ERROR" || status >= 400)
+      errors.add(normalizeServiceName(span.serviceName, services));
+  }
+  return errors;
+}
+
+function messageConnectionObserved(
+  connection: RunFlowData["messageConnections"][number],
+  destination: RunFlowData["destinations"][number],
+  spans: RunFlowData["spans"],
+  traceId: string,
+  services: RunFlowData["registeredServices"],
+  endpoints: RunFlowData["endpoints"],
+) {
+  const serviceId =
+    connection.type === "publish"
+      ? (connection.serviceId ??
+        endpoints.find(({ id }) => id === connection.endpointId)?.serviceId)
+      : connection.serviceId;
+  const serviceName = services.find((service) => service.id === serviceId)?.name;
+  if (!serviceName) return false;
+  const system = destination.broker === "rabbitmq" ? "rabbitmq" : "kafka";
+  return spans.some((span) => {
+    if (span.traceId !== traceId) return false;
+    const attrs = span.attributes;
+    const spanSystem = attrs["messaging.system"] ?? attrs["messaging.system.name"];
+    const destinationName =
+      attrs["messaging.destination.name"] ??
+      attrs["messaging.destination"] ??
+      attrs["messaging.source.name"];
+    const operation = attrs["messaging.operation.type"] ?? attrs["messaging.operation"];
+    if (
+      normalizeServiceName(span.serviceName, services) !== serviceName ||
+      spanSystem !== system ||
+      destinationName !== destination.name
+    )
+      return false;
+    const operations =
+      connection.type === "publish" ? ["publish", "send"] : ["receive", "process", "consume"];
+    return operations.includes(String(operation).toLowerCase());
+  });
+}
+
+function observedMessageConnections(
+  data: RunFlowData,
+  destinations: Map<string, RunFlowData["destinations"][number]>,
+) {
+  const observed = new Set<string>();
+  for (const connection of data.messageConnections) {
+    const destination = destinations.get(connection.destinationId);
+    if (
+      destination &&
+      messageConnectionObserved(
+        connection,
+        destination,
+        data.spans,
+        data.run.traceId,
+        data.registeredServices,
+        data.endpoints,
+      )
+    )
+      observed.add(connection.id);
+  }
+  return observed;
+}
+
 export function createGetRunFlowUseCase(dependencies: {
   ensureProject: () => Promise<string>;
   getRunFlowData: (projectId: string, id: string) => Promise<RunFlowData | undefined>;
@@ -31,81 +127,20 @@ export function createGetRunFlowUseCase(dependencies: {
   return async (id: string): Promise<RunFlowResponse> => {
     const data = await dependencies.getRunFlowData(await dependencies.ensureProject(), id);
     if (!data) throw new RunNotFoundError("Run not found");
-    const {
-      run,
-      spans,
-      registeredServices,
-      destinations,
-      messageConnections,
-      endpoints,
-      failedTargetService,
-    } = data;
+    const { run, spans, registeredServices, destinations, failedTargetService } = data;
     const now = (dependencies.now ?? Date.now)();
     const age = now - run.startedAt.getTime();
     const quiet = run.lastTelemetryAt
       ? now - run.lastTelemetryAt.getTime() >= dependencies.telemetryQuietMs()
       : false;
     const timedOut = age >= dependencies.telemetryMaxWaitMs();
-    const bySpanId = new Map(spans.map((span) => [span.spanId, span]));
-    const edges = new Map<
-      string,
-      { sourceService: string; targetService: string; sourceSpanId: string; targetSpanId: string }
-    >();
-    for (const span of spans) {
-      const parent = span.parentSpanId ? bySpanId.get(span.parentSpanId) : undefined;
-      if (parent && parent.serviceName !== span.serviceName) {
-        edges.set(`${parent.serviceName}\0${span.serviceName}`, {
-          sourceService: normalizeServiceName(parent.serviceName, registeredServices),
-          targetService: normalizeServiceName(span.serviceName, registeredServices),
-          sourceSpanId: parent.spanId,
-          targetSpanId: span.spanId,
-        });
-      }
-    }
-    const errorServices = new Set<string>();
-    for (const span of spans) {
-      const status = Number(
-        span.attributes["http.response.status_code"] ?? span.attributes["http.status_code"],
-      );
-      if (span.statusCode === "ERROR" || status >= 400)
-        errorServices.add(normalizeServiceName(span.serviceName, registeredServices));
-    }
+    const edges = spanEdges(spans, registeredServices);
+    const errorServices = spanErrors(spans, registeredServices);
     if (failedTargetService) errorServices.add(failedTargetService);
-    const observedMessageConnectionIds = new Set<string>();
     const destinationById = new Map(
       destinations.map((destination) => [destination.id, destination]),
     );
-    for (const connection of messageConnections) {
-      const destination = destinationById.get(connection.destinationId);
-      if (!destination) continue;
-      const serviceId =
-        connection.type === "publish"
-          ? (connection.serviceId ??
-            endpoints.find((endpoint) => endpoint.id === connection.endpointId)?.serviceId)
-          : connection.serviceId;
-      const serviceName = registeredServices.find((service) => service.id === serviceId)?.name;
-      if (!serviceName) continue;
-      const system = destination.broker === "rabbitmq" ? "rabbitmq" : "kafka";
-      const matches = spans.some((span) => {
-        if (span.traceId !== run.traceId) return false;
-        const attrs = span.attributes;
-        const spanSystem = attrs["messaging.system"] ?? attrs["messaging.system.name"];
-        const destinationName =
-          attrs["messaging.destination.name"] ??
-          attrs["messaging.destination"] ??
-          attrs["messaging.source.name"];
-        const operation = attrs["messaging.operation.type"] ?? attrs["messaging.operation"];
-        return (
-          normalizeServiceName(span.serviceName, registeredServices) === serviceName &&
-          spanSystem === system &&
-          destinationName === destination.name &&
-          (connection.type === "publish"
-            ? ["publish", "send"].includes(String(operation).toLowerCase())
-            : ["receive", "process", "consume"].includes(String(operation).toLowerCase()))
-        );
-      });
-      if (matches) observedMessageConnectionIds.add(connection.id);
-    }
+    const observedMessageConnectionIds = observedMessageConnections(data, destinationById);
     return {
       runId: run.id,
       traceId: run.traceId,
@@ -118,7 +153,7 @@ export function createGetRunFlowUseCase(dependencies: {
         endTime: span.endTime.toISOString(),
         receivedAt: span.receivedAt.toISOString(),
       })),
-      edges: [...edges.values()],
+      edges,
       observedMessageConnectionIds: [...observedMessageConnectionIds],
       errorServices: [...errorServices],
     };

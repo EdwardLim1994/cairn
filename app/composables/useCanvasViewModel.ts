@@ -15,6 +15,23 @@ type GraphCanvas = {
   setViewport: (viewport: { x: number; y: number; zoom: number }) => Promise<void> | void;
   updateNodeInternals: (nodeIds: string[]) => void;
 };
+type ConnectionSource = { serviceId?: string; endpointId?: string; subscriptionId?: string };
+
+function messageSourceKey(connection: {
+  subscriptionId?: string | null;
+  endpointId?: string | null;
+  serviceId?: string | null;
+}) {
+  if (connection.subscriptionId) return `subscription:${connection.subscriptionId}`;
+  if (connection.endpointId) return `endpoint:${connection.endpointId}`;
+  return `service:${connection.serviceId ?? ""}`;
+}
+
+function queueIdForNode(nodeId: string) {
+  if (nodeId === "message-queue") return "legacy-queue";
+  if (nodeId.startsWith("message-queue:")) return nodeId.slice("message-queue:".length);
+  return undefined;
+}
 
 export function useCanvasViewModel(options: {
   apiClient: ApiClient;
@@ -157,26 +174,17 @@ export function useCanvasViewModel(options: {
   async function onConnect(connection: Connection) {
     const message = messageConnection(connection);
     if (message) {
-      const exists = options.graphStore.messageConnections.some(
-        (current) =>
-          current.type === message.type &&
-          current.destinationId === message.destinationId &&
-          (message.type === "publish"
-            ? current.type === "publish" &&
-              (current.subscriptionId
-                ? `subscription:${current.subscriptionId}`
-                : current.endpointId
-                  ? `endpoint:${current.endpointId}`
-                  : `service:${current.serviceId}`) ===
-                (message.subscriptionId
-                  ? `subscription:${message.subscriptionId}`
-                  : "endpointId" in message && message.endpointId
-                    ? `endpoint:${message.endpointId}`
-                    : `service:${"serviceId" in message ? message.serviceId : ""}`)
-            : current.type === "subscribe" &&
-              current.serviceId === message.serviceId &&
-              current.destinationId === message.destinationId),
-      );
+      const exists = options.graphStore.messageConnections.some((current) => {
+        if (current.type !== message.type || current.destinationId !== message.destinationId)
+          return false;
+        if (current.type === "subscribe" && message.type === "subscribe")
+          return current.serviceId === message.serviceId;
+        return (
+          current.type === "publish" &&
+          message.type === "publish" &&
+          messageSourceKey(current) === messageSourceKey(message)
+        );
+      });
       if (exists) return;
       options.graphStore.setMessageConnections([
         ...options.graphStore.messageConnections,
@@ -203,33 +211,35 @@ export function useCanvasViewModel(options: {
     await saveCanvas();
   }
 
-  function sourceFromHandle(sourceId: string, handle: string | null | undefined) {
+  function sourceFromCallId(callId: string): ConnectionSource | undefined {
+    const edge = options.graphStore.serviceEdges.find(({ id }) => id === callId);
+    if (edge)
+      return {
+        serviceId: edge.sourceServiceId,
+        endpointId: edge.sourceEndpointId ?? undefined,
+        subscriptionId: edge.sourceSubscriptionId ?? undefined,
+      };
+    const publish = options.graphStore.messageConnections.find(
+      (item) => item.id === callId && item.type === "publish",
+    );
+    if (publish?.type !== "publish") return undefined;
+    return {
+      serviceId: publish.serviceId,
+      endpointId: publish.endpointId,
+      subscriptionId: publish.subscriptionId,
+    };
+  }
+
+  function sourceFromHandle(
+    sourceId: string,
+    handle: string | null | undefined,
+  ): ConnectionSource | undefined {
+    if (handle?.startsWith("outbound-call:"))
+      return sourceFromCallId(handle.slice("outbound-call:".length));
     const endpointId = handle?.startsWith("out:") ? handle.slice(4) : undefined;
     const subscriptionId = handle?.startsWith("consumer-out:")
       ? handle.slice("consumer-out:".length)
       : undefined;
-    const callId = handle?.startsWith("outbound-call:")
-      ? handle.slice("outbound-call:".length)
-      : undefined;
-    if (callId) {
-      const edge = options.graphStore.serviceEdges.find(({ id }) => id === callId);
-      const publish = options.graphStore.messageConnections.find(
-        (item) => item.id === callId && item.type === "publish",
-      );
-      return edge
-        ? {
-            serviceId: edge.sourceServiceId,
-            endpointId: edge.sourceEndpointId ?? undefined,
-            subscriptionId: edge.sourceSubscriptionId ?? undefined,
-          }
-        : publish?.type === "publish"
-          ? {
-              serviceId: publish.serviceId,
-              endpointId: publish.endpointId,
-              subscriptionId: publish.subscriptionId,
-            }
-          : undefined;
-    }
     if (endpointId) {
       const serviceId = options.graphStore.services.find((service) =>
         service.endpoints.some((endpoint) => endpoint.id === endpointId),
@@ -246,69 +256,84 @@ export function useCanvasViewModel(options: {
   }
 
   function messageConnection(connection: Connection) {
-    const queueIdForNode = (nodeId: string) =>
-      nodeId === "message-queue"
-        ? "legacy-queue"
-        : nodeId.startsWith("message-queue:")
-          ? nodeId.slice("message-queue:".length)
-          : undefined;
-    const sourceDestinationId =
-      queueIdForNode(connection.source) && connection.sourceHandle?.startsWith("subscribe-out:")
-        ? connection.sourceHandle.slice("subscribe-out:".length)
-        : undefined;
-    const targetDestinationId =
-      queueIdForNode(connection.target) && connection.targetHandle?.startsWith("publish-in:")
-        ? connection.targetHandle.slice("publish-in:".length)
-        : undefined;
-    if (targetDestinationId) {
-      const source = sourceFromHandle(connection.source, connection.sourceHandle);
-      if (!source || source.serviceId !== connection.source) return undefined;
-      const destination = options.graphStore.messageDestinations.find(
-        (item) =>
-          item.id === targetDestinationId &&
-          (item.queueId ?? "legacy-queue") === queueIdForNode(connection.target),
+    const targetQueueId = queueIdForNode(connection.target);
+    const targetHandle = connection.targetHandle;
+    if (targetQueueId && targetHandle?.startsWith("publish-in:"))
+      return publishMessageConnection(
+        connection,
+        targetQueueId,
+        targetHandle.slice("publish-in:".length),
       );
-      if (!destination) return undefined;
-      const routingKey =
-        destination.broker === "rabbitmq"
-          ? promptConnectionValue("RabbitMQ routing key", "events")?.trim()
-          : undefined;
-      if (destination.broker === "rabbitmq" && !routingKey) return undefined;
-      return {
-        type: "publish" as const,
-        destinationId: targetDestinationId,
-        serviceId: source.serviceId,
-        ...(source.endpointId ? { endpointId: source.endpointId } : {}),
-        ...(source.subscriptionId ? { subscriptionId: source.subscriptionId } : {}),
-        ...(routingKey ? { routingKey } : {}),
-      };
+    const sourceQueueId = queueIdForNode(connection.source);
+    const sourceHandle = connection.sourceHandle;
+    if (
+      sourceQueueId &&
+      sourceHandle?.startsWith("subscribe-out:") &&
+      targetHandle?.startsWith("subscriber-in:")
+    )
+      return subscribeMessageConnection(
+        connection,
+        sourceQueueId,
+        sourceHandle.slice("subscribe-out:".length),
+      );
+    return undefined;
+  }
+
+  function publishMessageConnection(
+    connection: Connection,
+    queueId: string,
+    destinationId: string,
+  ) {
+    const source = sourceFromHandle(connection.source, connection.sourceHandle);
+    if (!source || source.serviceId !== connection.source) return undefined;
+    const destination = options.graphStore.messageDestinations.find(
+      (item) => item.id === destinationId && (item.queueId ?? "legacy-queue") === queueId,
+    );
+    if (!destination) return undefined;
+    let routingKey: string | undefined;
+    if (destination.broker === "rabbitmq") {
+      routingKey = promptConnectionValue("RabbitMQ routing key", "events")?.trim();
+      if (!routingKey) return undefined;
     }
-    if (sourceDestinationId && connection.targetHandle?.startsWith("subscriber-in:")) {
-      if (!options.graphStore.services.some((service) => service.id === connection.target))
-        return undefined;
-      const destination = options.graphStore.messageDestinations.find(
-        (item) =>
-          item.id === sourceDestinationId &&
-          (item.queueId ?? "legacy-queue") === queueIdForNode(connection.source),
-      );
-      if (!destination) return undefined;
-      const connectionValue = promptConnectionValue(
-        destination.broker === "kafka" ? "Kafka consumer group" : "RabbitMQ binding key",
-        destination.broker === "kafka" ? "cairn-consumers" : "#",
-      )?.trim();
-      if (!connectionValue) return undefined;
-      const connectionDetails =
-        destination.broker === "kafka"
-          ? { consumerGroup: connectionValue }
-          : { bindingKey: connectionValue };
+    return {
+      type: "publish" as const,
+      destinationId,
+      serviceId: source.serviceId,
+      ...(source.endpointId ? { endpointId: source.endpointId } : {}),
+      ...(source.subscriptionId ? { subscriptionId: source.subscriptionId } : {}),
+      ...(routingKey ? { routingKey } : {}),
+    };
+  }
+
+  function subscribeMessageConnection(
+    connection: Connection,
+    queueId: string,
+    destinationId: string,
+  ) {
+    if (!options.graphStore.services.some((service) => service.id === connection.target))
+      return undefined;
+    const destination = options.graphStore.messageDestinations.find(
+      (item) => item.id === destinationId && (item.queueId ?? "legacy-queue") === queueId,
+    );
+    if (!destination) return undefined;
+    const isKafka = destination.broker === "kafka";
+    const connectionValue = isKafka
+      ? promptConnectionValue("Kafka consumer group", "cairn-consumers")?.trim()
+      : promptConnectionValue("RabbitMQ binding key", "#")?.trim();
+    if (!connectionValue) return undefined;
+    if (isKafka)
       return {
         type: "subscribe" as const,
-        destinationId: sourceDestinationId,
+        destinationId,
         serviceId: connection.target,
-        ...connectionDetails,
+        consumerGroup: connectionValue,
       };
-    }
-    return undefined;
+    return {
+      type: "subscribe" as const,
+      destinationId,
+      serviceId: connection.target,
+      bindingKey: connectionValue,
+    };
   }
 
   function edgeConnection(connection: Connection) {
@@ -445,6 +470,44 @@ export function useCanvasViewModel(options: {
     return true;
   }
 
+  function addOutboundTarget(
+    sourceId: string,
+    subscription: GraphStore["messageConnections"][number] | undefined,
+    sourceServiceId: string,
+    targetType: string | undefined,
+    targetId: string | undefined,
+    edges: GraphStore["serviceEdges"],
+    messages: GraphStore["messageConnections"],
+  ) {
+    if (targetType === "endpoint") {
+      const targetServiceId = options.graphViewModel.endpointTarget(targetId ?? "");
+      if (!targetId || !targetServiceId || sourceServiceId === targetServiceId) return false;
+      edges.push({
+        id: crypto.randomUUID(),
+        sourceServiceId,
+        sourceEndpointId: subscription ? null : sourceId,
+        ...(subscription ? { sourceSubscriptionId: subscription.id } : {}),
+        targetEndpointId: targetId,
+      });
+      return true;
+    }
+    if (targetType === "destination") {
+      const destination = options.graphStore.messageDestinations.find(({ id }) => id === targetId);
+      if (!destination) return false;
+      const routingKey = destination.broker === "rabbitmq" ? "events" : undefined;
+      messages.push({
+        id: crypto.randomUUID(),
+        type: "publish",
+        destinationId: destination.id,
+        serviceId: sourceServiceId,
+        ...(subscription ? { subscriptionId: subscription.id } : { endpointId: sourceId }),
+        ...(routingKey ? { routingKey } : {}),
+      });
+      return true;
+    }
+    return false;
+  }
+
   async function setOutboundCall(
     sourceId: string,
     connectionId: string | undefined,
@@ -462,29 +525,18 @@ export function useCanvasViewModel(options: {
     const edges = options.graphStore.serviceEdges.filter(({ id }) => id !== connectionId);
     const messages = options.graphStore.messageConnections.filter(({ id }) => id !== connectionId);
     const [targetType, targetId] = target.split(":", 2);
-    if (targetType === "endpoint") {
-      const targetServiceId = options.graphViewModel.endpointTarget(targetId ?? "");
-      if (!targetId || !targetServiceId || sourceServiceId === targetServiceId) return false;
-      edges.push({
-        id: crypto.randomUUID(),
+    if (
+      !addOutboundTarget(
+        sourceId,
+        subscription,
         sourceServiceId,
-        sourceEndpointId: subscription ? null : sourceId,
-        ...(subscription ? { sourceSubscriptionId: subscription.id } : {}),
-        targetEndpointId: targetId,
-      });
-    } else if (targetType === "destination") {
-      const destination = options.graphStore.messageDestinations.find(({ id }) => id === targetId);
-      if (!destination) return false;
-      const routingKey = destination.broker === "rabbitmq" ? "events" : undefined;
-      messages.push({
-        id: crypto.randomUUID(),
-        type: "publish",
-        destinationId: destination.id,
-        serviceId: sourceServiceId,
-        ...(subscription ? { subscriptionId: subscription.id } : { endpointId: sourceId }),
-        ...(routingKey ? { routingKey } : {}),
-      });
-    } else return false;
+        targetType,
+        targetId,
+        edges,
+        messages,
+      )
+    )
+      return false;
 
     options.graphStore.setServiceEdges(edges);
     options.graphStore.setMessageConnections(messages);

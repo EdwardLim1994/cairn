@@ -41,6 +41,179 @@ type ExecutionTarget = {
   protoStorageKey: string | null;
 };
 
+type RunDependencies = {
+  ensureProject: () => Promise<string>;
+  getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
+  getVariables: (projectId: string) => Promise<Array<{ name: string; value: string }>>;
+  createRun: (input: {
+    projectId: string;
+    mockApiId: string;
+    id: string;
+    traceId: string;
+    mockApiName: string;
+    method: string;
+    url: string;
+    requestBody: unknown;
+  }) => Promise<void>;
+  finishRun: (
+    id: string,
+    result: {
+      status: "completed" | "failed";
+      responseStatus?: number | null;
+      grpcStatus?: number | null;
+      grpcStatusName?: string | null;
+      responseHeaders?: Record<string, string> | null;
+      responseBody?: string | null;
+      error: string | null;
+    },
+  ) => Promise<void>;
+  addFailureLog: (input: {
+    projectId: string;
+    traceId: string;
+    serviceName: string;
+    mockApiName: string;
+    mockApiId: string;
+    runId: string;
+    method: string;
+    url: string;
+    responseStatus: number | null;
+    message: string;
+  }) => Promise<void>;
+  fetch: typeof globalThis.fetch;
+  timeoutMs: () => number;
+  newRunId?: () => string;
+  newTraceIds?: () => { traceId: string; spanId: string };
+};
+
+type RunCallContext = {
+  projectId: string;
+  mockApiId: string;
+  runId: string;
+  traceId: string;
+  spanId: string;
+  target: ExecutionTarget;
+  apiType: "HTTP" | "GRPC";
+  targetUrl: string;
+  methodName: string;
+  requestBody: unknown;
+  headers: Headers;
+  timeoutMs: number;
+  controller: AbortController;
+};
+
+type LogFailure = (message: string, responseStatus: number | null) => Promise<void>;
+
+async function executeGrpcCall(
+  dependencies: Pick<RunDependencies, "finishRun">,
+  context: RunCallContext,
+): Promise<MockApiRunResponse> {
+  if (!context.target.protoStorageKey)
+    throw new Error("Selected gRPC service has no stored proto file");
+  const proto = await getProtoFile(context.target.protoStorageKey);
+  if (!proto) throw new Error("Stored gRPC proto file is unavailable");
+  const response = await invokeUnaryGrpc({
+    proto,
+    rpcMethod: context.target.rpcMethod!,
+    target: context.targetUrl,
+    tls: context.target.grpcTls ?? false,
+    request: context.requestBody,
+    traceparent: `00-${context.traceId}-${context.spanId}-01`,
+    timeoutMs: context.timeoutMs,
+  });
+  const responseBody = JSON.stringify(response);
+  await dependencies.finishRun(context.runId, {
+    status: "completed",
+    responseBody,
+    grpcStatus: 0,
+    grpcStatusName: "OK",
+    error: null,
+  });
+  return {
+    id: context.runId,
+    traceId: context.traceId,
+    status: "completed",
+    responseStatus: null,
+    responseHeaders: null,
+    responseBody,
+    grpcStatus: 0,
+    grpcStatusName: "OK",
+    error: null,
+  };
+}
+
+async function executeHttpCall(
+  dependencies: Pick<RunDependencies, "fetch" | "finishRun">,
+  context: RunCallContext,
+  logFailure: LogFailure,
+): Promise<MockApiRunResponse> {
+  const response = await dependencies.fetch(
+    context.targetUrl,
+    createFetchOptions(
+      context.target.method!,
+      context.requestBody,
+      context.headers,
+      context.controller.signal,
+    ),
+  );
+  const responseBody = await response.text();
+  const responseHeaders = Object.fromEntries(response.headers.entries());
+  const status = response.ok ? "completed" : "failed";
+  const error = response.ok ? null : responseError(response.status, responseBody);
+  await dependencies.finishRun(context.runId, {
+    status,
+    responseStatus: response.status,
+    responseHeaders,
+    responseBody,
+    error,
+  });
+  if (error) await logFailure(error, response.status);
+  return {
+    id: context.runId,
+    traceId: context.traceId,
+    status,
+    responseStatus: response.status,
+    responseHeaders,
+    responseBody,
+    error,
+  };
+}
+
+function grpcStatusCode(cause: unknown) {
+  if (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    typeof cause.code === "number"
+  )
+    return cause.code;
+  return null;
+}
+
+async function recordFailedRun(
+  dependencies: Pick<RunDependencies, "finishRun">,
+  context: RunCallContext,
+  cause: unknown,
+  logFailure: LogFailure,
+): Promise<MockApiRunResponse> {
+  const message = failureMessage(cause, context.controller.signal.aborted, context.timeoutMs);
+  const grpcStatus = context.apiType === "GRPC" ? grpcStatusCode(cause) : null;
+  const grpcStatusName =
+    grpcStatus === null ? null : (grpcStatusCodes[grpcStatus] ?? String(grpcStatus));
+  const grpcResult = context.apiType === "GRPC" ? { grpcStatus, grpcStatusName } : {};
+  await dependencies.finishRun(context.runId, { status: "failed", error: message, ...grpcResult });
+  await logFailure(message, grpcStatus);
+  return {
+    id: context.runId,
+    traceId: context.traceId,
+    status: "failed",
+    responseStatus: null,
+    responseHeaders: null,
+    responseBody: null,
+    error: message,
+    ...grpcResult,
+  };
+}
+
 async function authorizationHeader(
   target: ExecutionTarget,
   projectId: string,
@@ -95,49 +268,7 @@ function createFetchOptions(
   };
 }
 
-export function createRunMockApiUseCase(dependencies: {
-  ensureProject: () => Promise<string>;
-  getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
-  getVariables: (projectId: string) => Promise<Array<{ name: string; value: string }>>;
-  createRun: (input: {
-    projectId: string;
-    mockApiId: string;
-    id: string;
-    traceId: string;
-    mockApiName: string;
-    method: string;
-    url: string;
-    requestBody: unknown;
-  }) => Promise<void>;
-  finishRun: (
-    id: string,
-    result: {
-      status: "completed" | "failed";
-      responseStatus?: number | null;
-      grpcStatus?: number | null;
-      grpcStatusName?: string | null;
-      responseHeaders?: Record<string, string> | null;
-      responseBody?: string | null;
-      error: string | null;
-    },
-  ) => Promise<void>;
-  addFailureLog: (input: {
-    projectId: string;
-    traceId: string;
-    serviceName: string;
-    mockApiName: string;
-    mockApiId: string;
-    runId: string;
-    method: string;
-    url: string;
-    responseStatus: number | null;
-    message: string;
-  }) => Promise<void>;
-  fetch: typeof globalThis.fetch;
-  timeoutMs: () => number;
-  newRunId?: () => string;
-  newTraceIds?: () => { traceId: string; spanId: string };
-}) {
+export function createRunMockApiUseCase(dependencies: RunDependencies) {
   return async (id: string): Promise<MockApiRunResponse> => {
     const projectId = await dependencies.ensureProject();
     const target = await dependencies.getTarget(projectId, id);
@@ -207,6 +338,22 @@ export function createRunMockApiUseCase(dependencies: {
       }
     };
 
+    const context: RunCallContext = {
+      projectId,
+      mockApiId: id,
+      runId,
+      traceId,
+      spanId,
+      target,
+      apiType,
+      targetUrl,
+      methodName,
+      requestBody: null,
+      headers: new Headers(),
+      timeoutMs,
+      controller,
+    };
+
     try {
       const resolvedPath =
         apiType === "HTTP"
@@ -221,6 +368,9 @@ export function createRunMockApiUseCase(dependencies: {
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
+      context.targetUrl = targetUrl;
+      context.requestBody = requestBody;
+      context.headers = headers;
       await dependencies.createRun({
         projectId,
         mockApiId: id,
@@ -247,94 +397,10 @@ export function createRunMockApiUseCase(dependencies: {
         headers.set("content-type", "application/json");
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       timeout = setTimeout(() => controller.abort(), timeoutMs);
-      if (apiType === "GRPC") {
-        if (!target.protoStorageKey)
-          throw new Error("Selected gRPC service has no stored proto file");
-        const proto = await getProtoFile(target.protoStorageKey);
-        if (!proto) throw new Error("Stored gRPC proto file is unavailable");
-        const response = await invokeUnaryGrpc({
-          proto,
-          rpcMethod: target.rpcMethod!,
-          target: grpcTarget,
-          tls: target.grpcTls ?? false,
-          request: requestBody,
-          traceparent: `00-${traceId}-${spanId}-01`,
-          timeoutMs,
-        });
-        const responseBody = JSON.stringify(response);
-        await dependencies.finishRun(runId, {
-          status: "completed",
-          responseBody,
-          grpcStatus: 0,
-          grpcStatusName: "OK",
-          error: null,
-        });
-        return {
-          id: runId,
-          traceId,
-          status: "completed",
-          responseStatus: null,
-          responseHeaders: null,
-          responseBody,
-          grpcStatus: 0,
-          grpcStatusName: "OK",
-          error: null,
-        };
-      }
-      const response = await dependencies.fetch(
-        targetUrl,
-        createFetchOptions(target.method!, requestBody, headers, controller.signal),
-      );
-      const responseBody = await response.text();
-      const responseHeaders = Object.fromEntries(response.headers.entries());
-      const status = response.ok ? "completed" : "failed";
-      const error = response.ok ? null : responseError(response.status, responseBody);
-      await dependencies.finishRun(runId, {
-        status,
-        responseStatus: response.status,
-        responseHeaders,
-        responseBody,
-        error,
-      });
-      if (error) await logFailure(error, response.status);
-      return {
-        id: runId,
-        traceId,
-        status,
-        responseStatus: response.status,
-        responseHeaders,
-        responseBody,
-        error,
-      };
+      if (apiType === "GRPC") return await executeGrpcCall(dependencies, context);
+      return await executeHttpCall(dependencies, context, logFailure);
     } catch (cause) {
-      const message = failureMessage(cause, controller.signal.aborted, timeoutMs);
-      const grpcStatusCode =
-        typeof cause === "object" &&
-        cause !== null &&
-        "code" in cause &&
-        typeof cause.code === "number"
-          ? cause.code
-          : null;
-      const grpcStatusName =
-        grpcStatusCode === null
-          ? null
-          : (grpcStatusCodes[grpcStatusCode] ?? String(grpcStatusCode));
-      await dependencies.finishRun(runId, {
-        status: "failed",
-        error: message,
-        ...(apiType === "GRPC" ? { grpcStatus: grpcStatusCode, grpcStatusName } : {}),
-      });
-      await logFailure(message, grpcStatusCode);
-      return {
-        id: runId,
-        traceId,
-        status: "failed",
-        responseStatus: null,
-        responseHeaders: null,
-        responseBody: null,
-        error: message,
-        ...(apiType === "GRPC" ? { grpcStatus: grpcStatusCode, grpcStatusName } : {}),
-      };
+      return await recordFailedRun(dependencies, context, cause, logFailure);
     } finally {
       if (timeout) clearTimeout(timeout);
     }

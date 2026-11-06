@@ -9,7 +9,7 @@ import {
   type EdgeUpdateEvent,
   type Node,
 } from "@vue-flow/core";
-import { Background, BackgroundVariant } from "@vue-flow/background";
+import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
 import MockApiTriggerNode from "./MockApiTriggerNode.vue";
@@ -114,7 +114,7 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     @move-end="emit('moveEnd', $event.flowTransform)"
     @node-drag-stop="emit('nodeDragStop')"
   >
-    <Background :variant="BackgroundVariant.Dots" :gap="22" :size="1.2" />
+    <Background variant="dots" :gap="22" :size="1.2" />
     <MiniMap
       pannable
       zoomable

@@ -103,6 +103,68 @@ export const canvasGetResponseSchema = z.object({
   authorizationTemplates: z.array(authorizationTemplateSchema).default([]),
 });
 
+function validateMessageConnection(
+  connection: z.infer<typeof messageConnectionInputSchema>,
+  destination: z.infer<typeof messageDestinationInputSchema> | undefined,
+  index: number,
+  context: z.RefinementCtx,
+) {
+  const path = ["messageConnections", index];
+  if (!destination) {
+    context.addIssue({
+      code: "custom",
+      path: [...path, "destinationId"],
+      message: "Unknown message destination",
+    });
+    return;
+  }
+  if (connection.type === "publish" && destination.broker === "kafka") {
+    if (connection.routingKey !== undefined)
+      context.addIssue({
+        code: "custom",
+        path: [...path, "routingKey"],
+        message: "Kafka publish connections do not use routing keys",
+      });
+    return;
+  }
+  if (connection.type === "publish") {
+    if (connection.routingKey === undefined)
+      context.addIssue({
+        code: "custom",
+        path: [...path, "routingKey"],
+        message: "RabbitMQ publish connections require a routing key",
+      });
+    return;
+  }
+  if (destination.broker === "kafka") {
+    if (connection.bindingKey !== undefined)
+      context.addIssue({
+        code: "custom",
+        path: [...path, "bindingKey"],
+        message: "Kafka subscriptions do not use binding keys",
+      });
+    if (!connection.consumerGroup?.trim())
+      context.addIssue({
+        code: "custom",
+        path: [...path, "consumerGroup"],
+        message: "Kafka subscriptions require a consumer group",
+      });
+    return;
+  }
+  if (connection.consumerGroup !== undefined)
+    context.addIssue({
+      code: "custom",
+      path: [...path, "consumerGroup"],
+      message: "RabbitMQ subscriptions do not use consumer groups",
+    });
+  if (connection.bindingKey === undefined)
+    context.addIssue({
+      code: "custom",
+      path: [...path, "bindingKey"],
+      message: "RabbitMQ subscriptions require a binding key",
+    });
+}
+
 export const canvasPutRequestSchema = z
   .object({
     nodesLocked: z.boolean().default(false),
@@ -126,74 +188,7 @@ export const canvasPutRequestSchema = z
     );
     for (const [index, connection] of messageConnections.entries()) {
       const destination = destinations.get(connection.destinationId);
-      if (!destination) {
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "destinationId"],
-          message: "Unknown message destination",
-        });
-        continue;
-      }
-      if (
-        connection.type === "publish" &&
-        destination.broker === "kafka" &&
-        connection.routingKey !== undefined
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "routingKey"],
-          message: "Kafka publish connections do not use routing keys",
-        });
-      if (
-        connection.type === "subscribe" &&
-        destination.broker === "kafka" &&
-        connection.bindingKey !== undefined
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "bindingKey"],
-          message: "Kafka subscriptions do not use binding keys",
-        });
-      if (
-        connection.type === "subscribe" &&
-        destination.broker === "rabbitmq" &&
-        connection.consumerGroup !== undefined
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "consumerGroup"],
-          message: "RabbitMQ subscriptions do not use consumer groups",
-        });
-      if (
-        connection.type === "publish" &&
-        destination.broker === "rabbitmq" &&
-        connection.routingKey === undefined
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "routingKey"],
-          message: "RabbitMQ publish connections require a routing key",
-        });
-      if (
-        connection.type === "subscribe" &&
-        destination.broker === "kafka" &&
-        !connection.consumerGroup?.trim()
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "consumerGroup"],
-          message: "Kafka subscriptions require a consumer group",
-        });
-      if (
-        connection.type === "subscribe" &&
-        destination.broker === "rabbitmq" &&
-        connection.bindingKey === undefined
-      )
-        context.addIssue({
-          code: "custom",
-          path: ["messageConnections", index, "bindingKey"],
-          message: "RabbitMQ subscriptions require a binding key",
-        });
+      validateMessageConnection(connection, destination, index, context);
     }
   });
 export const canvasPutResponseSchema = z.object({ saved: z.literal(true) });

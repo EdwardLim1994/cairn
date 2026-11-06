@@ -19,6 +19,87 @@ const layerWidth = 720;
 const triggerGap = 72;
 const rowGap = 88;
 
+function connectedComponents(
+  nodeIds: string[],
+  adjacency: Map<string, Set<string>>,
+  serviceKey: (id: string) => string,
+) {
+  let nextIndex = 0;
+  const indices = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
+  function visit(id: string) {
+    indices.set(id, nextIndex);
+    lowLinks.set(id, nextIndex++);
+    stack.push(id);
+    onStack.add(id);
+    for (const target of [...(adjacency.get(id) ?? [])].sort((left, right) =>
+      left.localeCompare(right),
+    )) {
+      if (!indices.has(target)) {
+        visit(target);
+        lowLinks.set(id, Math.min(lowLinks.get(id)!, lowLinks.get(target)!));
+      } else if (onStack.has(target)) {
+        lowLinks.set(id, Math.min(lowLinks.get(id)!, indices.get(target)!));
+      }
+    }
+    if (lowLinks.get(id) === indices.get(id)) {
+      const component: string[] = [];
+      let member: string;
+      do {
+        member = stack.pop()!;
+        onStack.delete(member);
+        component.push(member);
+      } while (member !== id);
+      components.push(
+        component.toSorted((left, right) => serviceKey(left).localeCompare(serviceKey(right))),
+      );
+    }
+  }
+  for (const id of nodeIds.toSorted((left, right) =>
+    serviceKey(left).localeCompare(serviceKey(right)),
+  ))
+    if (!indices.has(id)) visit(id);
+  return components;
+}
+
+function componentRanks(
+  components: string[][],
+  adjacency: Map<string, Set<string>>,
+  serviceKey: (id: string) => string,
+) {
+  const componentByNode = new Map(
+    components.flatMap((group, index) => group.map((id) => [id, index])),
+  );
+  const edges = components.map(() => new Set<number>());
+  const indegree = components.map(() => 0);
+  for (const [source, targets] of adjacency) {
+    const from = componentByNode.get(source)!;
+    for (const target of targets) {
+      const to = componentByNode.get(target)!;
+      if (from !== to && !edges[from]!.has(to)) {
+        edges[from]!.add(to);
+        indegree[to]!++;
+      }
+    }
+  }
+  const key = (index: number) => components[index]!.map(serviceKey).join("\0");
+  const ranks = components.map(() => 0);
+  const ready = components.map((_, index) => index).filter((index) => indegree[index] === 0);
+  while (ready.length) {
+    ready.sort((left, right) => key(left).localeCompare(key(right)));
+    const index = ready.shift()!;
+    for (const target of edges[index]!) {
+      ranks[target] = Math.max(ranks[target]!, ranks[index]! + 1);
+      indegree[target]!--;
+      if (indegree[target] === 0) ready.push(target);
+    }
+  }
+  return { componentByNode, ranks };
+}
+
 export function messageQueueNodeId(queueId?: string) {
   return !queueId || queueId === "legacy-queue" ? "message-queue" : `message-queue:${queueId}`;
 }
@@ -49,38 +130,6 @@ export function arrangeGraph(
     const target = endpointOwners.get(edge.targetEndpointId);
     if (target && target !== edge.sourceServiceId) adjacency.get(edge.sourceServiceId)?.add(target);
   }
-  let nextIndex = 0;
-  const indices = new Map<string, number>();
-  const lowLinks = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const components: string[][] = [];
-  function visit(id: string) {
-    indices.set(id, nextIndex);
-    lowLinks.set(id, nextIndex++);
-    stack.push(id);
-    onStack.add(id);
-    for (const target of [...(adjacency.get(id) ?? [])].sort()) {
-      if (!indices.has(target)) {
-        visit(target);
-        lowLinks.set(id, Math.min(lowLinks.get(id)!, lowLinks.get(target)!));
-      } else if (onStack.has(target)) {
-        lowLinks.set(id, Math.min(lowLinks.get(id)!, indices.get(target)!));
-      }
-    }
-    if (lowLinks.get(id) === indices.get(id)) {
-      const component: string[] = [];
-      let member: string;
-      do {
-        member = stack.pop()!;
-        onStack.delete(member);
-        component.push(member);
-      } while (member !== id);
-      components.push(
-        component.sort((left, right) => serviceKey(left).localeCompare(serviceKey(right))),
-      );
-    }
-  }
   const serviceById = new Map(services.map((service) => [service.id, service]));
   const destinationByNodeId = new Map(
     destinationNodeIds.map((id) => [id, { name: "Message Queue" }]),
@@ -88,38 +137,9 @@ export function arrangeGraph(
   const nodeName = (id: string) =>
     serviceById.get(id)?.name ?? destinationByNodeId.get(id)?.name ?? "";
   const serviceKey = (id: string) => `${nodeName(id)}\0${id}`;
-  for (const id of nodeIds.sort((left, right) => serviceKey(left).localeCompare(serviceKey(right))))
-    if (!indices.has(id)) visit(id);
-
-  const componentByService = new Map(
-    components.flatMap((group, index) => group.map((id) => [id, index])),
-  );
-  const componentEdges = components.map(() => new Set<number>());
-  const indegree = components.map(() => 0);
-  for (const [source, targets] of adjacency) {
-    const from = componentByService.get(source)!;
-    for (const target of targets) {
-      const to = componentByService.get(target)!;
-      if (from !== to && !componentEdges[from]!.has(to)) {
-        componentEdges[from]!.add(to);
-        indegree[to]!++;
-      }
-    }
-  }
-  const componentKey = (index: number) => components[index]!.map(serviceKey).join("\0");
-  const ranks = components.map(() => 0);
-  const ready = components.map((_, index) => index).filter((index) => indegree[index] === 0);
-  while (ready.length) {
-    ready.sort((left, right) => componentKey(left).localeCompare(componentKey(right)));
-    const index = ready.shift()!;
-    for (const target of componentEdges[index]!) {
-      ranks[target] = Math.max(ranks[target]!, ranks[index]! + 1);
-      indegree[target]!--;
-      if (indegree[target] === 0) ready.push(target);
-    }
-  }
-
-  const serviceRank = (id: string) => ranks[componentByService.get(id)!]!;
+  const components = connectedComponents(nodeIds, adjacency, serviceKey);
+  const { componentByNode, ranks } = componentRanks(components, adjacency, serviceKey);
+  const serviceRank = (id: string) => ranks[componentByNode.get(id)!]!;
   const queueRank = services.length
     ? Math.max(...services.map(({ id }) => serviceRank(id))) + 1
     : 0;
@@ -139,7 +159,7 @@ export function arrangeGraph(
   for (let rank = 0; rank < layerCount; rank++) {
     const layer = nodeIds
       .filter((id) => nodeRank(id) === rank)
-      .sort((a, b) => serviceKey(a).localeCompare(serviceKey(b)));
+      .toSorted((a, b) => serviceKey(a).localeCompare(serviceKey(b)));
     let y = 0;
     for (const id of layer) {
       const service = serviceById.get(id);

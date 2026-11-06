@@ -66,7 +66,7 @@ const queryExtensions = computed(() => [graphql(), EditorView.lineWrapping]);
 
 <template>
   <div class="flex flex-col gap-2">
-    <label class="flex flex-col gap-1 text-[10px] font-medium text-[var(--muted)]">
+    <div class="flex flex-col gap-1 text-[10px] font-medium text-[var(--muted)]">
       Query
       <Codemirror
         v-model="query"
@@ -75,7 +75,7 @@ const queryExtensions = computed(() => [graphql(), EditorView.lineWrapping]);
         placeholder="query { ... }"
         aria-label="GraphQL query"
       />
-    </label>
+    </div>
     <label class="flex flex-col gap-1 text-[10px] font-medium text-[var(--muted)]">
       Operation name (optional)
       <input

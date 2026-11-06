@@ -122,6 +122,9 @@ export async function updateService(
   const newProtoStorageKey =
     input.apiType === "GRPC" && input.protoContent ? `services/${id}/${randomUUID()}.proto` : null;
   const clearProto = input.apiType === "REST" || input.clearProto;
+  let protoFileName = existing.protoFileName;
+  if (clearProto) protoFileName = null;
+  else if (newProtoStorageKey) protoFileName = input.protoFileName ?? null;
   if (newProtoStorageKey) await putProtoFile(newProtoStorageKey, input.protoContent!);
 
   try {
@@ -150,11 +153,7 @@ export async function updateService(
           baseUrl: input.baseUrl,
           grpcTls: input.grpcTls,
           protoStorageKey: clearProto ? null : (newProtoStorageKey ?? existing.protoStorageKey),
-          protoFileName: clearProto
-            ? null
-            : newProtoStorageKey
-              ? (input.protoFileName ?? null)
-              : existing.protoFileName,
+          protoFileName,
           healthCheckUrl: input.healthCheckUrl,
           healthCheckHeaderTemplateId: input.healthCheckHeaderTemplateId,
           healthCheckCustomHeaders: input.healthCheckCustomHeaders,

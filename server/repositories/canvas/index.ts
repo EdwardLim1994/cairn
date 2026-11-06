@@ -143,113 +143,118 @@ export async function saveCanvas(
   await db.transaction(async (tx) => {
     const destinations = canvas.messageDestinations ?? [];
     const connections = canvas.messageConnections ?? [];
-    const destinationIds = destinations.map(({ id }) => id);
-    const existingDestinations = destinationIds.length
-      ? await tx
-          .select({ id: messageDestinations.id })
-          .from(messageDestinations)
-          .where(inArray(messageDestinations.id, destinationIds))
-      : [];
-    const existingDestinationIds = new Set(existingDestinations.map(({ id }) => id));
-    const ownedDestinationIds = destinationIds.length
-      ? await tx
-          .select({ id: messageDestinations.id })
-          .from(messageDestinations)
-          .where(
-            and(
-              eq(messageDestinations.projectId, projectId),
-              inArray(messageDestinations.id, destinationIds),
-            ),
-          )
-      : [];
-    if (existingDestinationIds.size !== ownedDestinationIds.length)
-      throw new CanvasConstraintError("Message destination belongs to another project");
-    const destinationIdSet = new Set(destinationIds);
-    if (connections.some(({ destinationId }) => !destinationIdSet.has(destinationId)))
-      throw new CanvasConstraintError(
-        "Message connection references a destination outside this canvas",
-      );
-    const endpointIds = [
-      ...new Set(
-        connections.flatMap((connection) =>
-          connection.type === "publish" && connection.endpointId ? [connection.endpointId] : [],
-        ),
-      ),
-    ];
-    const messageServiceIds = [
-      ...new Set(
-        connections.flatMap((connection) => (connection.serviceId ? [connection.serviceId] : [])),
-      ),
-    ];
-    const publishSubscriptionRefs = connections.flatMap((connection) =>
-      connection.type === "publish" && connection.subscriptionId
-        ? [{ id: connection.subscriptionId, serviceId: connection.serviceId }]
-        : [],
-    );
-    const subscriptionOwners = new Map(
-      connections.flatMap((connection) =>
-        connection.type === "subscribe" && connection.id
-          ? [[connection.id, connection.serviceId] as const]
-          : [],
-      ),
-    );
-    const [ownedMessageEndpoints, ownedConsumerServices] = await Promise.all([
-      endpointIds.length
-        ? tx
-            .select({ id: serviceEndpoints.id })
-            .from(serviceEndpoints)
+    const { existingDestinationIds, destinationIdSet } = await (async () => {
+      const destinationIds = destinations.map(({ id }) => id);
+      const existingDestinations = destinationIds.length
+        ? await tx
+            .select({ id: messageDestinations.id })
+            .from(messageDestinations)
+            .where(inArray(messageDestinations.id, destinationIds))
+        : [];
+      const existingDestinationIds = new Set(existingDestinations.map(({ id }) => id));
+      const ownedDestinationIds = destinationIds.length
+        ? await tx
+            .select({ id: messageDestinations.id })
+            .from(messageDestinations)
             .where(
               and(
-                eq(serviceEndpoints.projectId, projectId),
-                inArray(serviceEndpoints.id, endpointIds),
+                eq(messageDestinations.projectId, projectId),
+                inArray(messageDestinations.id, destinationIds),
               ),
             )
-        : [],
-      messageServiceIds.length
-        ? tx
-            .select({ id: services.id })
-            .from(services)
-            .where(and(eq(services.projectId, projectId), inArray(services.id, messageServiceIds)))
-        : [],
-    ]);
-    if (
-      ownedMessageEndpoints.length !== endpointIds.length ||
-      ownedConsumerServices.length !== messageServiceIds.length
-    )
-      throw new CanvasConstraintError(
-        "Message connection references a service or endpoint outside this project",
-      );
-    if (
-      publishSubscriptionRefs.some(
-        ({ id, serviceId }) =>
-          !subscriptionOwners.has(id) || subscriptionOwners.get(id) !== serviceId,
-      )
-    )
-      throw new CanvasConstraintError(
-        "A message publish must reference a subscription owned by its source service",
-      );
-    const variableNames = [
-      ...new Set(
-        destinations.flatMap(({ connection }) =>
-          connection.passwordVariable ? [connection.passwordVariable] : [],
-        ),
-      ),
-    ];
-    if (variableNames.length) {
-      const knownVariables = await tx
-        .select({ name: environmentVariables.name })
-        .from(environmentVariables)
-        .where(
-          and(
-            eq(environmentVariables.projectId, projectId),
-            inArray(environmentVariables.name, variableNames),
-          ),
-        );
-      if (knownVariables.length !== variableNames.length)
+        : [];
+      if (existingDestinationIds.size !== ownedDestinationIds.length)
+        throw new CanvasConstraintError("Message destination belongs to another project");
+      const destinationIdSet = new Set(destinationIds);
+      if (connections.some(({ destinationId }) => !destinationIdSet.has(destinationId)))
         throw new CanvasConstraintError(
-          "Message broker connection references an unknown project variable",
+          "Message connection references a destination outside this canvas",
         );
-    }
+      const endpointIds = [
+        ...new Set(
+          connections.flatMap((connection) =>
+            connection.type === "publish" && connection.endpointId ? [connection.endpointId] : [],
+          ),
+        ),
+      ];
+      const messageServiceIds = [
+        ...new Set(
+          connections.flatMap((connection) => (connection.serviceId ? [connection.serviceId] : [])),
+        ),
+      ];
+      const publishSubscriptionRefs = connections.flatMap((connection) =>
+        connection.type === "publish" && connection.subscriptionId
+          ? [{ id: connection.subscriptionId, serviceId: connection.serviceId }]
+          : [],
+      );
+      const subscriptionOwners = new Map(
+        connections.flatMap((connection) =>
+          connection.type === "subscribe" && connection.id
+            ? [[connection.id, connection.serviceId] as const]
+            : [],
+        ),
+      );
+      const [ownedMessageEndpoints, ownedConsumerServices] = await Promise.all([
+        endpointIds.length
+          ? tx
+              .select({ id: serviceEndpoints.id })
+              .from(serviceEndpoints)
+              .where(
+                and(
+                  eq(serviceEndpoints.projectId, projectId),
+                  inArray(serviceEndpoints.id, endpointIds),
+                ),
+              )
+          : [],
+        messageServiceIds.length
+          ? tx
+              .select({ id: services.id })
+              .from(services)
+              .where(
+                and(eq(services.projectId, projectId), inArray(services.id, messageServiceIds)),
+              )
+          : [],
+      ]);
+      if (
+        ownedMessageEndpoints.length !== endpointIds.length ||
+        ownedConsumerServices.length !== messageServiceIds.length
+      )
+        throw new CanvasConstraintError(
+          "Message connection references a service or endpoint outside this project",
+        );
+      if (
+        publishSubscriptionRefs.some(
+          ({ id, serviceId }) =>
+            !subscriptionOwners.has(id) || subscriptionOwners.get(id) !== serviceId,
+        )
+      )
+        throw new CanvasConstraintError(
+          "A message publish must reference a subscription owned by its source service",
+        );
+      const variableNames = [
+        ...new Set(
+          destinations.flatMap(({ connection }) =>
+            connection.passwordVariable ? [connection.passwordVariable] : [],
+          ),
+        ),
+      ];
+      if (variableNames.length) {
+        const knownVariables = await tx
+          .select({ name: environmentVariables.name })
+          .from(environmentVariables)
+          .where(
+            and(
+              eq(environmentVariables.projectId, projectId),
+              inArray(environmentVariables.name, variableNames),
+            ),
+          );
+        if (knownVariables.length !== variableNames.length)
+          throw new CanvasConstraintError(
+            "Message broker connection references an unknown project variable",
+          );
+      }
+      return { existingDestinationIds, destinationIdSet };
+    })();
     const oldDestinationRows = await tx
       .select({ id: messageDestinations.id, queueId: messageDestinations.queueId })
       .from(messageDestinations)
@@ -291,46 +296,51 @@ export async function saveCanvas(
             inArray(graphNodePositions.entityId, removedQueueIds),
           ),
         );
-    for (const destination of destinations) {
-      const values = {
-        projectId,
-        queueId: destination.queueId ?? "legacy-queue",
-        queueName: destination.queueName ?? "Message Queue",
-        codeKey: destination.codeKey,
-        broker: destination.broker,
-        name: destination.name,
-        connection: destination.connection as Record<string, string | boolean | undefined>,
-      };
-      if (existingDestinationIds.has(destination.id))
-        await tx
-          .update(messageDestinations)
-          .set(values)
-          .where(
-            and(
-              eq(messageDestinations.id, destination.id),
-              eq(messageDestinations.projectId, projectId),
-            ),
-          );
-      else await tx.insert(messageDestinations).values({ id: destination.id, ...values });
-    }
+    await Promise.all(
+      destinations.map((destination) => {
+        const values = {
+          projectId,
+          queueId: destination.queueId ?? "legacy-queue",
+          queueName: destination.queueName ?? "Message Queue",
+          codeKey: destination.codeKey,
+          broker: destination.broker,
+          name: destination.name,
+          connection: destination.connection as Record<string, string | boolean | undefined>,
+        };
+        if (existingDestinationIds.has(destination.id))
+          return tx
+            .update(messageDestinations)
+            .set(values)
+            .where(
+              and(
+                eq(messageDestinations.id, destination.id),
+                eq(messageDestinations.projectId, projectId),
+              ),
+            );
+        return tx.insert(messageDestinations).values({ id: destination.id, ...values });
+      }),
+    );
     const queuePositions = new Map<string, { x: number; y: number }>();
     for (const destination of destinations) {
       const queueId = destination.queueId ?? "legacy-queue";
       if (!queuePositions.has(queueId))
         queuePositions.set(queueId, { x: destination.x, y: destination.y });
     }
-    for (const [queueId, position] of queuePositions)
-      await tx
-        .insert(graphNodePositions)
-        .values({
-          id: randomUUID(),
-          projectId,
-          nodeType: "message_queue",
-          entityId: queueId,
-          positionX: position.x,
-          positionY: position.y,
-        })
-        .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } });
+    await Promise.all(
+      [...queuePositions].map(([queueId, position]) =>
+        tx
+          .insert(graphNodePositions)
+          .values({
+            id: randomUUID(),
+            projectId,
+            nodeType: "message_queue",
+            entityId: queueId,
+            positionX: position.x,
+            positionY: position.y,
+          })
+          .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } }),
+      ),
+    );
     if (connections.length)
       await tx.insert(messageConnections).values(
         [...connections]

@@ -135,15 +135,19 @@ async function signOut() {
   }
 }
 const graphCanvas = ref<InstanceType<typeof GraphCanvas> | null>(null);
+
+function fetchErrorStatus(cause: unknown) {
+  if (typeof cause !== "object" || cause === null) return undefined;
+  if ("statusCode" in cause && cause.statusCode !== undefined) return cause.statusCode;
+  if ("status" in cause) return cause.status;
+  return undefined;
+}
+
 const apiClient = createApiClient(async (url, options) => {
   try {
     return await $fetch<unknown>(url, options as never);
   } catch (cause) {
-    const status =
-      typeof cause === "object" && cause !== null
-        ? (("statusCode" in cause ? cause.statusCode : undefined) ??
-          ("status" in cause ? cause.status : undefined))
-        : undefined;
+    const status = fetchErrorStatus(cause);
     if (status === 401 && authStatus.value.enabled) {
       await navigateTo({ path: "/login", query: { returnTo: route.fullPath } });
     }

@@ -8,6 +8,24 @@ export type ParsedGrpcMethod = {
   rpcMethod: string;
 };
 
+function parseMethods(definition: ReturnType<typeof loadSync>) {
+  const methods: ParsedGrpcMethod[] = [];
+  const streamingMethods: string[] = [];
+  for (const [serviceName, service] of Object.entries(definition)) {
+    if (!service || typeof service !== "object") continue;
+    for (const [methodName, method] of Object.entries(service)) {
+      if (!method || typeof method !== "object" || !("path" in method)) continue;
+      const rpcMethod = String(method.path);
+      if ("requestStream" in method && (method.requestStream || method.responseStream)) {
+        streamingMethods.push(rpcMethod);
+      } else {
+        methods.push({ name: `${serviceName}.${methodName}`, rpcMethod });
+      }
+    }
+  }
+  return { methods, streamingMethods };
+}
+
 export async function parseGrpcProto(source: string) {
   if (!source.trim()) throw new Error("Proto file is empty");
   if (Buffer.byteLength(source, "utf8") > 1024 * 1024)
@@ -19,26 +37,13 @@ export async function parseGrpcProto(source: string) {
     await writeFile(file, source, "utf8");
     const importSource = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     const importedFiles = [
-      ...importSource.matchAll(/\bimport\s+(?:public\s+|weak\s+)?["']([^"']+)["']\s*;/g),
+      ...importSource.matchAll(/\bimport\s+(?:(?:public|weak)\s+)?["']([^"']+)["']\s*;/g),
     ].map(([, path]) => path);
     const unresolvedImports = importedFiles;
     if (unresolvedImports.length) return { methods: [], streamingMethods: [], unresolvedImports };
 
     const definition = loadSync(file, { keepCase: true, longs: String, enums: String });
-    const methods: ParsedGrpcMethod[] = [];
-    const streamingMethods: string[] = [];
-    for (const [serviceName, service] of Object.entries(definition)) {
-      if (!service || typeof service !== "object") continue;
-      for (const [methodName, method] of Object.entries(service)) {
-        if (!method || typeof method !== "object" || !("path" in method)) continue;
-        const rpcMethod = String(method.path);
-        if ("requestStream" in method && (method.requestStream || method.responseStream)) {
-          streamingMethods.push(rpcMethod);
-        } else {
-          methods.push({ name: `${serviceName}.${methodName}`, rpcMethod });
-        }
-      }
-    }
+    const { methods, streamingMethods } = parseMethods(definition);
     if (!methods.length && !streamingMethods.length)
       throw new Error("Proto file contains no service methods");
     return { methods, streamingMethods, unresolvedImports: [] };

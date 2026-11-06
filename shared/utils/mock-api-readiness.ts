@@ -120,6 +120,83 @@ function addHeaderReasons(
   }
 }
 
+function expectedEndpointType(apiType: MockApiReadinessInput["apiType"]) {
+  if (apiType === "GRPC") return "GRPC";
+  if (apiType === "GRAPHQL") return "GRAPHQL";
+  return "REST";
+}
+
+function addEndpointReasons(
+  api: MockApiReadinessInput,
+  endpointUrl: string | null,
+  expectedType: string,
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  if (!api.targetEndpointId) {
+    reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
+    return;
+  }
+  if (api.endpointApiType && api.endpointApiType !== expectedType) {
+    reasons.push({
+      code: "endpoint-type-mismatch",
+      message: "Mock API type must match the selected service endpoint",
+    });
+    return;
+  }
+  if (api.apiType !== "GRPC" && !endpointUrl) {
+    reasons.push({ code: "endpoint-missing", message: "Select a REST endpoint" });
+    return;
+  }
+  if (api.apiType !== "GRPC" && endpointUrl) {
+    addPathParameterReasons(api, endpointUrl, variables, reasons);
+    if (api.apiType && api.targetApiType && expectedType !== api.targetApiType)
+      reasons.push({
+        code: "api-type-mismatch",
+        message: "Mock API type must match service API type",
+      });
+  }
+}
+
+function addGraphqlReasons(
+  api: MockApiReadinessInput,
+  variables: Map<string, string>,
+  reasons: ReadinessReason[],
+) {
+  const request =
+    api.requestJson && typeof api.requestJson === "object" && !Array.isArray(api.requestJson)
+      ? (api.requestJson as { query?: unknown; variables?: unknown })
+      : {};
+  const query = request.query;
+  if (typeof query !== "string" || !query.trim()) {
+    reasons.push({ code: "graphql-query-missing", message: "Enter a GraphQL query" });
+  } else {
+    try {
+      parse(query);
+    } catch (error) {
+      reasons.push({
+        code: "graphql-syntax-invalid",
+        message: error instanceof Error ? error.message : "GraphQL syntax is invalid",
+      });
+    }
+  }
+  const requestVariables = request.variables;
+  if (
+    requestVariables !== undefined &&
+    (!requestVariables || typeof requestVariables !== "object" || Array.isArray(requestVariables))
+  )
+    reasons.push({
+      code: "graphql-variables-invalid",
+      message: "GraphQL variables must be a JSON object",
+    });
+  addMissingVariables(api.requestJson, "GraphQL request", variables, reasons);
+}
+
+function readinessStatus(reasons: ReadinessReason[], active: boolean) {
+  if (reasons.length) return "draft" as const;
+  return active ? ("ready" as const) : ("inactive" as const);
+}
+
 export function evaluateMockApiReadiness(
   api: MockApiReadinessInput,
   endpointUrl: string | null,
@@ -127,25 +204,8 @@ export function evaluateMockApiReadiness(
   variables: Map<string, string>,
 ) {
   const reasons: ReadinessReason[] = [];
-  const expectedEndpointApiType =
-    api.apiType === "GRPC" ? "GRPC" : api.apiType === "GRAPHQL" ? "GRAPHQL" : "REST";
-  if (!api.targetEndpointId) {
-    reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
-  } else if (api.endpointApiType && api.endpointApiType !== expectedEndpointApiType) {
-    reasons.push({
-      code: "endpoint-type-mismatch",
-      message: "Mock API type must match the selected service endpoint",
-    });
-  } else if (api.apiType !== "GRPC" && !endpointUrl) {
-    reasons.push({ code: "endpoint-missing", message: "Select a REST endpoint" });
-  } else if (api.apiType !== "GRPC" && endpointUrl) {
-    addPathParameterReasons(api, endpointUrl, variables, reasons);
-    if (api.apiType && api.targetApiType && expectedEndpointApiType !== api.targetApiType)
-      reasons.push({
-        code: "api-type-mismatch",
-        message: "Mock API type must match service API type",
-      });
-  }
+  const expectedType = expectedEndpointType(api.apiType);
+  addEndpointReasons(api, endpointUrl, expectedType, variables, reasons);
   if (api.headerTemplateId && api.headerTemplateExists === false)
     reasons.push({
       code: "header-template-missing",
@@ -166,42 +226,11 @@ export function evaluateMockApiReadiness(
     );
 
   if (api.apiType === "GRAPHQL") {
-    const query =
-      api.requestJson && typeof api.requestJson === "object" && !Array.isArray(api.requestJson)
-        ? (api.requestJson as { query?: unknown }).query
-        : undefined;
-    if (typeof query !== "string" || !query.trim())
-      reasons.push({ code: "graphql-query-missing", message: "Enter a GraphQL query" });
-    else {
-      try {
-        parse(query);
-      } catch (error) {
-        reasons.push({
-          code: "graphql-syntax-invalid",
-          message: error instanceof Error ? error.message : "GraphQL syntax is invalid",
-        });
-      }
-    }
-    const requestVariables =
-      api.requestJson && typeof api.requestJson === "object" && !Array.isArray(api.requestJson)
-        ? (api.requestJson as { variables?: unknown }).variables
-        : undefined;
-    if (
-      requestVariables !== undefined &&
-      (!requestVariables || typeof requestVariables !== "object" || Array.isArray(requestVariables))
-    )
-      reasons.push({
-        code: "graphql-variables-invalid",
-        message: "GraphQL variables must be a JSON object",
-      });
-    addMissingVariables(api.requestJson, "GraphQL request", variables, reasons);
+    addGraphqlReasons(api, variables, reasons);
   } else addMissingVariables(api.requestJson, "Request body", variables, reasons);
   if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
     addMissingVariables(api.matchUrl ?? api.importUrl, "Imported URL", variables, reasons);
   addHeaderReasons(templateHeaders, api.customHeaders, variables, reasons);
 
-  let status: "draft" | "ready" | "inactive" = "inactive";
-  if (reasons.length) status = "draft";
-  else if (api.active) status = "ready";
-  return { status, reasons };
+  return { status: readinessStatus(reasons, api.active), reasons };
 }

@@ -36,6 +36,7 @@ async function signIn() {
           <span>Username</span>
           <UInput
             id="username"
+            name="username"
             v-model="username"
             aria-label="Username"
             autocomplete="username"
@@ -46,6 +47,7 @@ async function signIn() {
           <span>Password</span>
           <UInput
             id="password"
+            name="password"
             v-model="password"
             aria-label="Password"
             type="password"

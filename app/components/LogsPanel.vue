@@ -23,7 +23,9 @@ function toggleFilter(values: string[], value: string) {
 }
 
 const serviceNames = computed(() =>
-  [...new Set(props.services.map((service) => service.name))].sort(),
+  [...new Set(props.services.map((service) => service.name))].toSorted((a, b) =>
+    a.localeCompare(b),
+  ),
 );
 const serviceFilterItems = computed(() => [
   [
@@ -90,21 +92,18 @@ const severityFilterItems = computed(() => [
     :style="{ '--logs-panel-height': `${props.height}px` }"
   >
     <div class="flex h-3 shrink-0 justify-center">
-      <div
+      <button
+        type="button"
         class="flex w-16 cursor-row-resize touch-none items-center justify-center rounded-full outline-none hover:bg-[var(--panel2)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-        role="separator"
-        tabindex="0"
         aria-label="Resize logs panel"
-        aria-orientation="horizontal"
+        aria-description="Use the up and down arrow keys to adjust height."
         aria-controls="logs-panel"
-        :aria-valuenow="props.height"
-        aria-valuetext="Panel height in pixels"
         @pointerdown.prevent="emit('resize', $event)"
         @keydown.up.prevent="emit('adjustHeight', 24)"
         @keydown.down.prevent="emit('adjustHeight', -24)"
       >
         <span class="h-1 w-10 rounded-full bg-[var(--muted)]" aria-hidden="true"></span>
-      </div>
+      </button>
     </div>
     <div
       class="flex min-h-[54px] flex-wrap items-center gap-2 border-b border-[var(--border)] px-3 pb-2 pt-3"

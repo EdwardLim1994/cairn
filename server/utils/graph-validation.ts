@@ -107,6 +107,34 @@ function endpoint(value: unknown, apiType: "REST" | "GRPC"): EndpointInput {
   };
 }
 
+function healthCheckUrl(input: Record<string, unknown>): string | null {
+  if (input.healthCheckUrl == null || input.healthCheckUrl === "") return null;
+  const value = requiredText(input.healthCheckUrl, "Health-check URL", 2048);
+  if (/^https?:\/\//i.test(value)) return httpUrl(value, "Health-check URL");
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  throw createError({
+    statusCode: 400,
+    statusMessage: "Health-check URL must be an HTTP(S) URL or begin with /",
+  });
+}
+
+function healthHeaders(input: Record<string, unknown>) {
+  const headers = input.healthCheckCustomHeaders ?? [];
+  if (!Array.isArray(headers))
+    throw createError({ statusCode: 400, statusMessage: "Health-check headers must be an array" });
+  try {
+    validateHeaderRows(headers as Array<{ name: string; value: string }>, "Custom header");
+  } catch (error) {
+    throw createError({ statusCode: 400, statusMessage: (error as Error).message });
+  }
+  return headers as Array<{ name: string; value: string }>;
+}
+
+function optionalNullableString(value: unknown) {
+  if (typeof value === "string" || value === null) return value;
+  return undefined;
+}
+
 export function serviceInput(value: unknown): ServiceInput {
   const input = record(value, "Service");
   if (!Array.isArray(input.endpoints))
@@ -123,28 +151,8 @@ export function serviceInput(value: unknown): ServiceInput {
       statusCode: 400,
       statusMessage: "Target address must use host:port format",
     });
-  let healthCheckUrl: string | null = null;
-  if (input.healthCheckUrl != null && input.healthCheckUrl !== "") {
-    const value = requiredText(input.healthCheckUrl, "Health-check URL", 2048);
-    if (/^https?:\/\//i.test(value)) healthCheckUrl = httpUrl(value, "Health-check URL");
-    else if (value.startsWith("/") && !value.startsWith("//")) healthCheckUrl = value;
-    else
-      throw createError({
-        statusCode: 400,
-        statusMessage: "Health-check URL must be an HTTP(S) URL or begin with /",
-      });
-  }
-  const healthCheckCustomHeaders = input.healthCheckCustomHeaders ?? [];
-  if (!Array.isArray(healthCheckCustomHeaders))
-    throw createError({ statusCode: 400, statusMessage: "Health-check headers must be an array" });
-  try {
-    validateHeaderRows(
-      healthCheckCustomHeaders as Array<{ name: string; value: string }>,
-      "Custom header",
-    );
-  } catch (error) {
-    throw createError({ statusCode: 400, statusMessage: (error as Error).message });
-  }
+  const parsedHealthCheckUrl = healthCheckUrl(input);
+  const healthCheckCustomHeaders = healthHeaders(input);
   const templateId = input.healthCheckHeaderTemplateId;
   if (templateId != null && typeof templateId !== "string")
     throw createError({
@@ -158,15 +166,10 @@ export function serviceInput(value: unknown): ServiceInput {
     framework: requiredText(input.framework, "Framework", 100),
     baseUrl,
     grpcTls: Boolean(input.grpcTls),
-    protoContent:
-      typeof input.protoContent === "string"
-        ? input.protoContent
-        : input.protoContent === null
-          ? null
-          : undefined,
+    protoContent: optionalNullableString(input.protoContent),
     protoFileName: typeof input.protoFileName === "string" ? input.protoFileName : null,
     clearProto: input.clearProto === true,
-    healthCheckUrl,
+    healthCheckUrl: parsedHealthCheckUrl,
     healthCheckHeaderTemplateId: typeof templateId === "string" && templateId ? templateId : null,
     healthCheckCustomHeaders: healthCheckCustomHeaders as Array<{ name: string; value: string }>,
     active: input.active === undefined ? true : Boolean(input.active),

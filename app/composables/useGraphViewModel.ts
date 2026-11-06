@@ -15,6 +15,26 @@ function frameworkLabel(framework: string) {
   return framework.toLowerCase().includes(".net") ? ".NET" : framework;
 }
 
+function endpointHandle(endpointId: string) {
+  return `in:${endpointId}`;
+}
+
+function endpointSourceHandle(endpointId: string) {
+  return `out:${endpointId}`;
+}
+
+function onlineStatus(destinations: Array<{ health?: boolean | null }>) {
+  if (destinations.some((destination) => destination.health === false)) return false;
+  if (destinations.every((destination) => destination.health === true)) return true;
+  return null;
+}
+
+function edgeClass(running: boolean, completed: boolean) {
+  if (running) return "app__flow-edge app__flow-edge--running";
+  if (completed) return "app__flow-edge app__flow-edge--observed";
+  return "";
+}
+
 export function useGraphViewModel({
   store,
   mockApis,
@@ -26,14 +46,6 @@ export function useGraphViewModel({
       if (service.endpoints.some((endpoint) => endpoint.id === endpointId)) return service.id;
     }
     return undefined;
-  }
-
-  function endpointHandle(endpointId: string) {
-    return `in:${endpointId}`;
-  }
-
-  function endpointSourceHandle(endpointId: string) {
-    return `out:${endpointId}`;
   }
 
   function serviceEndpointOptions() {
@@ -180,11 +192,7 @@ export function useGraphViewModel({
           store.observedMessageConnectionIds.includes(connection.id) &&
           destinationIds.has(connection.destinationId),
       );
-      const online = destinations.some((destination) => destination.health === false)
-        ? false
-        : destinations.every((destination) => destination.health === true)
-          ? true
-          : null;
+      const online = onlineStatus(destinations);
       return {
         id: nodeId,
         type: "messageQueue",
@@ -272,11 +280,7 @@ export function useGraphViewModel({
           target,
           targetHandle: endpointHandle(entry.targetEndpointId ?? ""),
           type: "default",
-          class: running
-            ? "app__flow-edge app__flow-edge--running"
-            : completed
-              ? "app__flow-edge app__flow-edge--observed"
-              : "",
+          class: edgeClass(running, completed),
           animated: running || completed,
         },
       ];

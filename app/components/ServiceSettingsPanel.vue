@@ -160,11 +160,9 @@ function subscriptionsValid() {
     const destination = props.messageDestinations.find(
       (item) => item.id === subscription.destinationId,
     );
-    return destination?.broker === "kafka"
-      ? Boolean(subscription.consumerGroup?.trim())
-      : destination?.broker === "rabbitmq"
-        ? Boolean(subscription.bindingKey?.trim())
-        : false;
+    if (destination?.broker === "kafka") return Boolean(subscription.consumerGroup?.trim());
+    if (destination?.broker === "rabbitmq") return Boolean(subscription.bindingKey?.trim());
+    return false;
   });
 }
 
@@ -442,10 +440,10 @@ function handleOpenChange(open: boolean) {
             />
           </label>
         </div>
-        <label v-if="draft.apiType === 'GRPC'" class="mt-2 flex items-center gap-2 text-[11px]">
+        <div v-if="draft.apiType === 'GRPC'" class="mt-2 flex items-center gap-2 text-[11px]">
           <UCheckbox v-model="draft.grpcTls" aria-label="Use TLS for gRPC calls" />
           <span>Use TLS</span>
-        </label>
+        </div>
         <div v-if="draft.apiType === 'GRPC'" class="mt-3">
           <div
             v-if="draft.protoFileName"
@@ -543,7 +541,7 @@ function handleOpenChange(open: boolean) {
           @toggle="expandedSubscriptionId = $event ? subscription.id : null"
           @delete="subscriptions.splice(index, 1)"
         >
-          <label class="flex flex-col gap-1">
+          <div class="flex flex-col gap-1">
             <span class="text-[10px] font-medium text-[var(--muted)]">Message queue topic</span>
             <USelect
               :model-value="subscription.destinationId"
@@ -551,8 +549,8 @@ function handleOpenChange(open: boolean) {
               :aria-label="`Subscriber ${index + 1} topic`"
               @update:model-value="selectDestination(subscription, String($event))"
             />
-          </label>
-          <label
+          </div>
+          <div
             v-if="
               props.messageDestinations.find((item) => item.id === subscription.destinationId)
                 ?.broker === 'kafka'
@@ -565,15 +563,15 @@ function handleOpenChange(open: boolean) {
               :aria-label="`Subscriber ${index + 1} consumer group`"
               required
             />
-          </label>
-          <label v-else class="flex flex-col gap-1">
+          </div>
+          <div v-else class="flex flex-col gap-1">
             <span class="text-[10px] font-medium text-[var(--muted)]">RabbitMQ binding key</span>
             <UInput
               v-model="subscription.bindingKey"
               :aria-label="`Subscriber ${index + 1} binding key`"
               required
             />
-          </label>
+          </div>
           <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
             <div class="flex items-center justify-between gap-2">
               <strong class="text-[10px] font-medium">Outbound calls</strong>

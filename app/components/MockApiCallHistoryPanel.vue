@@ -24,9 +24,9 @@ function formatTime(value: string) {
 function formatJson(value: unknown) {
   if (value === null) return "No body";
   try {
-    return JSON.stringify(value, null, 2) ?? String(value);
+    return JSON.stringify(value, null, 2) ?? "Unable to format JSON";
   } catch {
-    return String(value);
+    return "Unable to format JSON";
   }
 }
 

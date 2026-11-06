@@ -2,14 +2,14 @@ import type { CompletionContext } from "@codemirror/autocomplete";
 
 export function graphCodeCompletions(context: CompletionContext) {
   const before = context.state.doc.sliceString(0, context.pos);
-  const match = before.match(/"(framework|apiType|method)"\s*:\s*"([^"]*)$/);
+  const match = /"(framework|apiType|method)"\s*:\s*"([^"]*)$/.exec(before);
   if (!match) return null;
   const values =
-    match[1] === "framework"
-      ? ["Spring Boot", ".NET", "Other"]
-      : match[1] === "apiType"
-        ? ["REST", "GRPC"]
-        : ["GET", "POST", "PUT", "PATCH", "DELETE"];
+    {
+      framework: ["Spring Boot", ".NET", "Other"],
+      apiType: ["REST", "GRPC"],
+      method: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    }[match[1]!] ?? [];
   return {
     from: context.pos - match[2]!.length,
     options: values.map((label) => ({ label, type: "enum" })),

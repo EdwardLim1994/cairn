@@ -80,9 +80,14 @@ function collapseCard(id: string) {
   if (expandedCardId.value === id) expandedCardId.value = null;
 }
 
-function setCardOpen(id: string, open: boolean) {
-  if (open) expandCard(id);
-  else collapseCard(id);
+function expandVariableCard(variable: EnvironmentVariable) {
+  expandCard(`variable:${variable.id}`);
+  emit("openVariable", variable);
+}
+
+function collapseVariableCard(variable: EnvironmentVariable) {
+  collapseCard(`variable:${variable.id}`);
+  emit("closeVariable", variable);
 }
 
 function mockApiKey(entry: MockApiDraft, index: number) {
@@ -326,7 +331,8 @@ watchEffect(() => {
           :title="template.name || 'New header template'"
           :delete-label="`Delete ${template.name || 'header template'}`"
           :open="expandedCardId === `template:${template.id}`"
-          @toggle="setCardOpen(`template:${template.id}`, $event)"
+          @expand="expandCard(`template:${template.id}`)"
+          @collapse="collapseCard(`template:${template.id}`)"
           @delete="emit('deleteHeaderTemplate', template)"
         >
           <label
@@ -396,7 +402,8 @@ watchEffect(() => {
           :title="template.name || 'New authorization template'"
           :delete-label="`Delete ${template.name || 'authorization template'}`"
           :open="expandedCardId === `authorization:${template.id}`"
-          @toggle="setCardOpen(`authorization:${template.id}`, $event)"
+          @expand="expandCard(`authorization:${template.id}`)"
+          @collapse="collapseCard(`authorization:${template.id}`)"
           @delete="emit('deleteAuthorizationTemplate', template)"
         >
           <label
@@ -657,9 +664,8 @@ watchEffect(() => {
                     :title="variable.name || 'New variable'"
                     :delete-label="`Delete ${variable.name || 'variable'}`"
                     :open="expandedCardId === `variable:${variable.id}`"
-                    @toggle="setCardOpen(`variable:${variable.id}`, $event)"
-                    @expand="emit('openVariable', variable)"
-                    @collapse="emit('closeVariable', variable)"
+                    @expand="expandVariableCard(variable)"
+                    @collapse="collapseVariableCard(variable)"
                     @delete="emit('deleteVariable', variable)"
                   >
                     <template v-if="props.editingEnvironmentVariableId === variable.id">
@@ -782,7 +788,8 @@ watchEffect(() => {
                   :delete-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
                   :open="expandedCardId === `mock:${mockApiKey(entry, index)}`"
                   compact
-                  @toggle="setCardOpen(`mock:${mockApiKey(entry, index)}`, $event)"
+                  @expand="expandCard(`mock:${mockApiKey(entry, index)}`)"
+                  @collapse="collapseCard(`mock:${mockApiKey(entry, index)}`)"
                   @delete="emit('removeMockApi', index)"
                 >
                   <template #actions>
@@ -824,23 +831,24 @@ watchEffect(() => {
                       @update:model-value="emit('setMockEndpoint', entry)"
                     />
                   </label>
-                  <label
-                    v-if="(entry.apiType ?? 'HTTP') === 'HTTP'"
-                    v-for="name in props.endpointPathParameterNames(entry)"
-                    :key="name"
-                    :for="`mock-api-path-${entry.id || index}-${name}`"
-                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
-                  >
-                    <span>Path parameter: {{ name }}</span>
-                    <UInput
-                      :id="`mock-api-path-${entry.id || index}-${name}`"
-                      v-model="entry.pathParameters[name]"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
-                      :placeholder="`Value or {{${name}}}`"
-                    />
-                  </label>
+                  <template v-if="(entry.apiType ?? 'HTTP') === 'HTTP'">
+                    <label
+                      v-for="name in props.endpointPathParameterNames(entry)"
+                      :key="name"
+                      :for="`mock-api-path-${entry.id || index}-${name}`"
+                      class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                    >
+                      <span>Path parameter: {{ name }}</span>
+                      <UInput
+                        :id="`mock-api-path-${entry.id || index}-${name}`"
+                        v-model="entry.pathParameters[name]"
+                        :ui="{
+                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                        }"
+                        :placeholder="`Value or {{${name}}}`"
+                      />
+                    </label>
+                  </template>
                   <label
                     v-if="(entry.apiType ?? 'HTTP') === 'HTTP'"
                     :for="`mock-api-template-${entry.id || index}`"
