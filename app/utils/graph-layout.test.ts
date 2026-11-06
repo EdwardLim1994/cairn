@@ -50,22 +50,26 @@ describe("arrangeGraph", () => {
     expect(positions.get("target")!.y).toBeGreaterThan(positions.get("caller")!.y + 365);
   });
 
-  it("places message destinations between publishers and consumers", () => {
+  it("places all message queue nodes in their own column", () => {
     const positions = arrangeGraph(
       services as never,
       [],
       [],
-      [{ id: "orders", name: "Orders" }],
+      [
+        { id: "orders", name: "Orders", queueId: "orders" },
+        { id: "payments", name: "Payments", queueId: "payments" },
+      ],
       [
         { type: "publish", destinationId: "orders", endpointId: "caller-endpoint" },
-        { type: "subscribe", destinationId: "orders", serviceId: "target" },
+        { type: "subscribe", destinationId: "payments", serviceId: "target" },
       ],
     );
-    const destination = positions.get("message-queue")!;
-    expect(positions.get("caller")!.x).toBeLessThan(destination.x);
-    expect(destination.x).toBeLessThan(positions.get("target")!.x);
-    expect(destination.x).not.toBe(positions.get("caller")!.x);
-    expect(destination.x).not.toBe(positions.get("target")!.x);
+    const orders = positions.get("message-queue:orders")!;
+    const payments = positions.get("message-queue:payments")!;
+    expect(orders.x).toBe(payments.x);
+    expect(orders.x).toBeGreaterThan(positions.get("caller")!.x);
+    expect(orders.x).toBeGreaterThan(positions.get("target")!.x);
+    expect(orders.y).not.toBe(payments.y);
   });
 
   it("reserves the queue node's topic-dependent height during auto arrange", () => {

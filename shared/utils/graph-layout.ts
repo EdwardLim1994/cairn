@@ -43,25 +43,12 @@ export function arrangeGraph(
   const destinationNodeIds = [
     ...new Set(destinations.map((destination) => messageQueueNodeId(destination.queueId))),
   ];
-  const destinationById = new Map(destinations.map((destination) => [destination.id, destination]));
   const nodeIds = [...services.map(({ id }) => id), ...destinationNodeIds];
   const adjacency = new Map(nodeIds.map((id) => [id, new Set<string>()]));
   for (const edge of edges) {
     const target = endpointOwners.get(edge.targetEndpointId);
     if (target && target !== edge.sourceServiceId) adjacency.get(edge.sourceServiceId)?.add(target);
   }
-  for (const connection of messageConnections) {
-    const destination = destinationById.get(connection.destinationId);
-    if (!destination) continue;
-    const destinationNodeId = messageQueueNodeId(destination.queueId);
-    if (connection.type === "publish") {
-      const source =
-        (connection.endpointId && endpointOwners.get(connection.endpointId)) ??
-        connection.serviceId;
-      if (source) adjacency.get(source)?.add(destinationNodeId);
-    } else adjacency.get(destinationNodeId)?.add(connection.serviceId);
-  }
-
   let nextIndex = 0;
   const indices = new Map<string, number>();
   const lowLinks = new Map<string, number>();
@@ -132,7 +119,11 @@ export function arrangeGraph(
     }
   }
 
-  const nodeRank = (id: string) => ranks[componentByService.get(id)!]!;
+  const serviceRank = (id: string) => ranks[componentByService.get(id)!]!;
+  const queueRank = services.length
+    ? Math.max(...services.map(({ id }) => serviceRank(id))) + 1
+    : 0;
+  const nodeRank = (id: string) => (serviceById.has(id) ? serviceRank(id) : queueRank);
 
   const mockByService = new Map<string, GraphMockApi[]>();
   for (const api of mockApis) {

@@ -10,6 +10,7 @@ import { resolveStaticAuthorizationHeaders } from "../../utils/authorization";
 import { getOAuthAccessToken } from "../../utils/oauth-client";
 import { invokeUnaryGrpc } from "../../utils/grpc-client";
 import { getProtoFile } from "../../utils/proto-storage";
+import { status as grpcStatusCodes } from "@grpc/grpc-js";
 
 type ExecutionTarget = {
   apiType?: "HTTP" | "GRPC";
@@ -307,7 +308,7 @@ export function createRunMockApiUseCase(dependencies: {
       };
     } catch (cause) {
       const message = failureMessage(cause, controller.signal.aborted, timeoutMs);
-      const grpcStatus =
+      const grpcStatusCode =
         typeof cause === "object" &&
         cause !== null &&
         "code" in cause &&
@@ -315,17 +316,15 @@ export function createRunMockApiUseCase(dependencies: {
           ? cause.code
           : null;
       const grpcStatusName =
-        grpcStatus === null
+        grpcStatusCode === null
           ? null
-          : typeof cause === "object" && cause !== null && "code" in cause
-            ? String(cause.code)
-            : null;
+          : (grpcStatusCodes[grpcStatusCode] ?? String(grpcStatusCode));
       await dependencies.finishRun(runId, {
         status: "failed",
         error: message,
-        ...(apiType === "GRPC" ? { grpcStatus, grpcStatusName } : {}),
+        ...(apiType === "GRPC" ? { grpcStatus: grpcStatusCode, grpcStatusName } : {}),
       });
-      await logFailure(message, grpcStatus);
+      await logFailure(message, grpcStatusCode);
       return {
         id: runId,
         traceId,
@@ -334,7 +333,7 @@ export function createRunMockApiUseCase(dependencies: {
         responseHeaders: null,
         responseBody: null,
         error: message,
-        ...(apiType === "GRPC" ? { grpcStatus, grpcStatusName } : {}),
+        ...(apiType === "GRPC" ? { grpcStatus: grpcStatusCode, grpcStatusName } : {}),
       };
     } finally {
       if (timeout) clearTimeout(timeout);

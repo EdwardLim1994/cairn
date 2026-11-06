@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { MockApiNotFoundError, MockApiNotReadyError } from "../../repositories/mock-apis/errors";
+import { invokeUnaryGrpc } from "../../utils/grpc-client";
+import { getProtoFile } from "../../utils/proto-storage";
 import { createRunMockApiUseCase } from "./run-mock-api";
+
+vi.mock("../../utils/grpc-client", () => ({ invokeUnaryGrpc: vi.fn() }));
+vi.mock("../../utils/proto-storage", () => ({ getProtoFile: vi.fn() }));
 
 function requestUrl(input: RequestInfo | URL): string {
   return input instanceof URL ? input.href : typeof input === "string" ? input : input.url;
@@ -52,6 +57,87 @@ function setup(overrides: Partial<Parameters<typeof createRunMockApiUseCase>[0]>
 }
 
 describe("mock API run use case", () => {
+  it("runs a gRPC request with stored proto and records its response", async () => {
+    const grpcTarget = {
+      ...target,
+      apiType: "GRPC" as const,
+      endpointUrl: null,
+      method: null,
+      url: null,
+      rpcMethod: "/sample.Echo/Send",
+      baseUrl: "localhost:50051",
+      grpcTls: true,
+      protoStorageKey: "services/service-1/schema.proto",
+    };
+    vi.mocked(getProtoFile).mockResolvedValue("proto source");
+    vi.mocked(invokeUnaryGrpc).mockResolvedValue({ message: "hello" });
+    const { deps, run } = setup({ getTarget: vi.fn().mockResolvedValue(grpcTarget) });
+
+    const result = await run("mock-1");
+
+    expect(result).toMatchObject({
+      status: "completed",
+      responseBody: JSON.stringify({ message: "hello" }),
+      grpcStatus: 0,
+      grpcStatusName: "OK",
+    });
+    expect(invokeUnaryGrpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proto: "proto source",
+        rpcMethod: "/sample.Echo/Send",
+        target: "localhost:50051",
+        tls: true,
+        request: { token: "abc", enabled: true },
+        traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
+      }),
+    );
+    expect(deps.createRun).toHaveBeenCalledWith(
+      "project-1",
+      "mock-1",
+      "run-1",
+      "a".repeat(32),
+      "Create order",
+      "GRPC",
+      "localhost:50051",
+      { token: "abc", enabled: true },
+    );
+  });
+
+  it("records canonical gRPC status names on failed calls", async () => {
+    const grpcTarget = {
+      ...target,
+      apiType: "GRPC" as const,
+      endpointUrl: null,
+      method: null,
+      url: null,
+      rpcMethod: "/sample.Echo/Send",
+      baseUrl: "localhost:50051",
+      grpcTls: false,
+      protoStorageKey: "services/service-1/schema.proto",
+    };
+    vi.mocked(getProtoFile).mockResolvedValue("proto source");
+    vi.mocked(invokeUnaryGrpc).mockRejectedValue(
+      Object.assign(new Error("14 UNAVAILABLE: connection refused"), {
+        code: 14,
+        details: "connection refused",
+      }),
+    );
+    const { deps, run } = setup({ getTarget: vi.fn().mockResolvedValue(grpcTarget) });
+
+    const result = await run("mock-1");
+
+    expect(result).toMatchObject({
+      status: "failed",
+      grpcStatus: 14,
+      grpcStatusName: "UNAVAILABLE",
+      error: "14 UNAVAILABLE: connection refused",
+    });
+    expect(deps.finishRun).toHaveBeenCalledWith(
+      "run-1",
+      expect.objectContaining({ status: "failed", grpcStatus: 14, grpcStatusName: "UNAVAILABLE" }),
+    );
+  });
+
   it("runs a request with substituted values and persists the response", async () => {
     const { deps, run } = setup();
     const result = await run("mock-1");

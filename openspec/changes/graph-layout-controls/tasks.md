@@ -9,6 +9,7 @@
 
 - [x] 2.1 Implement deterministic service layers with cycle grouping, stable ordering, target-grouped Mock API nodes, and expanded-height spacing; verify connected, cyclic, disconnected, and collapsed layouts with focused layout tests.
 - [x] 2.2 Add the Auto arrange toolbar action, save all service and Mock API positions, then fit the viewport; verify one action updates positions and reload restores them.
+- [x] 2.3 Place all message queue nodes in a dedicated auto-arrange column and stack them without overlap.
 
 ## 3. Lock graph movement
 

@@ -27,6 +27,12 @@ The system SHALL provide an explicit action that positions all graph nodes to ma
 - **WHEN** a graph contains services without declared connections and a user activates Auto arrange
 - **THEN** the system places them in stable, non-overlapping positions
 
+#### Scenario: Arrange message queue nodes in a dedicated column
+
+- **WHEN** a user activates Auto arrange with message queue nodes present
+- **THEN** the system places all message queue nodes in their own column, separate from service nodes
+- **AND** the system stacks message queue nodes without overlap
+
 #### Scenario: Preserve space for collapsed services
 
 - **WHEN** a user activates Auto arrange while service nodes are collapsed

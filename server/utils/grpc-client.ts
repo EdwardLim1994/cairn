@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
+import { parse as parseProto } from "protobufjs";
 import { getOutboundGrpcTarget } from "./outbound-url";
 
 export async function invokeUnaryGrpc(input: {
@@ -25,6 +26,8 @@ export async function invokeUnaryGrpc(input: {
       defaults: true,
       oneofs: true,
     });
+    const protoRoot = parseProto(input.proto).root;
+    protoRoot.resolveAll();
     const root = grpc.loadPackageDefinition(definition) as Record<string, unknown>;
     const parts = input.rpcMethod.replace(/^\//, "").split("/");
     const [serviceName, methodName] = parts;
@@ -42,6 +45,13 @@ export async function invokeUnaryGrpc(input: {
     try {
       const method = Client.service[methodName];
       if (!method) throw new Error(`gRPC method not found: ${input.rpcMethod}`);
+      if (!input.request || typeof input.request !== "object" || Array.isArray(input.request))
+        throw new Error("gRPC request must be a JSON object");
+      const requestType =
+        protoRoot.lookupService(serviceName).methods[methodName]?.resolvedRequestType;
+      if (!requestType) throw new Error(`gRPC request type not found: ${input.rpcMethod}`);
+      const validationError = requestType.verify(input.request);
+      if (validationError) throw new Error(`Invalid gRPC request: ${validationError}`);
       const invoke = (
         client as unknown as Record<string, ((...args: unknown[]) => void) | undefined>
       )[methodName];
