@@ -23,19 +23,25 @@ See `proposal.md` for the motivation and `specs/message-flow-graph/spec.md` and 
 
 ## Decisions
 
-### Model a logical destination as one graph node
+### Render destinations in independently configured graph nodes
 
-Add a message destination entity and node type. A Kafka destination represents one topic. A RabbitMQ destination represents one topic exchange; the queues and bindings created by services remain behind this logical view. This keeps the graph focused on event flow without implying that Cairn owns RabbitMQ resources.
+Persist each message destination as its own entity and associate it with a stable queue ID. A Kafka destination represents one topic; a RabbitMQ destination represents one topic exchange. Render one Message Queue node per queue ID, with topic-specific handles and independently saved broker settings and position. Existing destinations migrate together into a legacy queue so their current graph remains intact.
 
-The destination stores its broker type, destination name, and broker connection settings. The visual edges represent intent: a registered service endpoint publishes to the destination, and a service consumes from it. Consumer edges target services because event handlers are not necessarily HTTP endpoints.
+Clicking a Message Queue node opens a right-side settings panel listing only that queue's destinations and broker connection health. Creating a queue starts with an empty topic list; adding a topic associates it with the selected queue. Visual edges represent intent: registered service endpoints or event handlers publish to a destination, and services consume from it. Consumer edges target services because event handlers are not necessarily HTTP endpoints.
 
 ### Keep routing attributes on message connections
 
-Represent publish and subscribe relationships as message connections separate from existing endpoint-to-endpoint call edges. Kafka subscription connections carry the consumer group. RabbitMQ publish connections carry a routing key and subscription connections carry a binding key. RabbitMQ queues and bindings are provisioned by user services; Cairn neither creates them nor confirms they exist.
+Represent publish and subscribe relationships as message connections separate from existing endpoint-to-endpoint call edges. A publisher can be a specific endpoint or a service-level event handler that publishes after consuming another event. Kafka subscription connections carry the consumer group. RabbitMQ publish connections carry a routing key and subscription connections carry a binding key. RabbitMQ queues and bindings are provisioned by user services; Cairn neither creates them nor confirms they exist.
 
-### Store graph entities and positions independently
+Consumer subscriptions also act as valid sources for downstream service calls and republishing. Persist the source subscription identity on those relationships so graph handles and consumer cards can restore the same topology. Service targets remain registered endpoints; message destinations use publish connections and broker-specific routing attributes.
 
-Persist destination definitions and message connections as project-scoped records with stable code keys. Add the destination entity type to graph node positions so coordinates remain canvas state, separate from destination configuration. Validate ownership and connection references within the same transaction when applying or saving graph state.
+In service settings, endpoint and consumer cards use repeatable outbound rows. Each dropdown combines service endpoint and message destination targets; deleting a selected row removes the corresponding saved graph connection.
+
+Render one graph output handle per saved outbound relationship and use its connection ID as the handle ID. This lets users see and identify each configured call while keeping unconnected endpoint and consumer rows available as drag sources.
+
+### Store graph entities and queue positions
+
+Persist destination definitions and message connections as project-scoped records with stable code keys. Persist each queue's visual position separately from its topic rows, while retaining fallback reads for legacy per-topic positions. Keep coordinates as canvas state, separate from destination configuration. Validate ownership and connection references within the same transaction when applying or saving graph state.
 
 ### Extend Graph as code with a compatible version
 
@@ -45,7 +51,7 @@ Do not serialize resolved credentials in graph code. Where a connection setting 
 
 ### Check broker connectivity without querying topology
 
-Run a periodic protocol-level connectivity check from the Cairn server using the configured broker connection. Kafka checks establish an authenticated client connection and request cluster availability; RabbitMQ checks establish an AMQP connection and channel. Neither check lists topics, exchanges, queues, bindings, or consumer groups. Show the result on each destination node and report connection or authentication failures as offline.
+Run a periodic protocol-level connectivity check from the Cairn server using the configured broker connection. Kafka checks establish an authenticated client connection and request cluster availability; RabbitMQ checks establish an AMQP connection and channel. Neither check lists topics, exchanges, queues, bindings, or consumer groups. Show each result beside its destination in the Message Queue node and settings panel, and report connection or authentication failures as offline.
 
 ### Derive actual event flow from telemetry
 

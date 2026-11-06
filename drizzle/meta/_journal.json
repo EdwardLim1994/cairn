@@ -110,15 +110,57 @@
     {
       "idx": 15,
       "version": "5",
-      "when": 1793774088138,
-      "tag": "0015_yummy_marvel_boy",
+      "when": 1793773992226,
+      "tag": "0015_nebulous_proteus",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "5",
+      "when": 1793774088138,
+      "tag": "0016_yummy_marvel_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
       "when": 1793850880688,
-      "tag": "0016_strange_tana_nile",
+      "tag": "0017_strange_tana_nile",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1793863125644,
+      "tag": "0018_steady_thundra",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1793941915760,
+      "tag": "0019_mixed_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1793942170023,
+      "tag": "0020_brave_stature",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1793952564960,
+      "tag": "0021_public_shard",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1793954230334,
+      "tag": "0022_lean_killraven",
       "breakpoints": true
     }
   ]

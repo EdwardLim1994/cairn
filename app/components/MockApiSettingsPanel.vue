@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, ref, watch, watchEffect } from "vue";
+import { defineAsyncComponent, nextTick, ref, watch, watchEffect } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import HeaderRowsEditor from "./HeaderRowsEditor.vue";
 import type {
@@ -29,6 +29,8 @@ const props = defineProps<{
   environmentVariablesLoading: boolean;
   editingEnvironmentVariableId: string | null;
   expandedEnvironmentVariableId: string | null;
+  focusMockApiId?: string | null;
+  focusMockApiRequest?: number;
   servicesForSelect: { id: string; label: string; apiType?: "HTTP" | "GRPC" }[];
   endpointPathParameterNames: (entry: MockApiDraft) => string[];
   endpointDetails: { id: string; url: string | null; apiType?: "REST" | "GRPC" }[];
@@ -92,6 +94,26 @@ watch(
   (id) => {
     if (id) expandedCardId.value = `variable:${id}`;
     else if (expandedCardId.value?.startsWith("variable:")) expandedCardId.value = null;
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.focusMockApiId, props.focusMockApiRequest] as const,
+  async ([id]) => {
+    if (!id) return;
+    const index = mockDraft.value.findIndex((entry) => entry.id === id);
+    if (index < 0) return;
+    expandedCardId.value = `mock:${mockApiKey(mockDraft.value[index]!, index)}`;
+    await nextTick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const panel = document.querySelector<HTMLElement>(".mock-api-settings-panel__body");
+    const card = document.getElementById(`mock-api-${id}`);
+    if (!panel || !card) return;
+    panel.scrollTo({
+      top: panel.scrollTop + card.getBoundingClientRect().top - panel.getBoundingClientRect().top,
+      behavior: "smooth",
+    });
   },
   { immediate: true },
 );
@@ -280,7 +302,7 @@ watchEffect(() => {
       content:
         'z-[71] flex h-full w-[min(520px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
       header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
-      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
+      body: 'mock-api-settings-panel__body flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
       footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
     }"
     @update:open="handleOpenChange"

@@ -6,23 +6,44 @@ Lets users represent event destinations and service publishing or consuming rela
 
 ## ADDED Requirements
 
-### Requirement: Users can create message destination nodes
+### Requirement: The graph shows destinations in independently configured message queue nodes
 
-The system SHALL let users explicitly create a Kafka topic or RabbitMQ topic destination node with a name and broker connection details.
+The system SHALL let users create multiple Message Queue nodes. Each node SHALL own its broker type, connection URL, position, and list of Kafka topics or RabbitMQ topic exchanges while retaining topic-specific publisher and consumer handles.
 
-#### Scenario: Create a Kafka topic node
+#### Scenario: Display topics in separate queues
 
-- **WHEN** a user creates a Kafka destination with a broker connection and topic name
-- **THEN** the graph displays a node representing that topic
+- **WHEN** a project contains destinations assigned to one or more queues
+- **THEN** the graph displays one Message Queue node per queue, listing only that queue's destinations
+- **AND** each destination has distinct handles for publisher and consumer connections
 
-#### Scenario: Create a RabbitMQ topic node
+#### Scenario: Create an independent queue
 
-- **WHEN** a user creates a RabbitMQ destination with a broker connection and topic exchange name
-- **THEN** the graph displays a node representing that logical topic
+- **WHEN** a user creates a Message Queue node
+- **THEN** the new queue starts with its own broker settings and no topics from other queues
+- **AND** adding or removing topics in that queue does not change the topics in another queue
+
+#### Scenario: Collapse all graph nodes
+
+- **WHEN** a user collapses all service nodes
+- **THEN** each Message Queue node bundles its own topic rows into one row
+- **AND** existing topic connections remain attached to their topic-specific handles at the bundled row
+
+#### Scenario: Open message queue settings
+
+- **WHEN** a user clicks the Message Queue node
+- **THEN** a right-side settings panel opens with fields for the broker type and connection URL
+- **AND** the panel lists topics in expandable cards with controls to create or remove topics
+- **AND** the panel lets the user set a custom queue name that appears in the node header
+- **AND** saving applies the broker settings and topic list only to the selected queue
+
+#### Scenario: Delete a message queue
+
+- **WHEN** a user removes a Message Queue node from its settings panel
+- **THEN** the system removes the queue, its topics, their connections, and its saved position
 
 ### Requirement: Users can connect publishing endpoints to destinations
 
-The system SHALL let users connect a registered service endpoint to a message destination to represent that the endpoint publishes events there.
+The system SHALL let users connect a registered service endpoint to a topic-specific handle on the Message Queue node to represent that the endpoint publishes events to that destination.
 
 #### Scenario: Connect a service endpoint to a Kafka topic
 
@@ -34,9 +55,20 @@ The system SHALL let users connect a registered service endpoint to a message de
 - **WHEN** a user connects a service endpoint to a RabbitMQ destination and supplies a routing key
 - **THEN** the graph displays the endpoint as a publisher using that routing key
 
+The system SHALL also let users connect a service directly to a topic-specific handle on the Message Queue node when an asynchronous handler publishes an event without an HTTP or gRPC endpoint.
+
+The service-level “Message publisher” row SHALL appear only when the service has a configured service-level publish connection.
+
+#### Scenario: Connect an event handler to a Kafka topic
+
+- **WHEN** a user connects a service that publishes from a message handler to a Kafka destination
+- **THEN** the graph displays the service as a publisher of that topic without assigning a request endpoint
+
 ### Requirement: Users can connect consuming services to destinations
 
-The system SHALL let users connect a message destination to a service that consumes events from it.
+The system SHALL let users connect a topic-specific handle on the Message Queue node to a service that consumes events from that destination.
+
+The service node SHALL show each configured subscription in its own consumer row, and service settings SHALL let users add, edit, and remove consumer subscriptions using the queue's configured topics.
 
 #### Scenario: Connect a service to a Kafka topic
 
@@ -48,6 +80,50 @@ The system SHALL let users connect a message destination to a service that consu
 - **WHEN** a user connects a RabbitMQ destination to a service and supplies a binding key
 - **THEN** the graph displays the service as a consumer matching that key
 
+#### Scenario: Configure a service consumer in service settings
+
+- **WHEN** a user adds a consumer subscription to a service in service settings
+- **THEN** the service node displays a dedicated consumer row with a connection handle
+- **AND** the graph connects the matching Message Queue topic to that row
+
+#### Scenario: Collapse service consumer rows
+
+- **WHEN** a user collapses a service node
+- **THEN** its consumer rows appear as one bundled row
+- **AND** each existing subscription remains connected through its topic-specific handle
+
+### Requirement: Consumers can connect to downstream services and destinations
+
+Each service consumer row SHALL expose an outbound connection handle. Endpoint and subscription cards SHALL let users manage repeatable downstream calls and publishes using one combined target dropdown.
+
+#### Scenario: Manage multiple outbound targets in service settings
+
+- **WHEN** a user adds an outbound call from an endpoint or consumer card
+- **THEN** the card adds a dropdown containing other service endpoints and message destinations
+- **AND** the user can add more dropdowns or delete a dropdown to remove its saved connection
+
+### Requirement: Service rows show configured outbound connections
+
+The graph SHALL display one distinct output dot for each configured outbound call or publish on its endpoint or consumer row. Each configured connection SHALL use its matching dot as its source.
+
+#### Scenario: Show multiple outbound connection dots
+
+- **WHEN** an endpoint or consumer has multiple configured outbound connections
+- **THEN** the service node shows a separate output dot for each connection on that row
+- **AND** each connection line starts at its matching dot
+
+#### Scenario: Connect a consumer to a downstream service
+
+- **WHEN** a user connects a service consumer row to another service endpoint
+- **THEN** the graph displays a downstream call sourced from that consumer
+- **AND** the consumer card lists the outbound call and allows its removal
+
+#### Scenario: Connect a consumer to another message destination
+
+- **WHEN** a user connects a service consumer row to a message destination
+- **THEN** the graph displays the consumer as a publisher to that destination
+- **AND** the consumer card lists the outbound publish and allows its removal
+
 ### Requirement: The graph preserves messaging topology
 
 The system SHALL save and restore message destination nodes, their publishing and consuming connections, connection details, and node positions with the project graph.
@@ -56,7 +132,7 @@ The system SHALL save and restore message destination nodes, their publishing an
 
 - **WHEN** a user saves and reloads a graph containing message destinations
 - **THEN** the system restores the destinations and their producer and consumer connections
-- **AND** the system restores each destination node's saved position
+- **AND** the system restores each Message Queue node's saved position and queue assignment
 
 ### Requirement: Graph as code supports message destinations
 

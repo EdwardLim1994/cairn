@@ -76,6 +76,8 @@ describe("graph view model", () => {
         },
       ],
       mockApis: apis,
+      messageDestinations: [],
+      messageConnections: [],
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -138,9 +140,9 @@ describe("graph view model", () => {
       edges: [{ sourceService: "Orders", targetService: "Orders" }],
     });
     const edges = model.buildEdges();
-    expect(edges.map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1", "observed-0"]);
+    expect(edges.map(({ id }) => id)).toEqual(["edge-1", "mock-mock-1"]);
     expect(edges[0]).toMatchObject({
-      sourceHandle: "out:endpoint-1",
+      sourceHandle: "outbound-call:edge-1",
       targetHandle: "in:endpoint-1",
       updatable: true,
       deletable: true,
@@ -151,10 +153,10 @@ describe("graph view model", () => {
       target: "service-1",
       targetHandle: "in:endpoint-1",
     });
-    expect(edges[2]?.animated).toBe(true);
+    expect(edges[0]?.animated).toBe(true);
     store.toggleServiceEndpoints("service-1");
     expect(model.buildEdges()[0]).toMatchObject({
-      sourceHandle: "out:endpoint-1",
+      sourceHandle: "outbound-call:edge-1",
       targetHandle: "in:endpoint-1",
       updatable: false,
       deletable: false,
@@ -207,14 +209,14 @@ describe("graph view model", () => {
     expect(model.buildEdges()[0]).toMatchObject({
       id: "assigned-edge",
       source: "service-2",
-      sourceHandle: "out:endpoint-2",
+      sourceHandle: "outbound-call:assigned-edge",
       target: "service-1",
       targetHandle: "in:endpoint-1",
     });
     store.setAllNodesCollapsed(true);
     expect(model.buildEdges()[0]).toMatchObject({
       id: "assigned-edge",
-      sourceHandle: "out:endpoint-2",
+      sourceHandle: "outbound-call:assigned-edge",
       targetHandle: "in:endpoint-1",
       updatable: false,
       deletable: false,
@@ -222,11 +224,162 @@ describe("graph view model", () => {
     store.setAllNodesCollapsed(false);
     expect(model.buildEdges()[0]).toMatchObject({
       id: "assigned-edge",
-      sourceHandle: "out:endpoint-2",
+      sourceHandle: "outbound-call:assigned-edge",
       targetHandle: "in:endpoint-1",
       updatable: true,
       deletable: true,
     });
+  });
+
+  it("anchors legacy service-level publishes on the service's first endpoint", () => {
+    const { store, model } = createModel();
+    store.setMessageDestinations([
+      {
+        id: "orders-topic",
+        projectId: "project-1",
+        codeKey: "orders",
+        broker: "kafka",
+        name: "Orders",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+        x: 500,
+        y: 100,
+      },
+    ]);
+    store.setMessageConnections([
+      {
+        id: "publish-1",
+        type: "publish",
+        serviceId: "service-1",
+        destinationId: "orders-topic",
+      },
+    ]);
+
+    const node = model.serviceNode(store.services[0]!);
+    expect(node.data).toMatchObject({
+      hasMessagePublisher: false,
+    });
+    expect(
+      (
+        node.data as {
+          outboundCalls: { id: string; kind?: string; sourceEndpointId?: string }[];
+        }
+      ).outboundCalls,
+    ).toContainEqual({
+      id: "publish-1",
+      kind: "message",
+      sourceEndpointId: "endpoint-1",
+      sourceSubscriptionId: undefined,
+    });
+    expect(model.buildEdges().find((edge) => edge.id === "message-publish-1")).toMatchObject({
+      source: "service-1",
+      sourceHandle: "outbound-call:publish-1",
+      targetHandle: "publish-in:orders-topic",
+    });
+  });
+
+  it("includes endpoint-owned publishes even when the connection has no serviceId", () => {
+    const { store, model } = createModel();
+    store.setMessageDestinations([
+      {
+        id: "review-topic",
+        projectId: "project-1",
+        codeKey: "review-added",
+        broker: "kafka",
+        name: "Review added",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+        x: 500,
+        y: 100,
+      },
+    ]);
+    store.setMessageConnections([
+      {
+        id: "review-publish",
+        type: "publish",
+        endpointId: "endpoint-1",
+        destinationId: "review-topic",
+      },
+    ]);
+
+    const node = model.serviceNode(store.services[0]!);
+    expect(
+      (
+        node.data as {
+          outboundCalls: { id: string; kind?: string; sourceEndpointId?: string }[];
+        }
+      ).outboundCalls,
+    ).toContainEqual({
+      id: "review-publish",
+      kind: "message",
+      sourceEndpointId: "endpoint-1",
+      sourceSubscriptionId: undefined,
+    });
+    expect(model.buildEdges().find((edge) => edge.id === "message-review-publish")).toMatchObject({
+      source: "service-1",
+      sourceHandle: "outbound-call:review-publish",
+    });
+  });
+
+  it("renders independent message queue nodes and attaches each edge to its queue", () => {
+    const { store, model } = createModel();
+    store.services.push({ ...service, id: "service-2", name: "Inventory", endpoints: [] });
+    store.setMessageDestinations([
+      {
+        id: "orders-topic",
+        queueId: "queue-orders",
+        projectId: "project-1",
+        codeKey: "orders",
+        broker: "kafka",
+        name: "Orders",
+        connection: { brokers: "kafka-orders:9092", securityProtocol: "PLAINTEXT" },
+        x: 100,
+        y: 100,
+      },
+      {
+        id: "payments-topic",
+        queueId: "queue-payments",
+        projectId: "project-1",
+        codeKey: "payments",
+        broker: "rabbitmq",
+        name: "Payments",
+        connection: { host: "rabbit-payments", port: 5672, virtualHost: "/", tls: false },
+        x: 800,
+        y: 100,
+      },
+    ]);
+    store.setMessageConnections([
+      {
+        id: "publish-orders",
+        type: "publish",
+        destinationId: "orders-topic",
+        endpointId: "endpoint-1",
+        serviceId: "service-1",
+      },
+      {
+        id: "consume-payments",
+        type: "subscribe",
+        destinationId: "payments-topic",
+        serviceId: "service-2",
+        bindingKey: "payment.*",
+      },
+    ]);
+
+    const nodes = model.syncNodes();
+    expect(nodes.filter((node) => node.type === "messageQueue").map(({ id }) => id)).toEqual([
+      "message-queue:queue-orders",
+      "message-queue:queue-payments",
+    ]);
+    expect(model.buildEdges()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "message-publish-orders",
+          target: "message-queue:queue-orders",
+        }),
+        expect.objectContaining({
+          id: "message-consume-payments",
+          source: "message-queue:queue-payments",
+        }),
+      ]),
+    );
   });
 
   it("stacks triggers in stable order and follows the target service position", () => {
@@ -262,6 +415,8 @@ describe("graph view model", () => {
       viewport: { x: 4, y: 5, zoom: 1.5 },
       services: [{ id: "service-1", x: 30, y: 40 }],
       mockApiPositions: [{ id: "mock-1", x: -190, y: 40 }],
+      messageDestinations: [],
+      messageConnections: [],
       edges: store.serviceEdges,
     });
     model.syncSavedPositions();
@@ -291,8 +446,100 @@ describe("graph view model", () => {
     const payload = model.canvasPayload();
 
     expect(store.nodes[0]?.class).toContain("service-error");
-    expect(store.edges.some((edge) => edge.id === "observed-0" && edge.animated)).toBe(true);
+    expect(store.edges).toHaveLength(2);
     expect(store.allNodesCollapsed).toBe(true);
     expect(payload.edges).toEqual(store.serviceEdges);
+  });
+
+  it("highlights only message links matched by the run trace", () => {
+    const { store, model } = createModel();
+    store.setMessageDestinations([
+      {
+        id: "destination-1",
+        projectId: "project-1",
+        codeKey: "orders",
+        broker: "kafka",
+        name: "orders",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+        x: 500,
+        y: 100,
+      },
+    ]);
+    store.setMessageConnections([
+      {
+        id: "publish-link",
+        type: "publish",
+        destinationId: "destination-1",
+        endpointId: "endpoint-1",
+      },
+      {
+        id: "subscribe-link",
+        type: "subscribe",
+        destinationId: "destination-1",
+        serviceId: "service-2",
+        consumerGroup: "orders",
+      },
+    ]);
+    store.services.push({ ...service, id: "service-2", name: "Consumer", endpoints: [] });
+    store.services.push({ ...service, id: "service-3", name: "Billing", endpoints: [] });
+    store.setObservations({
+      services: ["Orders", "Consumer"],
+      errorServices: [],
+      edges: [],
+      messageConnectionIds: ["publish-link"],
+    });
+
+    model.syncNodes();
+    const renderedEdges = store.edges as unknown as {
+      id: string;
+      animated?: boolean;
+      targetHandle?: string;
+      label?: string;
+    }[];
+    const publish = renderedEdges.find((edge) => edge.id === "message-publish-link");
+    const subscribe = renderedEdges.find((edge) => edge.id === "message-subscribe-link");
+    const renderedNodes = store.nodes as unknown as { id: string; class?: string }[];
+    const destination = renderedNodes.find((node) => node.id === "message-queue");
+    const consumer = (store.nodes as unknown as { id: string; data: unknown }[]).find(
+      (node) => node.id === "service-2",
+    ) as {
+      data: { subscriptions: { id: string; destinationName: string; consumerGroup?: string }[] };
+    };
+    expect(publish?.animated).toBe(true);
+    expect(subscribe?.animated).toBe(false);
+    expect(publish?.label).toBeUndefined();
+    expect(subscribe?.label).toBeUndefined();
+    expect(subscribe?.targetHandle).toBe("subscriber-in:subscribe-link");
+    expect(consumer.data.subscriptions).toMatchObject([
+      { id: "subscribe-link", destinationName: "orders", consumerGroup: "orders" },
+    ]);
+    expect(destination?.class).toContain("app__flow-node--service-observed");
+    const queueCollapsed = () =>
+      (store.nodes as unknown as { id: string; data: { topicsCollapsed: boolean } }[]).find(
+        (node) => node.id === "message-queue",
+      )?.data.topicsCollapsed;
+    store.setAllNodesCollapsed(true);
+    model.syncNodes();
+    expect(queueCollapsed()).toBe(true);
+    store.setAllNodesCollapsed(false);
+    model.syncNodes();
+    expect(queueCollapsed()).toBe(false);
+    store.setObservations({
+      services: ["Orders", "Consumer"],
+      errorServices: [],
+      edges: [{ sourceService: "Consumer", targetService: "Billing" }],
+      messageConnectionIds: ["publish-link", "subscribe-link"],
+    });
+    model.syncNodes();
+    expect(
+      (store.edges as unknown as { id: string; animated?: boolean }[]).find(
+        (edge) => edge.id === "message-subscribe-link",
+      )?.animated,
+    ).toBe(true);
+    expect(
+      (store.edges as unknown as { id: string; animated?: boolean }[]).find(
+        (edge) => edge.id === "observed-0",
+      )?.animated,
+    ).toBe(true);
   });
 });

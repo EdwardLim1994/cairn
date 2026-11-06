@@ -11,7 +11,7 @@ processors:
 
 exporters:
   otlp_http/app:
-    endpoint: http://app:3002
+    endpoint: http://app:3004
     encoding: json
     headers:
       Authorization: "Bearer ${env:CAIRN_OTEL_ACCESS_TOKEN}"

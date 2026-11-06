@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "2a5bbc6d-1925-4161-9d88-86d96f15109e",
-  "prevId": "3804df77-30fd-4b1c-af51-47a04e61810d",
+  "id": "86e6832e-c44b-46af-9387-ffd3db2d53c7",
+  "prevId": "4b301f8f-ed9c-4c36-a3a0-92ba3d378fd7",
   "tables": {
     "authorization_templates": {
       "name": "authorization_templates",
@@ -30,7 +30,7 @@
         },
         "type": {
           "name": "type",
-          "type": "enum('bearer','basic','api-key','oauth-client-credentials')",
+          "type": "enum(\u0027bearer\u0027,\u0027basic\u0027,\u0027api-key\u0027,\u0027oauth-client-credentials\u0027)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -183,7 +183,7 @@
         },
         "node_type": {
           "name": "node_type",
-          "type": "enum('service','mock_api')",
+          "type": "enum(\u0027service\u0027,\u0027mock_api\u0027,\u0027message_destination\u0027)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -272,7 +272,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "('[]')"
+          "default": "(\u0027[]\u0027)"
         },
         "created_at": {
           "name": "created_at",
@@ -492,11 +492,11 @@
         },
         "status": {
           "name": "status",
-          "type": "enum('running','completed','failed')",
+          "type": "enum(\u0027running\u0027,\u0027completed\u0027,\u0027failed\u0027)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'running'"
+          "default": "\u0027running\u0027"
         },
         "triggered_at": {
           "name": "triggered_at",
@@ -578,7 +578,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'REST'"
+          "default": "\u0027REST\u0027"
         },
         "target_endpoint_id": {
           "name": "target_endpoint_id",
@@ -607,7 +607,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "('[]')"
+          "default": "(\u0027[]\u0027)"
         },
         "active": {
           "name": "active",
@@ -644,7 +644,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "('{}')"
+          "default": "(\u0027{}\u0027)"
         },
         "request_json": {
           "name": "request_json",
@@ -659,7 +659,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "('')"
+          "default": "(\u0027\u0027)"
         },
         "created_at": {
           "name": "created_at",
@@ -907,29 +907,15 @@
         },
         "status": {
           "name": "status",
-          "type": "enum('running','completed','failed')",
+          "type": "enum(\u0027running\u0027,\u0027completed\u0027,\u0027failed\u0027)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'running'"
+          "default": "\u0027running\u0027"
         },
         "response_status": {
           "name": "response_status",
           "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "grpc_status": {
-          "name": "grpc_status",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "grpc_status_name": {
-          "name": "grpc_status_name",
-          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1159,21 +1145,14 @@
           "name": "method",
           "type": "varchar(10)",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "url": {
           "name": "url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "rpc_method": {
-          "name": "rpc_method",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "created_at": {
@@ -1263,7 +1242,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'REST'"
+          "default": "\u0027REST\u0027"
         },
         "framework": {
           "name": "framework",
@@ -1277,28 +1256,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "grpc_tls": {
-          "name": "grpc_tls",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "proto_storage_key": {
-          "name": "proto_storage_key",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "proto_file_name": {
-          "name": "proto_file_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "health_check_url": {
@@ -1321,7 +1278,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "('[]')"
+          "default": "(\u0027[]\u0027)"
         },
         "active": {
           "name": "active",
@@ -1453,7 +1410,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'UNSET'"
+          "default": "\u0027UNSET\u0027"
         },
         "attributes": {
           "name": "attributes",
@@ -1497,6 +1454,205 @@
       "compositePrimaryKeys": {
         "spans_id": {
           "name": "spans_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "message_connections": {
+      "name": "message_connections",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destination_id": {
+          "name": "destination_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "enum(\u0027publish\u0027,\u0027subscribe\u0027)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "endpoint_id": {
+          "name": "endpoint_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "consumer_group": {
+          "name": "consumer_group",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "routing_key": {
+          "name": "routing_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "binding_key": {
+          "name": "binding_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "message_connections_project_idx": {
+          "name": "message_connections_project_idx",
+          "columns": ["project_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "message_connections_project_id_projects_id_fk": {
+          "name": "message_connections_project_id_projects_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_destination_id_message_destinations_id_fk": {
+          "name": "message_connections_destination_id_message_destinations_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "message_destinations",
+          "columnsFrom": ["destination_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_endpoint_id_service_endpoints_id_fk": {
+          "name": "message_connections_endpoint_id_service_endpoints_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "service_endpoints",
+          "columnsFrom": ["endpoint_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_service_id_services_id_fk": {
+          "name": "message_connections_service_id_services_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "services",
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "message_connections_id": {
+          "name": "message_connections_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "message_destinations": {
+      "name": "message_destinations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_key": {
+          "name": "code_key",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "broker": {
+          "name": "broker",
+          "type": "enum(\u0027kafka\u0027,\u0027rabbitmq\u0027)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "connection": {
+          "name": "connection",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "message_destinations_project_code_key_unique": {
+          "name": "message_destinations_project_code_key_unique",
+          "columns": ["project_id", "code_key"],
+          "isUnique": true
+        },
+        "message_destinations_project_idx": {
+          "name": "message_destinations_project_idx",
+          "columns": ["project_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "message_destinations_project_id_projects_id_fk": {
+          "name": "message_destinations_project_id_projects_id_fk",
+          "tableFrom": "message_destinations",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "message_destinations_id": {
+          "name": "message_destinations_id",
           "columns": ["id"]
         }
       },

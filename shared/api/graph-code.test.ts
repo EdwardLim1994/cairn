@@ -29,10 +29,10 @@ describe("service graph code schema", () => {
     expect(graphCodeManifestSchema.safeParse(validManifest).success).toBe(true);
   });
 
-  it("accepts one POST endpoint on a GraphQL service and rejects other shapes", () => {
+  it("accepts GraphQL HTTP endpoints and rejects gRPC endpoint mismatches", () => {
     const service = {
       ...validManifest.services[0],
-      apiType: "GRAPHQL",
+      apiType: "REST",
       endpoints: [{ ...validEndpoint, method: "POST", url: "/graphql" }],
     };
     expect(graphCodeManifestSchema.safeParse({ version: 1, services: [service] }).success).toBe(
@@ -41,13 +41,14 @@ describe("service graph code schema", () => {
     expect(
       graphCodeManifestSchema.safeParse({
         version: 1,
-        services: [{ ...service, endpoints: [] }],
-      }).success,
-    ).toBe(false);
-    expect(
-      graphCodeManifestSchema.safeParse({
-        version: 1,
-        services: [{ ...service, endpoints: [{ ...service.endpoints[0], method: "GET" }] }],
+        services: [
+          {
+            ...service,
+            apiType: "GRPC",
+            baseUrl: "localhost:9000",
+            endpoints: [{ ...service.endpoints[0], method: "POST", url: "/graphql" }],
+          },
+        ],
       }).success,
     ).toBe(false);
   });
@@ -136,5 +137,82 @@ describe("service graph code schema", () => {
     const paths = result.error.issues.map((issue) => issue.path);
     expect(paths).toContainEqual(["services", 0, "endpoints", 0, "outboundConnections", 0]);
     expect(paths).toContainEqual(["services", 0, "endpoints", 0, "outboundConnections", 1]);
+  });
+
+  it("accepts version 2 message destinations and typed connections", () => {
+    const manifest = {
+      version: 2,
+      services: validManifest.services,
+      destinations: [
+        {
+          key: "orders",
+          broker: "kafka",
+          name: "Orders",
+          connection: { brokers: "localhost:9092" },
+        },
+        { key: "events", broker: "rabbitmq", name: "Events", connection: { host: "localhost" } },
+      ],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationKey: "orders",
+          serviceKey: "orders",
+          endpointKey: "list-orders",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "orders",
+          serviceKey: "orders",
+          consumerGroup: "workers",
+        },
+        {
+          type: "publish",
+          destinationKey: "events",
+          serviceKey: "orders",
+          endpointKey: "list-orders",
+          routingKey: "orders.created",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "events",
+          serviceKey: "orders",
+          bindingKey: "orders.*",
+        },
+      ],
+    };
+    expect(graphCodeManifestSchema.safeParse(manifest).success).toBe(true);
+  });
+
+  it("rejects duplicate destinations, unknown messaging references, broker mismatches, and literal secrets", () => {
+    const manifest = {
+      version: 2,
+      services: validManifest.services,
+      destinations: [
+        {
+          key: "orders",
+          broker: "kafka",
+          name: "Orders",
+          connection: { brokers: "localhost:9092", password: "literal-secret" },
+        },
+        { key: "orders", broker: "rabbitmq", name: "Events", connection: { host: "localhost" } },
+      ],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationKey: "missing",
+          serviceKey: "orders",
+          endpointKey: "missing-endpoint",
+          routingKey: "invalid-for-kafka",
+        },
+      ],
+    };
+    const result = graphCodeManifestSchema.safeParse(manifest);
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const messages = result.error.issues.map(({ message }) => message);
+    expect(messages).toContain("Duplicate destination key: orders");
+    expect(messages).toContain("Unknown destination reference: missing");
+    expect(messages).toContain("Unknown endpoint reference: orders.missing-endpoint");
+    expect(messages.some((message) => message.includes("Unrecognized key"))).toBe(true);
   });
 });

@@ -7,10 +7,15 @@ import { useGraphInteractionViewModel } from "./useGraphInteractionViewModel";
 
 const service = {
   id: "service-1",
+  codeKey: "service-1",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  grpcTls: false,
+  protoStorageKey: null,
+  protoFileName: null,
   healthCheckUrl: null,
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
@@ -36,6 +41,7 @@ describe("graph interaction view model", () => {
       graphCanvas,
       syncNodes: vi.fn(),
       editService: vi.fn(),
+      editMessageDestination: vi.fn(),
     });
     const graph = document.createElement("div");
     graph.className = "app__graph-flow";
@@ -75,16 +81,18 @@ describe("graph interaction view model", () => {
       graphCanvas: ref(null),
       syncNodes: vi.fn(),
       editService: vi.fn(),
+      editMessageDestination: vi.fn(),
     });
     model.handleCanvasContextMenu(new MouseEvent("contextmenu", { clientX: 30, clientY: 40 }));
     expect(contextMenu.value).toEqual({ x: 30, y: 40, flowX: 160, flowY: 120 });
   });
 
-  it("selects services and ignores graph nodes that are not services", () => {
+  it("selects services and routes message queue clicks to settings", () => {
     const store = useGraphStore();
     store.services = [service];
     const syncNodes = vi.fn();
     const editService = vi.fn();
+    const editMessageQueue = vi.fn();
     const fitView = vi.fn();
     const model = useGraphInteractionViewModel({
       store,
@@ -92,6 +100,8 @@ describe("graph interaction view model", () => {
       graphCanvas: ref({ screenToFlowCoordinate: vi.fn(), fitView }),
       syncNodes,
       editService,
+      editMessageDestination: vi.fn(),
+      editMessageQueue,
     });
     model.onNodeClick("service-1");
     expect(store.selectedNodeId).toBe("service-1");
@@ -99,8 +109,10 @@ describe("graph interaction view model", () => {
     expect(fitView).toHaveBeenCalledWith({ nodes: ["service-1"], padding: 0.45, duration: 300 });
     expect(editService).toHaveBeenCalledWith("service-1");
     model.onNodeClick("mock-api-mock-1");
+    model.onNodeClick("message-queue");
     expect(syncNodes).toHaveBeenCalledOnce();
     expect(fitView).toHaveBeenCalledOnce();
     expect(editService).toHaveBeenCalledOnce();
+    expect(editMessageQueue).toHaveBeenCalledOnce();
   });
 });

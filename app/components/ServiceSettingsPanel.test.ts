@@ -60,6 +60,19 @@ const nuxtUiStubs = {
     },
   }),
   UIcon: defineComponent({ setup: () => () => h("span") }),
+  UFileUpload: defineComponent({
+    props: { modelValue: File },
+    emits: ["update:modelValue"],
+    setup(_props, { emit, attrs }) {
+      return () =>
+        h("input", {
+          ...attrs,
+          type: "file",
+          onChange: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).files?.[0]),
+        });
+    },
+  }),
   UCheckbox: defineComponent({
     props: { modelValue: Boolean },
     emits: ["update:modelValue"],
@@ -235,7 +248,45 @@ describe("ServiceSettingsPanel", () => {
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true], [false]]);
   });
 
-  it("lists, adds, and requests removal of endpoint outbound calls", async () => {
+  it("adds Kafka subscribers to the service draft and includes them when saving", async () => {
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      messageDestinations: [
+        {
+          id: "orders-topic",
+          projectId: "project-1",
+          codeKey: "orders",
+          broker: "kafka",
+          name: "Orders",
+          connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageSubscriptions: [],
+    });
+
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("New subscriber"))!
+      .trigger("click");
+    expect(wrapper.text()).toContain("Consumers / subscribers");
+    expect(wrapper.text()).toContain("Orders");
+    await wrapper
+      .findAll("footer button")
+      .find((button) => button.text() === "Save")!
+      .trigger("click");
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject([
+      {
+        destinationId: "orders-topic",
+        consumerGroup: "cairn-consumers",
+      },
+    ]);
+  });
+
+  it("adds repeatable combined outbound targets to endpoints and removes saved calls", async () => {
     const wrapper = mountPanel({
       draft: structuredClone(draft),
       frameworkMenuOpen: false,
@@ -247,9 +298,25 @@ describe("ServiceSettingsPanel", () => {
       outboundCallEdges: [],
     });
 
-    await wrapper.get('[aria-expanded="false"]').trigger("click");
-    await wrapper.get('[aria-label="Add outbound call"]').setValue("endpoint-2");
-    expect(wrapper.emitted("addOutboundCall")).toEqual([["endpoint-1", "endpoint-2"]]);
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("List orders"))!
+      .trigger("click");
+    const newCallButtons = wrapper
+      .findAll("button")
+      .filter((button) => button.text().trim() === "New");
+    await newCallButtons[0]!.trigger("click");
+    await wrapper
+      .findAll("button")
+      .filter((button) => button.text().trim() === "New")[0]!
+      .trigger("click");
+    expect(wrapper.findAll('[aria-label^="Outbound call "][aria-label$=" target"]')).toHaveLength(
+      2,
+    );
+    await wrapper.get('[aria-label="Outbound call 1 target"]').setValue("endpoint:endpoint-2");
+    expect(wrapper.emitted("setOutboundCall")).toEqual([
+      ["endpoint-1", undefined, "endpoint:endpoint-2"],
+    ]);
 
     const existingCallEdges = [
       { id: "edge-1", sourceEndpointId: "endpoint-1", targetEndpointId: "endpoint-2" },
@@ -263,23 +330,103 @@ describe("ServiceSettingsPanel", () => {
       ],
       outboundCallEdges: existingCallEdges,
     });
-    await existingCall.get('[aria-expanded="false"]').trigger("click");
+    await existingCall
+      .findAll("button")
+      .find((button) => button.text().includes("List orders"))!
+      .trigger("click");
     expect(existingCall.text()).toContain("Payments | Create payment (POST)");
-    const confirmation = vi.fn().mockReturnValue(false);
-    Object.defineProperty(window, "confirm", { configurable: true, value: confirmation });
-    await existingCall
-      .get('[aria-label="Remove outbound call to Payments | Create payment (POST)"]')
-      .trigger("click");
-    expect(existingCall.emitted("removeOutboundCall")).toBeUndefined();
-    expect(existingCallEdges).toHaveLength(1);
-
-    confirmation.mockReturnValue(true);
-    await existingCall
-      .get('[aria-label="Remove outbound call to Payments | Create payment (POST)"]')
-      .trigger("click");
-
+    await existingCall.get('[aria-label="Delete outbound call 1"]').trigger("click");
     expect(existingCall.emitted("removeOutboundCall")).toEqual([["edge-1"]]);
-    Reflect.deleteProperty(window, "confirm");
+  });
+
+  it("shows legacy service-level publishes under the first endpoint", async () => {
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      messageDestinations: [
+        {
+          id: "topic-1",
+          projectId: "project-1",
+          codeKey: "orders",
+          broker: "kafka",
+          name: "Orders",
+          connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageConnections: [
+        {
+          id: "publish-1",
+          type: "publish",
+          serviceId: "service-1",
+          destinationId: "topic-1",
+        },
+      ],
+    });
+
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("List orders"))!
+      .trigger("click");
+
+    expect(
+      (wrapper.get('[aria-label="Outbound call 1 target"]').element as HTMLSelectElement).value,
+    ).toBe("destination:topic-1");
+  });
+
+  it("lets saved consumer cards add multiple combined outbound targets", async () => {
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      endpointOptions: [
+        { id: "endpoint-2", serviceId: "service-2", label: "Payments | Create payment (POST)" },
+      ],
+      messageDestinations: [
+        {
+          id: "topic-2",
+          projectId: "project-1",
+          codeKey: "payments",
+          broker: "kafka",
+          name: "Payments",
+          connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageSubscriptions: [
+        {
+          id: "subscription-1",
+          type: "subscribe",
+          destinationId: "topic-1",
+          serviceId: "service-1",
+          consumerGroup: "orders",
+        },
+      ],
+      messageConnections: [],
+      outboundCallEdges: [],
+    });
+
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Select topic"))!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .filter((button) => button.text().trim() === "New")[0]!
+      .trigger("click");
+    await wrapper
+      .findAll("button")
+      .filter((button) => button.text().trim() === "New")[0]!
+      .trigger("click");
+    await wrapper.get('[aria-label="Outbound call 1 target"]').setValue("endpoint:endpoint-2");
+    await wrapper.get('[aria-label="Outbound call 1 target"]').setValue("destination:topic-2");
+    expect(wrapper.emitted("setOutboundCall")).toEqual([
+      ["subscription-1", undefined, "endpoint:endpoint-2"],
+      ["subscription-1", undefined, "destination:topic-2"],
+    ]);
   });
 
   it("shows the GET-only health URL and reusable header controls for Other", async () => {
@@ -295,10 +442,10 @@ describe("ServiceSettingsPanel", () => {
     });
     await wrapper.get('[aria-label="Framework: Spring Boot"]').setValue("Other");
     expect(wrapper.get('input[aria-label="Health-check header name"]').element).toBeTruthy();
-    expect(wrapper.text()).toContain("Only GET requests are allowed.");
+    expect(wrapper.text()).toContain("use an absolute URL when the health endpoint");
     expect(wrapper.find('option[value="template-1"]').exists()).toBe(true);
     expect(
-      wrapper.find('input[placeholder="/health or https://service.example/health"]').exists(),
+      wrapper.find('input[placeholder="Leave blank to use the framework default"]').exists(),
     ).toBe(true);
   });
 
@@ -323,7 +470,7 @@ describe("ServiceSettingsPanel", () => {
     await wrapper.get('[aria-label="Remove List orders"]').trigger("click");
     await wrapper.get('[aria-label="Remove service"]').trigger("click");
 
-    expect(wrapper.emitted("save")).toEqual([[]]);
+    expect(wrapper.emitted("save")).toEqual([[[]]]);
     expect(wrapper.emitted("discard")).toEqual([[]]);
     expect(wrapper.emitted("addEndpoint")).toEqual([[]]);
     expect(wrapper.emitted("removeEndpoint")).toEqual([[0]]);
@@ -365,15 +512,15 @@ describe("ServiceSettingsPanel", () => {
     expect(panelDraft.apiType).toBe("GRPC");
     expect(wrapper.text()).toContain("Target address");
     expect(wrapper.text()).toContain("Use TLS");
-    expect(wrapper.find('input[aria-label="Upload proto file"]').exists()).toBe(true);
+    expect(wrapper.findAll('input[type="file"]')).toHaveLength(1);
     expect(wrapper.find('input[aria-label="Upload OpenAPI schema"]').exists()).toBe(false);
 
     const file = new File(['syntax = "proto3";'], "service.proto", { type: "text/plain" });
-    Object.defineProperty(wrapper.get('input[aria-label="Upload proto file"]').element, "files", {
+    Object.defineProperty(wrapper.get('input[type="file"]').element, "files", {
       configurable: true,
       value: [file],
     });
-    await wrapper.get('input[aria-label="Upload proto file"]').trigger("change");
+    await wrapper.get('input[type="file"]').trigger("change");
     expect(wrapper.emitted("importProto")).toEqual([[file]]);
   });
 
@@ -387,12 +534,12 @@ describe("ServiceSettingsPanel", () => {
 
     await wrapper.get('[aria-expanded="false"]').trigger("click");
 
-    expect(wrapper.findAll('input:not([type="file"])')).toHaveLength(4);
+    expect(wrapper.findAll('input:not([type="file"])')).toHaveLength(5);
     expect(wrapper.findAll("select")).toHaveLength(4);
-    expect(wrapper.findAll("button")).toHaveLength(6);
+    expect(wrapper.findAll("button")).toHaveLength(9);
     expect(wrapper.find('select option[value="PATCH"]').exists()).toBe(true);
     await wrapper.get('input[placeholder="e.g. Checkout API"]').setValue("Catalog API");
-    await wrapper.findAll("select").at(2)!.setValue("POST");
+    await wrapper.findAll("select").at(3)!.setValue("POST");
 
     expect(panelDraft.name).toBe("Catalog API");
     expect(panelDraft.endpoints[0]?.method).toBe("POST");

@@ -11,3 +11,10 @@ export function getOutboundUrl(path: string, baseUrl: string): URL {
 
   return url;
 }
+
+export function getOutboundGrpcTarget(target: string): string {
+  const gateway = process.env.OUTBOUND_HOST_GATEWAY?.trim();
+  if (!gateway) return target;
+  const match = /^(?:localhost|127\.0\.0\.1|\[?::1\]?):(\d+)$/.exec(target);
+  return match ? `${gateway}:${match[1]}` : target;
+}

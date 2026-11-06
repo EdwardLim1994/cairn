@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { graphCodeManifestSchema } from "#shared/api/graph-code";
+import { messageDestinationHealthResponseSchema } from "#shared/api/message-flows";
 import {
   canvasGetRequestSchema,
   canvasGetResponseSchema,
@@ -136,6 +137,14 @@ export function createApiClient(transport: ApiTransport) {
         undefined,
         serviceHealthRequestSchema,
         serviceHealthResponseSchema,
+      ),
+    checkMessageDestinationHealth: () =>
+      send(
+        "/api/message-destinations/health",
+        "GET",
+        undefined,
+        z.void(),
+        messageDestinationHealthResponseSchema,
       ),
     listMockApis: () =>
       send("/api/mock-apis", "GET", undefined, mockApiListRequestSchema, mockApiListResponseSchema),

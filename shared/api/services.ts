@@ -116,8 +116,8 @@ export const protoParseResponseSchema = z.object({
   unresolvedImports: z.array(z.string()),
 });
 
-export type ServiceInput = z.infer<typeof serviceInputSchema>;
-export type ServiceCreateRequest = z.infer<typeof serviceCreateRequestSchema>;
-export type ServiceUpdateRequest = z.infer<typeof serviceUpdateRequestSchema>;
+export type ServiceInput = z.input<typeof serviceInputSchema>;
+export type ServiceCreateRequest = z.input<typeof serviceCreateRequestSchema>;
+export type ServiceUpdateRequest = z.input<typeof serviceUpdateRequestSchema>;
 export type ServiceListResponse = z.infer<typeof serviceListResponseSchema>;
 export type ServiceHealthResponse = z.infer<typeof serviceHealthResponseSchema>;

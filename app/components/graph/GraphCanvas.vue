@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import {
   VueFlow,
   useVueFlow,
@@ -14,6 +14,7 @@ import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
 import MockApiTriggerNode from "./MockApiTriggerNode.vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
+import MessageQueueNode from "./MessageQueueNode.vue";
 import type { GraphMockApi } from "../../models/graph";
 
 const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean; nodesLocked: boolean }>();
@@ -43,6 +44,51 @@ const modelEdges = computed({
 });
 const { fitView, screenToFlowCoordinate, setViewport, updateNodeInternals } = useVueFlow();
 
+function handleLayoutSignature(node: Node) {
+  const data = node.data as {
+    endpoints?: { id: string }[];
+    subscriptions?: { id: string }[];
+    outboundCalls?: {
+      id: string;
+      kind?: "api" | "message";
+      sourceEndpointId?: string;
+      sourceSubscriptionId?: string;
+    }[];
+    hasMessagePublisher?: boolean;
+    endpointsCollapsed?: boolean;
+    destinations?: { id: string }[];
+    topicsCollapsed?: boolean;
+  };
+  if (node.type === "service")
+    return JSON.stringify([
+      data.endpoints?.map((item) => item.id),
+      data.subscriptions?.map((item) => item.id),
+      data.outboundCalls?.map((item) => [
+        item.id,
+        item.kind,
+        item.sourceEndpointId,
+        item.sourceSubscriptionId,
+      ]),
+      data.hasMessagePublisher,
+      data.endpointsCollapsed,
+    ]);
+  if (node.type === "messageQueue")
+    return JSON.stringify([data.destinations?.map((item) => item.id), data.topicsCollapsed]);
+  return "";
+}
+
+watch(
+  () => props.nodes.map((node) => [node.id, handleLayoutSignature(node)] as const),
+  (current, previous) => {
+    const previousSignatures = new Map(previous.map(([id, signature]) => [id, signature]));
+    const changedNodeIds = current
+      .filter(([id, signature]) => previousSignatures.get(id) !== signature)
+      .map(([id]) => id);
+    if (changedNodeIds.length) updateNodeInternals(changedNodeIds);
+  },
+  { flush: "post" },
+);
+
 defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals });
 </script>
 
@@ -54,6 +100,8 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     :select-nodes-on-drag="false"
     :elements-selectable="true"
     :nodes-draggable="!nodesLocked"
+    :snap-to-grid="true"
+    :snap-grid="[22, 22]"
     :min-zoom="0.2"
     :max-zoom="1.8"
     fit-view-on-init
@@ -85,6 +133,9 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     </template>
     <template #node-mockApiTrigger="{ data }">
       <MockApiTriggerNode :data="data" @trigger="emit('runMockApi', data.entry)" />
+    </template>
+    <template #node-messageQueue="{ data }">
+      <MessageQueueNode :data="data" />
     </template>
   </VueFlow>
 </template>

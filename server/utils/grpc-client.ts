@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
+import { getOutboundGrpcTarget } from "./outbound-url";
 
 export async function invokeUnaryGrpc(input: {
   proto: string;
@@ -35,7 +36,7 @@ export async function invokeUnaryGrpc(input: {
     if (!Client || !(methodName in Client.service))
       throw new Error(`gRPC method not found: ${input.rpcMethod}`);
     const client = new Client(
-      input.target,
+      getOutboundGrpcTarget(input.target),
       input.tls ? grpc.credentials.createSsl() : grpc.credentials.createInsecure(),
     );
     try {

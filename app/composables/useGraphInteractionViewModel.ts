@@ -20,6 +20,9 @@ export function useGraphInteractionViewModel(options: {
   graphCanvas: Ref<GraphCanvas | null>;
   syncNodes: () => void;
   editService: (id: string) => void;
+  editMessageDestination: (id: string) => void;
+  editMessageQueue?: (queueId: string) => void;
+  editMockApi?: (id: string) => void;
 }) {
   function handleCanvasContextMenu(event: MouseEvent) {
     const point = options.graphCanvas.value?.screenToFlowCoordinate({
@@ -35,6 +38,23 @@ export function useGraphInteractionViewModel(options: {
   }
 
   function onNodeClick(nodeId: string) {
+    if (nodeId.startsWith("mock-api-")) {
+      options.editMockApi?.(nodeId.slice("mock-api-".length));
+      return;
+    }
+    if (nodeId === "message-queue" || nodeId.startsWith("message-queue:")) {
+      options.store.setSelection(nodeId);
+      options.editMessageQueue?.(
+        nodeId === "message-queue" ? "legacy-queue" : nodeId.slice("message-queue:".length),
+      );
+      return;
+    }
+    if (nodeId.startsWith("message-destination-")) {
+      const id = nodeId.slice("message-destination-".length);
+      options.store.setSelection(nodeId);
+      options.editMessageDestination(id);
+      return;
+    }
     if (!options.store.services.some((service) => service.id === nodeId)) return;
     options.store.setSelection(nodeId);
     options.syncNodes();

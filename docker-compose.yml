@@ -7,7 +7,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_PORT:-3309}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -28,7 +28,7 @@ services:
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
       PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
-      PORT: ${PORT:-3003}
+      PORT: ${PORT:-3004}
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
       AUTH_USERNAME: ${AUTH_USERNAME:?Set AUTH_USERNAME in .env}
       AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
@@ -36,7 +36,7 @@ services:
       OUTBOUND_HOST_GATEWAY: host.docker.internal
       OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
       TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-5000}
-      TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-10000}
+      TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-15000}
       PROTO_STORAGE_DRIVER: ${PROTO_STORAGE_DRIVER:-fs}
       PROTO_STORAGE_FS_BASE: /app/data/protos
       PROTO_STORAGE_S3_ENDPOINT: ${PROTO_STORAGE_S3_ENDPOINT:-}
@@ -46,7 +46,7 @@ services:
       PROTO_STORAGE_S3_SECRET_ACCESS_KEY: ${PROTO_STORAGE_S3_SECRET_ACCESS_KEY:-}
       GRPC_DEFAULT_SSL_ROOTS_FILE_PATH: ${CA_CERT_URL:+/etc/cairn/ca/custom-ca.pem}
     ports:
-      - "${PORT:-3003}:${PORT:-3003}"
+      - "${PORT:-3004}:${PORT:-3004}"
     volumes:
       - proto_data:/app/data/protos
       - ca_data:/etc/cairn/ca:ro

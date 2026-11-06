@@ -20,7 +20,10 @@ describe("save canvas use case", () => {
       saved: true,
     });
     expect(dependencies.ensureProject).toHaveBeenCalledOnce();
-    expect(dependencies.saveCanvas).toHaveBeenCalledWith("project-1", validCanvas);
+    expect(dependencies.saveCanvas).toHaveBeenCalledWith(
+      "project-1",
+      expect.objectContaining(validCanvas),
+    );
   });
 
   it("rejects invalid contracts before calling the repository", async () => {
@@ -74,6 +77,93 @@ describe("save canvas use case", () => {
     };
 
     await expect(createSaveCanvasUseCase(dependencies)(canvas)).resolves.toEqual({ saved: true });
-    expect(dependencies.saveCanvas).toHaveBeenCalledWith("project-1", canvas);
+    expect(dependencies.saveCanvas).toHaveBeenCalledWith(
+      "project-1",
+      expect.objectContaining(canvas),
+    );
+  });
+
+  it("accepts typed Kafka and RabbitMQ message connections", async () => {
+    const dependencies = {
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      saveCanvas: vi.fn().mockResolvedValue(undefined),
+    };
+    const canvas = {
+      ...validCanvas,
+      messageDestinations: [
+        {
+          id: "kafka-1",
+          codeKey: "orders",
+          broker: "kafka",
+          name: "orders",
+          connection: { brokers: "localhost:9092" },
+          x: 0,
+          y: 0,
+        },
+        {
+          id: "rabbit-1",
+          codeKey: "events",
+          broker: "rabbitmq",
+          name: "events",
+          connection: { host: "localhost" },
+          x: 300,
+          y: 0,
+        },
+      ],
+      messageConnections: [
+        { type: "publish", destinationId: "kafka-1", endpointId: "endpoint-1" },
+        {
+          type: "subscribe",
+          destinationId: "kafka-1",
+          serviceId: "service-2",
+          consumerGroup: "orders-v1",
+        },
+        {
+          type: "publish",
+          destinationId: "rabbit-1",
+          endpointId: "endpoint-2",
+          routingKey: "orders.created",
+        },
+        {
+          type: "subscribe",
+          destinationId: "rabbit-1",
+          serviceId: "service-3",
+          bindingKey: "orders.*",
+        },
+      ],
+    };
+
+    await expect(createSaveCanvasUseCase(dependencies)(canvas)).resolves.toEqual({ saved: true });
+  });
+
+  it("rejects invalid broker-specific connection fields", async () => {
+    const dependencies = { ensureProject: vi.fn(), saveCanvas: vi.fn() };
+    const canvas = {
+      ...validCanvas,
+      messageDestinations: [
+        {
+          id: "kafka-1",
+          codeKey: "orders",
+          broker: "kafka",
+          name: "orders",
+          connection: { brokers: "localhost:9092" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationId: "kafka-1",
+          endpointId: "endpoint-1",
+          routingKey: "orders.created",
+        },
+      ],
+    };
+
+    await expect(createSaveCanvasUseCase(dependencies)(canvas)).rejects.toBeInstanceOf(
+      CanvasConstraintError,
+    );
+    expect(dependencies.saveCanvas).not.toHaveBeenCalled();
   });
 });

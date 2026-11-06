@@ -1,12 +1,22 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { GraphCodeManifest } from "#shared/api/graph-code";
-import { arrangeGraph } from "#shared/utils/graph-layout";
+import { arrangeGraph, messageQueueNodeId } from "#shared/utils/graph-layout";
 import { getDb } from "../db";
 import { deactivateInvalidMockApis } from "./mock-apis/reconcile-readiness";
-import { graphNodePositions, serviceEdges, serviceEndpoints, services } from "../db/schema";
+import {
+  environmentVariables,
+  graphNodePositions,
+  messageConnections,
+  messageDestinations,
+  serviceEdges,
+  serviceEndpoints,
+  services,
+} from "../db/schema";
 
 type Database = ReturnType<typeof getDb>;
+
+export class GraphCodeConstraintError extends Error {}
 
 export async function applyGraphCode(
   projectId: string,
@@ -14,12 +24,41 @@ export async function applyGraphCode(
   db: Database = getDb(),
 ) {
   await db.transaction(async (tx) => {
-    const [oldServices, oldEndpoints, oldPositions] = await Promise.all([
+    const destinations = manifest.version === 2 ? (manifest.destinations ?? []) : [];
+    const messageDefinitions = manifest.version === 2 ? (manifest.messageConnections ?? []) : [];
+    const variableNames = [
+      ...new Set(
+        destinations.flatMap(({ connection }) =>
+          connection.passwordVariable ? [connection.passwordVariable] : [],
+        ),
+      ),
+    ];
+    if (variableNames.length) {
+      const variables = await tx
+        .select({ name: environmentVariables.name })
+        .from(environmentVariables)
+        .where(
+          and(
+            eq(environmentVariables.projectId, projectId),
+            inArray(environmentVariables.name, variableNames),
+          ),
+        );
+      if (variables.length !== variableNames.length)
+        throw new GraphCodeConstraintError(
+          "Message broker connection references an unknown project variable",
+        );
+    }
+
+    const [oldServices, oldEndpoints, oldDestinations, oldPositions] = await Promise.all([
       tx.select().from(services).where(eq(services.projectId, projectId)),
       tx.select().from(serviceEndpoints).where(eq(serviceEndpoints.projectId, projectId)),
+      tx.select().from(messageDestinations).where(eq(messageDestinations.projectId, projectId)),
       tx.select().from(graphNodePositions).where(eq(graphNodePositions.projectId, projectId)),
     ]);
     const existingByKey = new Map(oldServices.map((service) => [service.codeKey, service]));
+    const existingDestinationsByKey = new Map(
+      oldDestinations.map((destination) => [destination.codeKey, destination]),
+    );
     const endpointsByService = new Map<string, typeof oldEndpoints>();
     for (const endpoint of oldEndpoints)
       endpointsByService.set(endpoint.serviceId, [
@@ -28,6 +67,7 @@ export async function applyGraphCode(
       ]);
 
     await tx.delete(serviceEdges).where(eq(serviceEdges.projectId, projectId));
+    await tx.delete(messageConnections).where(eq(messageConnections.projectId, projectId));
 
     const nextServiceIds = new Map<string, string>();
     const nextEndpointIds = new Map<string, string>();
@@ -117,6 +157,90 @@ export async function applyGraphCode(
     );
     if (nextEdges.length) await tx.insert(serviceEdges).values(nextEdges);
 
+    const nextDestinationIds = new Map<string, string>();
+    const nextQueueIds = new Map<string, string>();
+    for (const destination of destinations) {
+      const existing = existingDestinationsByKey.get(destination.key);
+      const id = existing?.id ?? randomUUID();
+      nextDestinationIds.set(destination.key, id);
+      const queueKey = destination.queueKey ?? "legacy-queue";
+      const queueId = nextQueueIds.get(queueKey) ?? existing?.queueId ?? randomUUID();
+      nextQueueIds.set(queueKey, queueId);
+      const values = {
+        projectId,
+        queueId,
+        queueName: destination.queueName ?? "Message Queue",
+        codeKey: destination.key,
+        broker: destination.broker,
+        name: destination.name,
+        connection: destination.connection as Record<string, string | boolean | undefined>,
+      };
+      if (existing)
+        await tx
+          .update(messageDestinations)
+          .set(values)
+          .where(and(eq(messageDestinations.id, id), eq(messageDestinations.projectId, projectId)));
+      else await tx.insert(messageDestinations).values({ id, ...values });
+    }
+    const retainedDestinationIds = new Set(nextDestinationIds.values());
+    const removedDestinationIds = oldDestinations
+      .filter((destination) => !retainedDestinationIds.has(destination.id))
+      .map((destination) => destination.id);
+    if (removedDestinationIds.length) {
+      await tx
+        .delete(graphNodePositions)
+        .where(
+          and(
+            eq(graphNodePositions.projectId, projectId),
+            eq(graphNodePositions.nodeType, "message_destination"),
+            inArray(graphNodePositions.entityId, removedDestinationIds),
+          ),
+        );
+      await tx
+        .delete(messageDestinations)
+        .where(
+          and(
+            eq(messageDestinations.projectId, projectId),
+            inArray(messageDestinations.id, removedDestinationIds),
+          ),
+        );
+    }
+    const nextMessageConnections = messageDefinitions.map((connection) => ({
+      id: randomUUID(),
+      projectId,
+      destinationId: nextDestinationIds.get(connection.destinationKey)!,
+      type: connection.type,
+      endpointId:
+        connection.type === "publish" && connection.endpointKey
+          ? nextEndpointIds.get(`${connection.serviceKey}\0${connection.endpointKey}`)!
+          : null,
+      serviceId:
+        connection.type === "subscribe" || !connection.endpointKey
+          ? nextServiceIds.get(connection.serviceKey)!
+          : null,
+      consumerGroup: connection.type === "subscribe" ? (connection.consumerGroup ?? null) : null,
+      routingKey: connection.type === "publish" ? (connection.routingKey ?? null) : null,
+      bindingKey: connection.type === "subscribe" ? (connection.bindingKey ?? null) : null,
+    }));
+    const layoutConnections: NonNullable<Parameters<typeof arrangeGraph>[4]> = [];
+    for (const connection of nextMessageConnections) {
+      if (connection.type === "publish" && (connection.endpointId || connection.serviceId))
+        layoutConnections.push({
+          type: "publish",
+          destinationId: connection.destinationId,
+          ...(connection.endpointId ? { endpointId: connection.endpointId } : {}),
+          ...(connection.serviceId ? { serviceId: connection.serviceId } : {}),
+        });
+      else if (connection.type === "subscribe" && connection.serviceId)
+        layoutConnections.push({
+          type: "subscribe",
+          destinationId: connection.destinationId,
+          serviceId: connection.serviceId,
+        });
+    }
+    if (nextMessageConnections.length)
+      await tx.insert(messageConnections).values(nextMessageConnections);
+
     const positionByEntity = new Map(
       oldPositions.map((position) => [`${position.nodeType}:${position.entityId}`, position]),
     );
@@ -127,12 +251,32 @@ export async function applyGraphCode(
         id: nextEndpointIds.get(`${service.key}\0${endpoint.key}`)!,
       })),
     }));
-    const nextPositions = new Map<string, { x: number; y: number }>();
-    if (oldServices.length === 0) {
-      const layout = arrangeGraph(nextServices, nextEdges, []);
+    const nextDestinations = destinations.map((destination) => ({
+      id: nextDestinationIds.get(destination.key)!,
+      name: destination.name,
+      queueId: nextQueueIds.get(destination.queueKey ?? "legacy-queue")!,
+      queueName: destination.queueName ?? "Message Queue",
+    }));
+    const nextPositions: {
+      nodeType: "service" | "message_destination" | "message_queue";
+      entityId: string;
+      x: number;
+      y: number;
+    }[] = [];
+    const setPosition = (
+      nodeType: "service" | "message_destination" | "message_queue",
+      entityId: string,
+      position: { x: number; y: number },
+    ) => nextPositions.push({ nodeType, entityId, ...position });
+    if (oldServices.length === 0 && oldDestinations.length === 0) {
+      const layout = arrangeGraph(nextServices, nextEdges, [], nextDestinations, layoutConnections);
       for (const service of nextServices) {
         const position = layout.get(service.id);
-        if (position) nextPositions.set(service.id, position);
+        if (position) setPosition("service", service.id, position);
+      }
+      for (const queueId of new Set(nextQueueIds.values())) {
+        const position = layout.get(messageQueueNodeId(queueId));
+        if (position) setPosition("message_queue", queueId, position);
       }
     } else {
       const x = Math.max(0, ...oldPositions.map((position) => position.positionX)) + 720;
@@ -141,28 +285,41 @@ export async function applyGraphCode(
         const serviceId = nextServiceIds.get(service.key)!;
         const existing = existingByKey.get(service.key);
         const saved = existing && positionByEntity.get(`service:${existing.id}`);
-        if (existing && saved)
-          nextPositions.set(serviceId, { x: saved.positionX, y: saved.positionY });
-        else if (existing) nextPositions.set(serviceId, { x: 0, y: 0 });
+        if (saved) setPosition("service", serviceId, { x: saved.positionX, y: saved.positionY });
         else {
-          nextPositions.set(serviceId, { x, y });
+          setPosition("service", serviceId, { x, y });
           y += Math.max(320, 218 + service.endpoints.length * 47);
         }
       }
+      const oldQueuePositions = new Map<string, { x: number; y: number }>();
+      for (const destination of oldDestinations) {
+        if (oldQueuePositions.has(destination.queueId)) continue;
+        const saved = positionByEntity.get(`message_queue:${destination.queueId}`);
+        const legacy = positionByEntity.get(`message_destination:${destination.id}`);
+        if (saved || legacy)
+          oldQueuePositions.set(destination.queueId, {
+            x: (saved ?? legacy)!.positionX,
+            y: (saved ?? legacy)!.positionY,
+          });
+      }
+      for (const [queueIndex, queueId] of [...new Set(nextQueueIds.values())].entries()) {
+        const saved = oldQueuePositions.get(queueId);
+        setPosition("message_queue", queueId, saved ?? { x, y: y + queueIndex * 320 });
+      }
     }
     await Promise.all(
-      [...nextPositions].map(([entityId, position]) =>
+      nextPositions.map(({ nodeType, entityId, x, y }) =>
         tx
           .insert(graphNodePositions)
           .values({
             id: randomUUID(),
             projectId,
-            nodeType: "service",
+            nodeType,
             entityId,
-            positionX: position.x,
-            positionY: position.y,
+            positionX: x,
+            positionY: y,
           })
-          .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } }),
+          .onDuplicateKeyUpdate({ set: { positionX: x, positionY: y } }),
       ),
     );
     await deactivateInvalidMockApis(tx, projectId);

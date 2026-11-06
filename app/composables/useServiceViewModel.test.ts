@@ -320,6 +320,8 @@ describe("service view model", () => {
       nodesLocked: false,
       services: [service],
       edges: [],
+      messageDestinations: [],
+      messageConnections: [],
       mockApis: [],
       headerTemplates: [],
       authorizationTemplates: [],

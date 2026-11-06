@@ -8,7 +8,7 @@ function requestUrl(input: RequestInfo | URL): string {
 
 const target = {
   mockApiId: "mock-1",
-  apiType: "REST" as const,
+  apiType: "HTTP" as const,
   targetApiType: "REST" as const,
   endpointId: "endpoint-1",
   targetEndpointId: "endpoint-1",
@@ -95,8 +95,7 @@ describe("mock API run use case", () => {
   it("sends GraphQL query, variables, and operation name as JSON and completes HTTP 200 errors", async () => {
     const graphqlTarget = {
       ...target,
-      apiType: "GRAPHQL" as const,
-      targetApiType: "GRAPHQL" as const,
+      apiType: "HTTP" as const,
       endpointUrl: "/graphql",
       url: "/graphql",
       method: "POST",

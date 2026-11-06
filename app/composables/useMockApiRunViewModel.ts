@@ -31,12 +31,13 @@ export function useMockApiRunViewModel(options: {
   const now = options.now ?? Date.now;
   let replayGeneration = 0;
 
-  function setInitialObservations(entry: MockApiDraft, targetService?: GraphService) {
+  function setInitialObservations(entry: MockApiDraft) {
     options.mockApiStore.clearRunResults();
     options.graphStore.setObservations({
-      services: targetService ? [targetService.name] : [],
+      services: [],
       errorServices: [],
       edges: [],
+      messageConnectionIds: [],
     });
     options.mockApiStore.setRunResult(entry.id!, {
       id: "",
@@ -49,6 +50,23 @@ export function useMockApiRunViewModel(options: {
     options.graphViewModel.syncNodes();
   }
 
+  function tracedServices(flow: Awaited<ReturnType<typeof options.apiClient.getRunFlow>>) {
+    const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return [
+      ...new Set(
+        flow.spans
+          .filter(({ traceId }) => traceId === flow.traceId)
+          .map(({ serviceName }) => {
+            const key = normalize(serviceName);
+            return (
+              options.services().find((service) => normalize(service.name) === key)?.name ??
+              serviceName
+            );
+          }),
+      ),
+    ];
+  }
+
   async function showServiceLogs(service?: GraphService) {
     options.logService.value = service ? [service.name] : [];
     options.logSeverity.value = [];
@@ -57,10 +75,10 @@ export function useMockApiRunViewModel(options: {
   }
 
   async function waitForFlow(runId: string, shouldContinue = () => true) {
-    const deadline = now() + 11_000;
+    const deadline = now() + 20_000;
     async function poll(): Promise<Awaited<ReturnType<typeof options.apiClient.getRunFlow>>> {
       const flow = await options.apiClient.getRunFlow(runId);
-      if (flow.status === "complete" || !shouldContinue()) return flow;
+      if ((flow.status === "complete" && !flow.incomplete) || !shouldContinue()) return flow;
       await wait(350);
       return shouldContinue() && now() < deadline ? poll() : flow;
     }
@@ -71,7 +89,6 @@ export function useMockApiRunViewModel(options: {
     entry: MockApiDraft,
     result: Awaited<ReturnType<typeof options.apiClient.runMockApi>>,
     flow: Awaited<ReturnType<typeof options.apiClient.getRunFlow>>,
-    targetService?: GraphService,
   ) {
     options.graphStore.setObservations({
       errorServices: flow.errorServices,
@@ -79,12 +96,8 @@ export function useMockApiRunViewModel(options: {
         sourceService,
         targetService,
       })),
-      services: [
-        ...new Set([
-          ...flow.edges.flatMap((edge) => [edge.sourceService, edge.targetService]),
-          ...(targetService ? [targetService.name] : []),
-        ]),
-      ],
+      messageConnectionIds: flow.observedMessageConnectionIds,
+      services: tracedServices(flow),
     });
     options.mockApiStore.setRunResult(entry.id!, { ...result, flow });
     options.graphViewModel.syncNodes();
@@ -101,7 +114,7 @@ export function useMockApiRunViewModel(options: {
         service.endpoints.some((endpoint) => endpoint.id === entry.targetEndpointId),
       );
     options.mockApiStore.setRunningMockId(entry.id);
-    setInitialObservations(entry, targetService);
+    setInitialObservations(entry);
 
     try {
       const result = await options.apiClient.runMockApi(entry.id);
@@ -109,7 +122,7 @@ export function useMockApiRunViewModel(options: {
       options.graphViewModel.buildEdges();
       if (result.status === "failed") await showServiceLogs(targetService);
       const flow = await waitForFlow(result.id);
-      applyFlow(entry, result, flow, targetService);
+      applyFlow(entry, result, flow);
       if (result.status === "failed" || options.logsOpen.value) await options.loadLogs();
     } catch (cause) {
       options.mockApiStore.setRunResult(entry.id, {
@@ -139,9 +152,8 @@ export function useMockApiRunViewModel(options: {
         sourceService,
         targetService,
       })),
-      services: [
-        ...new Set(flow.edges.flatMap((edge) => [edge.sourceService, edge.targetService])),
-      ],
+      messageConnectionIds: flow.observedMessageConnectionIds,
+      services: tracedServices(flow),
     });
     options.mockApiStore.setRunResult(entry.mockApiId, {
       id: entry.runId,

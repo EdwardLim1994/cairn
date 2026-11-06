@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "3804df77-30fd-4b1c-af51-47a04e61810d",
+  "id": "4b301f8f-ed9c-4c36-a3a0-92ba3d378fd7",
   "prevId": "4e7b3294-1c00-4999-97ed-9289fddc4d79",
   "tables": {
     "authorization_templates": {
@@ -183,7 +183,7 @@
         },
         "node_type": {
           "name": "node_type",
-          "type": "enum('service','mock_api')",
+          "type": "enum('service','mock_api','message_destination')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -424,6 +424,205 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "message_connections": {
+      "name": "message_connections",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destination_id": {
+          "name": "destination_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "enum('publish','subscribe')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "endpoint_id": {
+          "name": "endpoint_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "consumer_group": {
+          "name": "consumer_group",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "routing_key": {
+          "name": "routing_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "binding_key": {
+          "name": "binding_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "message_connections_project_idx": {
+          "name": "message_connections_project_idx",
+          "columns": ["project_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "message_connections_project_id_projects_id_fk": {
+          "name": "message_connections_project_id_projects_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_destination_id_message_destinations_id_fk": {
+          "name": "message_connections_destination_id_message_destinations_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "message_destinations",
+          "columnsFrom": ["destination_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_endpoint_id_service_endpoints_id_fk": {
+          "name": "message_connections_endpoint_id_service_endpoints_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "service_endpoints",
+          "columnsFrom": ["endpoint_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_connections_service_id_services_id_fk": {
+          "name": "message_connections_service_id_services_id_fk",
+          "tableFrom": "message_connections",
+          "tableTo": "services",
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "message_connections_id": {
+          "name": "message_connections_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "message_destinations": {
+      "name": "message_destinations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_key": {
+          "name": "code_key",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "broker": {
+          "name": "broker",
+          "type": "enum('kafka','rabbitmq')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "connection": {
+          "name": "connection",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "message_destinations_project_code_key_unique": {
+          "name": "message_destinations_project_code_key_unique",
+          "columns": ["project_id", "code_key"],
+          "isUnique": true
+        },
+        "message_destinations_project_idx": {
+          "name": "message_destinations_project_idx",
+          "columns": ["project_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "message_destinations_project_id_projects_id_fk": {
+          "name": "message_destinations_project_id_projects_id_fk",
+          "tableFrom": "message_destinations",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "message_destinations_id": {
+          "name": "message_destinations_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "mock_api_call_history": {
       "name": "mock_api_call_history",
       "columns": {
@@ -571,14 +770,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "api_type": {
-          "name": "api_type",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'REST'"
         },
         "target_endpoint_id": {
           "name": "target_endpoint_id",
@@ -1141,6 +1332,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "api_type": {
+          "name": "api_type",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'REST'"
+        },
         "method": {
           "name": "method",
           "type": "varchar(10)",
@@ -1235,14 +1434,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "api_type": {
-          "name": "api_type",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'REST'"
         },
         "framework": {
           "name": "framework",

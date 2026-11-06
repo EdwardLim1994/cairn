@@ -1,0 +1,1 @@
+ALTER TABLE `message_destinations` ADD `queue_name` varchar(255) DEFAULT 'Message Queue' NOT NULL;

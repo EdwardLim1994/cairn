@@ -1,0 +1,2 @@
+ALTER TABLE `message_connections` ADD CONSTRAINT `message_connections_subscription_id_message_connections_id_fk` FOREIGN KEY (`subscription_id`) REFERENCES `message_connections`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `service_edges` ADD CONSTRAINT `service_edges_source_subscription_id_message_connections_id_fk` FOREIGN KEY (`source_subscription_id`) REFERENCES `message_connections`(`id`) ON DELETE cascade ON UPDATE no action;

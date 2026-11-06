@@ -71,6 +71,7 @@ export const runFlowResponseSchema = z.object({
       targetSpanId: z.string(),
     }),
   ),
+  observedMessageConnectionIds: z.array(z.string()).default([]),
   errorServices: z.array(z.string()),
 });
 

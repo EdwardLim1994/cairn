@@ -10,6 +10,7 @@ const mockApi: GraphMockApi = {
   id: "mock-1",
   projectId: "project-1",
   name: "List orders",
+  apiType: "HTTP",
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],
@@ -30,6 +31,8 @@ const VueFlowStub = defineComponent({
     "nodes",
     "edges",
     "nodesDraggable",
+    "snapToGrid",
+    "snapGrid",
     "selectNodesOnDrag",
     "elementsSelectable",
     "minZoom",
@@ -137,6 +140,8 @@ describe("GraphCanvas", () => {
     expect(wrapper.emitted("edgeDoubleClick")).toEqual([[{ edge: { id: "edge-1" } }]]);
     expect(wrapper.emitted("nodeClick")).toEqual([[{ node: { id: "service-1" } }]]);
     expect(wrapper.getComponent(VueFlowStub).props("nodesDraggable")).toBe(false);
+    expect(wrapper.getComponent(VueFlowStub).props("snapToGrid")).toBe(true);
+    expect(wrapper.getComponent(VueFlowStub).props("snapGrid")).toEqual([22, 22]);
     expect(wrapper.emitted("moveEnd")).toEqual([[{ x: 8, y: 9, zoom: 1.5 }]]);
     expect(wrapper.emitted("nodeDragStop")).toEqual([[]]);
   });

@@ -124,7 +124,12 @@ describe("telemetry endpoint use cases", () => {
                   startTimeUnixNano: "1000000",
                   endTimeUnixNano: "2000000",
                   status: { code: 2 },
-                  attributes: [{ key: "http.status_code", value: { intValue: "500" } }],
+                  attributes: [
+                    { key: "http.status_code", value: { intValue: "500" } },
+                    { key: "messaging.system", value: { stringValue: "kafka" } },
+                    { key: "messaging.destination.name", value: { stringValue: "orders" } },
+                    { key: "messaging.operation.type", value: { stringValue: "publish" } },
+                  ],
                 },
               ],
             },
@@ -139,7 +144,12 @@ describe("telemetry endpoint use cases", () => {
         traceId: "a".repeat(32),
         serviceName: "inventory-service",
         statusCode: "ERROR",
-        attributes: { "http.status_code": 500 },
+        attributes: {
+          "http.status_code": 500,
+          "messaging.system": "kafka",
+          "messaging.destination.name": "orders",
+          "messaging.operation.type": "publish",
+        },
       }),
     ]);
     expect(events).toEqual(["ensure-project", "insert-spans"]);

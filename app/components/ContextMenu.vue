@@ -1,12 +1,17 @@
 <script setup lang="ts">
 const open = defineModel<boolean>("open", { required: true });
-const emit = defineEmits<{ addService: [] }>();
+const emit = defineEmits<{ addService: []; addMessageQueue: [] }>();
 const items = [
   [
     {
       label: "Add new service",
       icon: "i-lucide-plus",
       onSelect: () => emit("addService"),
+    },
+    {
+      label: "Add message queue",
+      icon: "i-lucide-radio-tower",
+      onSelect: () => emit("addMessageQueue"),
     },
   ],
 ];

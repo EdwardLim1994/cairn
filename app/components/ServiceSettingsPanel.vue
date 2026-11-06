@@ -3,6 +3,7 @@ import { ref } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import HeaderRowsEditor from "./HeaderRowsEditor.vue";
 import type { HeaderTemplateDraft } from "../models/mock-api";
+import type { CanvasGetResponse } from "#shared/api/canvas";
 
 type EndpointDraft = {
   id?: string;
@@ -27,8 +28,21 @@ type ServiceDraft = {
   active: boolean;
   endpoints: EndpointDraft[];
 };
-type OutboundCall = { id: string; sourceEndpointId: string | null; targetEndpointId: string };
+type OutboundCall = {
+  id: string;
+  sourceEndpointId: string | null;
+  sourceSubscriptionId?: string | null;
+  targetEndpointId: string;
+};
+type OutboundRow = { key: string; connectionId?: string; draftKey?: string; value: string };
 type EndpointOption = { id: string; serviceId: string; label: string };
+type Destination = CanvasGetResponse["messageDestinations"][number];
+type SubscriptionDraft = {
+  id: string;
+  destinationId: string;
+  consumerGroup?: string;
+  bindingKey?: string;
+};
 
 const draft = defineModel<ServiceDraft>("draft", { required: true });
 const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: true });
@@ -38,15 +52,33 @@ const props = withDefaults(
     headerTemplates: HeaderTemplateDraft[];
     outboundCallEdges?: OutboundCall[];
     endpointOptions?: EndpointOption[];
+    messageDestinations?: Destination[];
+    messageSubscriptions?: SubscriptionDraft[];
+    messageConnections?: Array<{
+      id: string;
+      type: string;
+      serviceId?: string;
+      endpointId?: string;
+      subscriptionId?: string;
+      destinationId: string;
+    }>;
   }>(),
   {
     outboundCallEdges: () => [],
     endpointOptions: () => [],
+    messageDestinations: () => [],
+    messageSubscriptions: () => [],
+    messageConnections: () => [],
   },
 );
 const openApiFileInput = ref<HTMLInputElement | null>(null);
 const protoUpload = ref<File | undefined>(undefined);
 const expandedEndpointKey = ref<string | null>(null);
+const subscriptions = ref<SubscriptionDraft[]>(
+  props.messageSubscriptions.map((item) => ({ ...item })),
+);
+const expandedSubscriptionId = ref<string | null>(null);
+const newOutboundRows = ref<Record<string, Array<{ key: string; value: string }>>>({});
 const frameworks = [
   { label: "Spring Boot", value: "Spring Boot" },
   { label: ".NET", value: ".NET" },
@@ -63,35 +95,177 @@ const emit = defineEmits<{
   importOpenApi: [file: File];
   importProto: [file: File];
   removeProto: [];
-  save: [];
+  save: [subscriptions: SubscriptionDraft[]];
   discard: [];
   removeService: [id: string];
-  addOutboundCall: [sourceEndpointId: string, targetEndpointId: string];
+  setOutboundCall: [sourceId: string, connectionId: string | undefined, target: string];
   removeOutboundCall: [edgeId: string];
 }>();
 
-function callsFrom(endpointId: string | undefined) {
-  return endpointId
-    ? props.outboundCallEdges.filter((edge) => edge.sourceEndpointId === endpointId)
+function addSubscription() {
+  const destination = props.messageDestinations.find(
+    (item) => !subscriptions.value.some((subscription) => subscription.destinationId === item.id),
+  );
+  if (!destination) return;
+  const subscription: SubscriptionDraft = {
+    id: crypto.randomUUID(),
+    destinationId: destination.id,
+    ...(destination.broker === "kafka"
+      ? { consumerGroup: "cairn-consumers" }
+      : { bindingKey: "#" }),
+  };
+  subscriptions.value.push(subscription);
+  expandedSubscriptionId.value = subscription.id;
+}
+
+function canAddSubscription() {
+  return (
+    Boolean(props.editingServiceId) &&
+    props.messageDestinations.some(
+      (destination) =>
+        !subscriptions.value.some((subscription) => subscription.destinationId === destination.id),
+    )
+  );
+}
+
+function availableDestinations(subscription: SubscriptionDraft) {
+  return props.messageDestinations
+    .filter(
+      (destination) =>
+        destination.id === subscription.destinationId ||
+        !subscriptions.value.some(
+          (item) => item.id !== subscription.id && item.destinationId === destination.id,
+        ),
+    )
+    .map((destination) => ({ label: destination.name, value: destination.id }));
+}
+
+function selectDestination(subscription: SubscriptionDraft, destinationId: string) {
+  const destination = props.messageDestinations.find((item) => item.id === destinationId);
+  if (!destination) return;
+  subscription.destinationId = destinationId;
+  subscription.consumerGroup = destination.broker === "kafka" ? "cairn-consumers" : undefined;
+  subscription.bindingKey = destination.broker === "rabbitmq" ? "#" : undefined;
+}
+
+function subscriptionTitle(subscription: SubscriptionDraft) {
+  return (
+    props.messageDestinations.find((item) => item.id === subscription.destinationId)?.name ??
+    "Select topic"
+  );
+}
+
+function subscriptionsValid() {
+  return subscriptions.value.every((subscription) => {
+    const destination = props.messageDestinations.find(
+      (item) => item.id === subscription.destinationId,
+    );
+    return destination?.broker === "kafka"
+      ? Boolean(subscription.consumerGroup?.trim())
+      : destination?.broker === "rabbitmq"
+        ? Boolean(subscription.bindingKey?.trim())
+        : false;
+  });
+}
+
+function callsFrom(sourceId: string | undefined, subscription = false) {
+  return sourceId
+    ? props.outboundCallEdges.filter((edge) =>
+        subscription
+          ? edge.sourceSubscriptionId === sourceId
+          : edge.sourceEndpointId === sourceId ||
+            (!edge.sourceEndpointId &&
+              !edge.sourceSubscriptionId &&
+              props.draft.endpoints[0]?.id === sourceId),
+      )
     : [];
 }
 
-function availableTargets(endpointId: string | undefined) {
-  const existingTargets = new Set(callsFrom(endpointId).map((edge) => edge.targetEndpointId));
-  return props.endpointOptions
+function outboundRows(sourceId: string, subscription = false): OutboundRow[] {
+  const serviceCalls = callsFrom(sourceId, subscription).map((call) => ({
+    key: `edge:${call.id}`,
+    connectionId: call.id,
+    value: `endpoint:${call.targetEndpointId}`,
+  }));
+  const publishes = props.messageConnections
     .filter(
-      (option) => option.serviceId !== props.editingServiceId && !existingTargets.has(option.id),
+      (connection) =>
+        connection.type === "publish" &&
+        (subscription
+          ? connection.subscriptionId === sourceId
+          : connection.endpointId === sourceId ||
+            (!connection.endpointId &&
+              !connection.subscriptionId &&
+              connection.serviceId === props.editingServiceId &&
+              props.draft.endpoints[0]?.id === sourceId)),
     )
-    .map(({ id, label }) => ({ label, value: id }));
+    .map((connection) => ({
+      key: `publish:${connection.id}`,
+      connectionId: connection.id,
+      value: `destination:${connection.destinationId}`,
+    }));
+  return [
+    ...serviceCalls,
+    ...publishes,
+    ...(newOutboundRows.value[sourceId] ?? []).map((row) => ({
+      key: `draft:${row.key}`,
+      draftKey: row.key,
+      value: row.value,
+    })),
+  ];
 }
 
-function targetLabel(endpointId: string) {
-  return props.endpointOptions.find((option) => option.id === endpointId)?.label ?? endpointId;
+function outboundTargetOptions(sourceId: string, value: string) {
+  const usedValues = new Set(
+    outboundRows(sourceId)
+      .filter((row) => row.value !== value)
+      .map((row) => row.value),
+  );
+  return [
+    ...props.endpointOptions
+      .filter((option) => option.serviceId !== props.editingServiceId)
+      .map(({ id, label }) => ({ label, value: `endpoint:${id}` })),
+    ...props.messageDestinations.map((destination) => ({
+      label: `Message Queue | ${destination.name} (publish)`,
+      value: `destination:${destination.id}`,
+    })),
+  ].filter((option) => option.value === value || !usedValues.has(option.value));
 }
 
-function confirmRemoveCall(call: OutboundCall) {
-  const target = targetLabel(call.targetEndpointId);
-  if (window.confirm(`Remove outbound call to ${target}?`)) emit("removeOutboundCall", call.id);
+function addOutboundRow(sourceId: string) {
+  newOutboundRows.value[sourceId] = [
+    ...(newOutboundRows.value[sourceId] ?? []),
+    { key: crypto.randomUUID(), value: "" },
+  ];
+}
+
+function setOutboundTarget(sourceId: string, row: OutboundRow, target: string) {
+  emit("setOutboundCall", sourceId, row.connectionId, target);
+  if (!row.draftKey) return;
+  newOutboundRows.value[sourceId] = (newOutboundRows.value[sourceId] ?? []).filter(
+    (draft) => draft.key !== row.draftKey,
+  );
+}
+
+function removeOutboundRow(sourceId: string, row: OutboundRow) {
+  if (row.connectionId) emit("removeOutboundCall", row.connectionId);
+  if (row.draftKey)
+    newOutboundRows.value[sourceId] = (newOutboundRows.value[sourceId] ?? []).filter(
+      (draft) => draft.key !== row.draftKey,
+    );
+}
+
+function outboundTargetLabel(value: string) {
+  const [type, id] = value.split(":", 2);
+  if (type === "endpoint")
+    return props.endpointOptions.find((option) => option.id === id)?.label ?? id;
+  if (type === "destination")
+    return `Message Queue | ${props.messageDestinations.find((destination) => destination.id === id)?.name ?? id} (publish)`;
+  return "Select outbound target";
+}
+
+function isSavedSubscription(subscriptionId: string) {
+  return props.messageSubscriptions.some(({ id }) => id === subscriptionId);
 }
 
 function handleOpenApiFileChange(event: Event) {
@@ -346,6 +520,117 @@ function handleOpenChange(open: boolean) {
           aria-prefix="Health-check header"
         />
       </section>
+      <section class="flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-2">
+          <strong class="text-xs">Consumers / subscribers</strong>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="outline"
+            :disabled="!canAddSubscription()"
+            @click="addSubscription"
+          >
+            + New subscriber
+          </UButton>
+        </div>
+        <SettingsAccordionCard
+          v-for="(subscription, index) in subscriptions"
+          :key="subscription.id"
+          :title="subscriptionTitle(subscription)"
+          :subtitle="subscription.consumerGroup || subscription.bindingKey || 'Subscriber'"
+          :delete-label="`Remove subscriber ${subscriptionTitle(subscription)}`"
+          :open="expandedSubscriptionId === subscription.id"
+          @toggle="expandedSubscriptionId = $event ? subscription.id : null"
+          @delete="subscriptions.splice(index, 1)"
+        >
+          <label class="flex flex-col gap-1">
+            <span class="text-[10px] font-medium text-[var(--muted)]">Message queue topic</span>
+            <USelect
+              :model-value="subscription.destinationId"
+              :items="availableDestinations(subscription)"
+              :aria-label="`Subscriber ${index + 1} topic`"
+              @update:model-value="selectDestination(subscription, String($event))"
+            />
+          </label>
+          <label
+            v-if="
+              props.messageDestinations.find((item) => item.id === subscription.destinationId)
+                ?.broker === 'kafka'
+            "
+            class="flex flex-col gap-1"
+          >
+            <span class="text-[10px] font-medium text-[var(--muted)]">Consumer group</span>
+            <UInput
+              v-model="subscription.consumerGroup"
+              :aria-label="`Subscriber ${index + 1} consumer group`"
+              required
+            />
+          </label>
+          <label v-else class="flex flex-col gap-1">
+            <span class="text-[10px] font-medium text-[var(--muted)]">RabbitMQ binding key</span>
+            <UInput
+              v-model="subscription.bindingKey"
+              :aria-label="`Subscriber ${index + 1} binding key`"
+              required
+            />
+          </label>
+          <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
+            <div class="flex items-center justify-between gap-2">
+              <strong class="text-[10px] font-medium">Outbound calls</strong>
+              <UButton
+                v-if="isSavedSubscription(subscription.id)"
+                type="button"
+                color="neutral"
+                variant="outline"
+                @click="addOutboundRow(subscription.id)"
+                >New</UButton
+              >
+            </div>
+            <div
+              v-for="(row, rowIndex) in outboundRows(subscription.id, true)"
+              :key="row.key"
+              class="flex min-w-0 items-center gap-2"
+            >
+              <USelect
+                class="min-w-0 flex-1"
+                :model-value="row.value"
+                :items="outboundTargetOptions(subscription.id, row.value)"
+                :placeholder="row.value ? undefined : 'Select endpoint or message publish'"
+                :aria-label="`Outbound call ${rowIndex + 1} target`"
+                @update:model-value="setOutboundTarget(subscription.id, row, String($event))"
+              />
+              <UButton
+                type="button"
+                color="error"
+                variant="ghost"
+                class="grid size-7 shrink-0 place-items-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+                :aria-label="`Delete outbound call ${rowIndex + 1}`"
+                @click="removeOutboundRow(subscription.id, row)"
+              >
+                <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
+              </UButton>
+            </div>
+            <span
+              v-if="!isSavedSubscription(subscription.id)"
+              class="text-[10px] text-[var(--muted)]"
+              >Save this consumer before adding outbound calls.</span
+            >
+          </section>
+        </SettingsAccordionCard>
+        <p
+          v-if="!subscriptions.length"
+          class="rounded-xl border border-dashed border-[var(--border)] p-3 text-[10px] text-[var(--muted)]"
+        >
+          {{
+            props.messageDestinations.length
+              ? "No consumers configured."
+              : "Add a message queue topic before configuring consumers."
+          }}
+        </p>
+        <p v-if="!props.editingServiceId" class="text-[10px] text-[var(--muted)]">
+          Save the service before adding subscribers.
+        </p>
+      </section>
       <div class="mt-1 flex items-center justify-between gap-2">
         <strong class="text-xs">Available endpoints</strong>
         <div class="flex items-center gap-2">
@@ -454,38 +739,42 @@ function handleOpenChange(open: boolean) {
           />
         </label>
         <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
-          <strong class="text-[10px] font-medium">Outbound calls</strong>
+          <div class="flex items-center justify-between gap-2">
+            <strong class="text-[10px] font-medium">Outbound calls</strong>
+            <UButton
+              v-if="endpoint.id"
+              type="button"
+              color="neutral"
+              variant="outline"
+              @click="addOutboundRow(endpoint.id)"
+              >New</UButton
+            >
+          </div>
           <div
-            v-for="call in callsFrom(endpoint.id)"
-            :key="call.id"
-            class="flex items-center gap-2 text-[10px]"
+            v-for="(row, rowIndex) in endpoint.id ? outboundRows(endpoint.id) : []"
+            :key="row.key"
+            class="flex min-w-0 items-center gap-2"
           >
-            <span class="min-w-0 flex-1 truncate">{{ targetLabel(call.targetEndpointId) }}</span>
+            <USelect
+              class="min-w-0 flex-1"
+              :model-value="row.value"
+              :items="outboundTargetOptions(endpoint.id!, row.value)"
+              :placeholder="row.value ? undefined : 'Select endpoint or message publish'"
+              :aria-label="`Outbound call ${rowIndex + 1} target`"
+              @update:model-value="setOutboundTarget(endpoint.id!, row, String($event))"
+            />
             <UButton
               type="button"
               color="error"
               variant="ghost"
               class="grid size-7 shrink-0 place-items-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-soft)]"
-              :aria-label="`Remove outbound call to ${targetLabel(call.targetEndpointId)}`"
-              @click="confirmRemoveCall(call)"
+              :aria-label="`Delete outbound call ${rowIndex + 1}`"
+              @click="removeOutboundRow(endpoint.id!, row)"
             >
               <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
             </UButton>
           </div>
-          <USelect
-            v-if="endpoint.id"
-            :items="availableTargets(endpoint.id)"
-            placeholder="Add outbound call"
-            aria-label="Add outbound call"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)]',
-            }"
-            @update:model-value="
-              (targetEndpointId: string) =>
-                targetEndpointId && emit('addOutboundCall', endpoint.id!, targetEndpointId)
-            "
-          />
-          <span v-else class="text-[10px] text-[var(--muted)]"
+          <span v-if="!endpoint.id" class="text-[10px] text-[var(--muted)]"
             >Save endpoint before adding calls.</span
           >
         </section>
@@ -504,7 +793,8 @@ function handleOpenChange(open: boolean) {
       <UButton
         type="button"
         class="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-xs font-medium text-[var(--accent-ink)] disabled:opacity-60"
-        @click="emit('save')"
+        :disabled="!subscriptionsValid()"
+        @click="emit('save', subscriptions)"
       >
         Save
       </UButton>

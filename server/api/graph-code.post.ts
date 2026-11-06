@@ -1,5 +1,5 @@
 import { graphCodeManifestSchema } from "#shared/api/graph-code";
-import { applyGraphCode } from "../repositories/graph-code";
+import { applyGraphCode, GraphCodeConstraintError } from "../repositories/graph-code";
 import { ensureProject } from "../utils/project";
 
 export default defineEventHandler(async (event) => {
@@ -13,6 +13,12 @@ export default defineEventHandler(async (event) => {
         message: issue.message,
       })),
     });
-  await applyGraphCode(await ensureProject(), parsed.data);
+  try {
+    await applyGraphCode(await ensureProject(), parsed.data);
+  } catch (error) {
+    if (error instanceof GraphCodeConstraintError)
+      throw createError({ statusCode: 400, statusMessage: error.message, cause: error });
+    throw error;
+  }
   return { applied: true };
 });

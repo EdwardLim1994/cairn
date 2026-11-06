@@ -9,6 +9,8 @@ export const useGraphStore = defineStore("graph", () => {
   const edges = ref<Edge[]>([]);
   const services = ref<CanvasGetResponse["services"]>([]);
   const serviceEdges = ref<CanvasGetResponse["edges"]>([]);
+  const messageDestinations = ref<CanvasGetResponse["messageDestinations"]>([]);
+  const messageConnections = ref<CanvasGetResponse["messageConnections"]>([]);
   const collapsedServiceEndpoints = ref<Record<string, boolean>>({});
   const serviceHealth = ref<Record<string, boolean | null>>({});
   const viewport = ref<GraphViewport>({ x: 0, y: 0, zoom: 1 });
@@ -16,6 +18,7 @@ export const useGraphStore = defineStore("graph", () => {
   const observedErrorServices = ref<string[]>([]);
   const observedServices = ref<string[]>([]);
   const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
+  const observedMessageConnectionIds = ref<string[]>([]);
   const selectedNodeId = ref<string | null>(null);
   const allNodesCollapsed = computed(() => {
     const servicesWithEndpoints = services.value.filter((service) => service.endpoints.length);
@@ -28,6 +31,8 @@ export const useGraphStore = defineStore("graph", () => {
   function applyCanvas(canvas: CanvasGetResponse) {
     services.value = canvas.services;
     serviceEdges.value = canvas.edges;
+    messageDestinations.value = canvas.messageDestinations ?? [];
+    messageConnections.value = canvas.messageConnections ?? [];
     viewport.value = canvas.viewport;
     nodesLocked.value = canvas.nodesLocked;
     selectedNodeId.value = null;
@@ -50,6 +55,12 @@ export const useGraphStore = defineStore("graph", () => {
   function setServiceEdges(value: CanvasGetResponse["edges"]) {
     serviceEdges.value = value;
   }
+  function setMessageConnections(value: CanvasGetResponse["messageConnections"]) {
+    messageConnections.value = value;
+  }
+  function setMessageDestinations(value: CanvasGetResponse["messageDestinations"]) {
+    messageDestinations.value = value;
+  }
   function toggleServiceEndpoints(serviceId: string) {
     collapsedServiceEndpoints.value = {
       ...collapsedServiceEndpoints.value,
@@ -65,10 +76,12 @@ export const useGraphStore = defineStore("graph", () => {
     services: string[];
     errorServices: string[];
     edges: { sourceService: string; targetService: string }[];
+    messageConnectionIds?: string[];
   }) {
     observedServices.value = value.services;
     observedErrorServices.value = value.errorServices;
     observedEdges.value = value.edges;
+    observedMessageConnectionIds.value = value.messageConnectionIds ?? [];
   }
   function setSelection(nodeId: string | null) {
     selectedNodeId.value = nodeId;
@@ -80,6 +93,15 @@ export const useGraphStore = defineStore("graph", () => {
         service.positionX = node.position.x;
         service.positionY = node.position.y;
       }
+      if (node.id === "message-queue" || node.id.startsWith("message-queue:")) {
+        const queueId =
+          node.id === "message-queue" ? "legacy-queue" : node.id.slice("message-queue:".length);
+        for (const destination of messageDestinations.value)
+          if ((destination.queueId ?? "legacy-queue") === queueId) {
+            destination.x = node.position.x;
+            destination.y = node.position.y;
+          }
+      }
     }
   }
 
@@ -88,6 +110,8 @@ export const useGraphStore = defineStore("graph", () => {
     edges,
     services,
     serviceEdges,
+    messageDestinations,
+    messageConnections,
     collapsedServiceEndpoints,
     serviceHealth,
     viewport,
@@ -95,6 +119,7 @@ export const useGraphStore = defineStore("graph", () => {
     observedErrorServices,
     observedServices,
     observedEdges,
+    observedMessageConnectionIds,
     selectedNodeId,
     allNodesCollapsed,
     applyCanvas,
@@ -104,6 +129,8 @@ export const useGraphStore = defineStore("graph", () => {
     setViewport,
     setNodesLocked,
     setServiceEdges,
+    setMessageConnections,
+    setMessageDestinations,
     toggleServiceEndpoints,
     setAllNodesCollapsed,
     setObservations,

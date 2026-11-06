@@ -6,8 +6,9 @@ Cairn currently models service-to-service calls but cannot show event-driven flo
 
 ## What Changes
 
-- Add logical message destination nodes for Kafka topics and RabbitMQ topic exchanges.
-- Let users connect service endpoints to destinations as publishers and destinations to services as consumers.
+- Add one message queue graph node that lists all configured Kafka topics and RabbitMQ topic exchanges.
+- Open a right-side settings panel from the message queue node to view, add, and edit destinations.
+- Let users connect service endpoints or event-producing services to destinations as publishers and destinations to services as consumers.
 - Check Kafka and RabbitMQ broker health without creating, changing, or deleting broker topology.
 - Extend Graph as code to import, validate, apply, and serialize destination nodes and their publish/subscribe connections.
 - Use existing OpenTelemetry spans and propagated message context to show related consumers and downstream work by trace ID when telemetry provides that context.

@@ -1,1 +1,1 @@
-export { arrangeGraph } from "#shared/utils/graph-layout";
+export { arrangeGraph, messageQueueNodeId } from "#shared/utils/graph-layout";

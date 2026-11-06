@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@vue-flow/core";
 import type { GraphMockApi, GraphService } from "../models/graph";
 import type { useGraphStore } from "../stores/graph";
-import { arrangeGraph } from "../utils/graph-layout";
+import { arrangeGraph, messageQueueNodeId } from "../utils/graph-layout";
 
 type Store = ReturnType<typeof useGraphStore>;
 type ViewModelOptions = {
@@ -59,8 +59,64 @@ export function useGraphViewModel({
         name: service.name,
         apiType: service.apiType,
         framework: frameworkLabel(service.framework),
+        hasMessagePublisher:
+          !service.endpoints.length &&
+          store.messageConnections.some(
+            (connection) =>
+              connection.type === "publish" &&
+              connection.serviceId === service.id &&
+              !connection.endpointId &&
+              !connection.subscriptionId,
+          ),
+        outboundCalls: [
+          ...store.serviceEdges
+            .filter((edge) => edge.sourceServiceId === service.id)
+            .map((edge) => ({
+              id: edge.id,
+              kind: "api" as const,
+              sourceEndpointId:
+                edge.sourceEndpointId ??
+                (edge.sourceSubscriptionId ? undefined : service.endpoints[0]?.id),
+              sourceSubscriptionId: edge.sourceSubscriptionId,
+            })),
+          ...store.messageConnections
+            .filter(
+              (connection) =>
+                connection.type === "publish" &&
+                (connection.serviceId === service.id ||
+                  ("endpointId" in connection &&
+                    service.endpoints.some((endpoint) => endpoint.id === connection.endpointId))),
+            )
+            .map((connection) => ({
+              id: connection.id,
+              kind: "message" as const,
+              sourceEndpointId:
+                ("endpointId" in connection ? connection.endpointId : undefined) ??
+                ("subscriptionId" in connection && connection.subscriptionId
+                  ? undefined
+                  : service.endpoints[0]?.id),
+              sourceSubscriptionId:
+                "subscriptionId" in connection ? connection.subscriptionId : undefined,
+            })),
+        ],
         online: store.serviceHealth[service.id] ?? null,
         endpoints: service.endpoints,
+        subscriptions: store.messageConnections.flatMap((connection) => {
+          if (connection.type !== "subscribe" || connection.serviceId !== service.id) return [];
+          const destination = store.messageDestinations.find(
+            (item) => item.id === connection.destinationId,
+          );
+          return destination
+            ? [
+                {
+                  id: connection.id,
+                  destinationName: destination.name,
+                  consumerGroup: connection.consumerGroup,
+                  bindingKey: connection.bindingKey,
+                },
+              ]
+            : [];
+        }),
         endpointsCollapsed: store.collapsedServiceEndpoints[service.id] ?? false,
         hasError,
       },
@@ -110,6 +166,54 @@ export function useGraphViewModel({
     });
   }
 
+  function messageQueueNodes(): Node[] {
+    const queues = new Map<string, typeof store.messageDestinations>();
+    for (const destination of store.messageDestinations) {
+      const queueId = destination.queueId ?? "legacy-queue";
+      queues.set(queueId, [...(queues.get(queueId) ?? []), destination]);
+    }
+    return [...queues].map(([queueId, destinations]) => {
+      const nodeId = messageQueueNodeId(queueId);
+      const destinationIds = new Set(destinations.map(({ id }) => id));
+      const observed = store.messageConnections.some(
+        (connection) =>
+          store.observedMessageConnectionIds.includes(connection.id) &&
+          destinationIds.has(connection.destinationId),
+      );
+      const online = destinations.some((destination) => destination.health === false)
+        ? false
+        : destinations.every((destination) => destination.health === true)
+          ? true
+          : null;
+      return {
+        id: nodeId,
+        type: "messageQueue",
+        position: {
+          x:
+            destinations.reduce((total, destination) => total + destination.x, 0) /
+            destinations.length,
+          y:
+            destinations.reduce((total, destination) => total + destination.y, 0) /
+            destinations.length,
+        },
+        data: {
+          queueId,
+          name: destinations[0]?.queueName ?? "Message Queue",
+          destinations,
+          online,
+          topicsCollapsed: store.allNodesCollapsed,
+        },
+        class: [
+          "app__flow-node app__flow-node--message-queue",
+          observed ? "app__flow-node--service-observed" : "",
+          store.selectedNodeId === nodeId ? "selected" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      };
+    });
+  }
+
   function buildEdges() {
     const declared: Edge[] = store.serviceEdges.flatMap((edge) => {
       const target = endpointTarget(edge.targetEndpointId);
@@ -117,7 +221,18 @@ export function useGraphViewModel({
       const sourceService = store.services.find((service) => service.id === edge.sourceServiceId);
       const sourceEndpointId =
         edge.sourceEndpointId ?? sourceService?.endpoints.find((endpoint) => endpoint.id)?.id;
-      if (!sourceEndpointId || endpointTarget(sourceEndpointId) !== edge.sourceServiceId) return [];
+      const subscription = edge.sourceSubscriptionId
+        ? store.messageConnections.find(
+            (connection) =>
+              connection.id === edge.sourceSubscriptionId && connection.type === "subscribe",
+          )
+        : undefined;
+      if (
+        (!subscription &&
+          (!sourceEndpointId || endpointTarget(sourceEndpointId) !== edge.sourceServiceId)) ||
+        (subscription && subscription.serviceId !== edge.sourceServiceId)
+      )
+        return [];
       const canEdit =
         !(store.collapsedServiceEndpoints[edge.sourceServiceId] ?? false) &&
         !(store.collapsedServiceEndpoints[target] ?? false);
@@ -132,7 +247,7 @@ export function useGraphViewModel({
         {
           id: edge.id,
           source: edge.sourceServiceId,
-          sourceHandle: endpointSourceHandle(sourceEndpointId),
+          sourceHandle: `outbound-call:${edge.id}`,
           target,
           targetHandle: endpointHandle(edge.targetEndpointId),
           updatable: canEdit,
@@ -195,13 +310,59 @@ export function useGraphViewModel({
         },
       ];
     });
-    const edges = [...declared, ...mock, ...observed];
+    const messages: Edge[] = store.messageConnections.flatMap((connection) => {
+      const destination = store.messageDestinations.find(
+        (item) => item.id === connection.destinationId,
+      );
+      if (!destination) return [];
+      if (connection.type === "publish") {
+        const source = connection.endpointId
+          ? endpointTarget(connection.endpointId)
+          : connection.serviceId;
+        if (!source) return [];
+        return [
+          {
+            id: `message-${connection.id}`,
+            source,
+            sourceHandle: `outbound-call:${connection.id}`,
+            target: messageQueueNodeId(destination.queueId),
+            targetHandle: `publish-in:${destination.id}`,
+            data: { messageConnectionId: connection.id },
+            type: "default",
+            deletable: true,
+            updatable: false,
+            class: store.observedMessageConnectionIds.includes(connection.id)
+              ? "app__flow-edge app__flow-edge--message app__flow-edge--observed"
+              : "app__flow-edge app__flow-edge--message",
+            animated: store.observedMessageConnectionIds.includes(connection.id),
+          },
+        ];
+      }
+      return [
+        {
+          id: `message-${connection.id}`,
+          source: messageQueueNodeId(destination.queueId),
+          sourceHandle: `subscribe-out:${destination.id}`,
+          target: connection.serviceId,
+          targetHandle: `subscriber-in:${connection.id}`,
+          data: { messageConnectionId: connection.id },
+          type: "default",
+          deletable: true,
+          updatable: false,
+          class: store.observedMessageConnectionIds.includes(connection.id)
+            ? "app__flow-edge app__flow-edge--message app__flow-edge--observed"
+            : "app__flow-edge app__flow-edge--message",
+          animated: store.observedMessageConnectionIds.includes(connection.id),
+        },
+      ];
+    });
+    const edges = [...declared, ...mock, ...messages, ...observed];
     store.setEdges(edges);
     return edges;
   }
 
   function syncNodes() {
-    const nodes = [...store.services.map(serviceNode), ...mockApiNodes()];
+    const nodes = [...store.services.map(serviceNode), ...messageQueueNodes(), ...mockApiNodes()];
     store.setNodes(nodes);
     buildEdges();
     return nodes;
@@ -222,11 +383,26 @@ export function useGraphViewModel({
         x: node.position.x,
         y: node.position.y,
       }));
+    const queuePositions = new Map(
+      graphNodes
+        .filter((node) => node.id === "message-queue" || node.id.startsWith("message-queue:"))
+        .map((node) => [node.id, node.position as { x: number; y: number }]),
+    );
+    const messageDestinations = store.messageDestinations.map((destination) => {
+      const queuePosition = queuePositions.get(messageQueueNodeId(destination.queueId));
+      return {
+        ...destination,
+        x: queuePosition?.x ?? destination.x,
+        y: queuePosition?.y ?? destination.y,
+      };
+    });
     return {
       nodesLocked: store.nodesLocked,
       viewport: store.viewport,
       services: servicePositions,
       mockApiPositions,
+      messageDestinations,
+      messageConnections: store.messageConnections,
       edges: store.serviceEdges,
     };
   }
@@ -262,7 +438,13 @@ export function useGraphViewModel({
   }
 
   function arrangeNodes() {
-    const positions = arrangeGraph(store.services, store.serviceEdges, mockApis());
+    const positions = arrangeGraph(
+      store.services,
+      store.serviceEdges,
+      mockApis(),
+      store.messageDestinations,
+      store.messageConnections,
+    );
     const nodes = store.nodes as unknown as {
       id: string;
       position: { x: number; y: number };

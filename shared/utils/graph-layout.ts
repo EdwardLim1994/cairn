@@ -1,26 +1,65 @@
-type GraphService = { id: string; name: string; endpoints: { id: string }[] };
+type GraphService = {
+  id: string;
+  name: string;
+  endpoints: { id: string }[];
+};
 type GraphMockApi = { id: string; targetEndpointId: string | null };
+type GraphDestination = { id: string; name: string; queueId?: string };
+type GraphMessageConnection =
+  | { type: "publish"; destinationId: string; endpointId?: string; serviceId?: string }
+  | { type: "subscribe"; destinationId: string; serviceId: string };
 
 const serviceBaseHeight = 130;
-const endpointHeight = 47;
+const endpointHeight = 56;
+const queueRowHeight = 47;
+const messageQueueBaseHeight = 58;
 const triggerWidth = 254;
 const mockHeight = 88;
 const layerWidth = 720;
 const triggerGap = 72;
 const rowGap = 88;
 
+export function messageQueueNodeId(queueId?: string) {
+  return !queueId || queueId === "legacy-queue" ? "message-queue" : `message-queue:${queueId}`;
+}
+
 export function arrangeGraph(
   services: GraphService[],
   edges: { sourceServiceId: string; targetEndpointId: string }[],
   mockApis: GraphMockApi[],
+  destinations: GraphDestination[] = [],
+  messageConnections: GraphMessageConnection[] = [],
 ) {
   const endpointOwners = new Map(
     services.flatMap((service) => service.endpoints.map((endpoint) => [endpoint.id, service.id])),
   );
-  const adjacency = new Map(services.map(({ id }) => [id, new Set<string>()]));
+  const subscriptionsByService = new Map<string, number>();
+  for (const connection of messageConnections)
+    if (connection.type === "subscribe")
+      subscriptionsByService.set(
+        connection.serviceId,
+        (subscriptionsByService.get(connection.serviceId) ?? 0) + 1,
+      );
+  const destinationNodeIds = [
+    ...new Set(destinations.map((destination) => messageQueueNodeId(destination.queueId))),
+  ];
+  const destinationById = new Map(destinations.map((destination) => [destination.id, destination]));
+  const nodeIds = [...services.map(({ id }) => id), ...destinationNodeIds];
+  const adjacency = new Map(nodeIds.map((id) => [id, new Set<string>()]));
   for (const edge of edges) {
     const target = endpointOwners.get(edge.targetEndpointId);
     if (target && target !== edge.sourceServiceId) adjacency.get(edge.sourceServiceId)?.add(target);
+  }
+  for (const connection of messageConnections) {
+    const destination = destinationById.get(connection.destinationId);
+    if (!destination) continue;
+    const destinationNodeId = messageQueueNodeId(destination.queueId);
+    if (connection.type === "publish") {
+      const source =
+        (connection.endpointId && endpointOwners.get(connection.endpointId)) ??
+        connection.serviceId;
+      if (source) adjacency.get(source)?.add(destinationNodeId);
+    } else adjacency.get(destinationNodeId)?.add(connection.serviceId);
   }
 
   let nextIndex = 0;
@@ -56,10 +95,13 @@ export function arrangeGraph(
     }
   }
   const serviceById = new Map(services.map((service) => [service.id, service]));
-  const serviceKey = (id: string) => `${serviceById.get(id)?.name ?? ""}\0${id}`;
-  for (const { id } of [...services].sort((left, right) =>
-    serviceKey(left.id).localeCompare(serviceKey(right.id)),
-  ))
+  const destinationByNodeId = new Map(
+    destinationNodeIds.map((id) => [id, { name: "Message Queue" }]),
+  );
+  const nodeName = (id: string) =>
+    serviceById.get(id)?.name ?? destinationByNodeId.get(id)?.name ?? "";
+  const serviceKey = (id: string) => `${nodeName(id)}\0${id}`;
+  for (const id of nodeIds.sort((left, right) => serviceKey(left).localeCompare(serviceKey(right))))
     if (!indices.has(id)) visit(id);
 
   const componentByService = new Map(
@@ -90,6 +132,8 @@ export function arrangeGraph(
     }
   }
 
+  const nodeRank = (id: string) => ranks[componentByService.get(id)!]!;
+
   const mockByService = new Map<string, GraphMockApi[]>();
   for (const api of mockApis) {
     const serviceId = endpointOwners.get(api.targetEndpointId ?? "");
@@ -100,29 +144,39 @@ export function arrangeGraph(
     apis.sort((left, right) => left.id!.localeCompare(right.id!));
 
   const positions = new Map<string, { x: number; y: number }>();
-  const layerCount = Math.max(0, ...ranks) + 1;
+  const layerCount = Math.max(0, ...nodeIds.map(nodeRank)) + 1;
   for (let rank = 0; rank < layerCount; rank++) {
-    const layer = components
-      .map((group, index) => ({ group, index }))
-      .filter(({ index }) => ranks[index] === rank)
-      .sort((left, right) => componentKey(left.index).localeCompare(componentKey(right.index)));
+    const layer = nodeIds
+      .filter((id) => nodeRank(id) === rank)
+      .sort((a, b) => serviceKey(a).localeCompare(serviceKey(b)));
     let y = 0;
-    for (const { group } of layer) {
-      for (const id of group) {
-        const service = serviceById.get(id)!;
-        const apis = mockByService.get(id) ?? [];
-        const serviceHeight = serviceBaseHeight + service.endpoints.length * endpointHeight;
-        const rowHeight = Math.max(serviceHeight, apis.length * mockHeight);
-        const serviceY = y + (rowHeight - serviceHeight) / 2;
-        positions.set(id, { x: rank * layerWidth, y: serviceY });
-        apis.forEach((api, index) =>
-          positions.set(`mock-api-${api.id}`, {
-            x: rank * layerWidth - triggerWidth - triggerGap,
-            y: y + (rowHeight - apis.length * mockHeight) / 2 + index * mockHeight,
-          }),
-        );
-        y += rowHeight + rowGap;
+    for (const id of layer) {
+      const service = serviceById.get(id);
+      if (!service) {
+        const queueId = id === "message-queue" ? "legacy-queue" : id.slice("message-queue:".length);
+        const topicCount = destinations.filter(
+          (destination) =>
+            destination.queueId === queueId || (!destination.queueId && queueId === "legacy-queue"),
+        ).length;
+        positions.set(id, { x: rank * layerWidth, y });
+        y += messageQueueBaseHeight + topicCount * queueRowHeight + rowGap;
+        continue;
       }
+      const apis = mockByService.get(id) ?? [];
+      const serviceHeight =
+        serviceBaseHeight +
+        (service.endpoints.length + (subscriptionsByService.get(id) ?? 0)) * endpointHeight +
+        (destinations.length ? queueRowHeight : 0);
+      const rowHeight = Math.max(serviceHeight, apis.length * mockHeight);
+      const serviceY = y + (rowHeight - serviceHeight) / 2;
+      positions.set(id, { x: rank * layerWidth, y: serviceY });
+      apis.forEach((api, index) =>
+        positions.set(`mock-api-${api.id}`, {
+          x: rank * layerWidth - triggerWidth - triggerGap,
+          y: y + (rowHeight - apis.length * mockHeight) / 2 + index * mockHeight,
+        }),
+      );
+      y += rowHeight + rowGap;
     }
   }
   return positions;

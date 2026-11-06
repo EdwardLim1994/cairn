@@ -15,6 +15,8 @@ const services = [
     projectId: "p",
     name: "Orders",
     apiType: "REST" as const,
+    grpcTls: false,
+    protoFileName: null,
     framework: "Spring Boot",
     baseUrl: "http://orders",
     healthCheckUrl: null,
@@ -31,9 +33,9 @@ const services = [
         projectId: "p",
         serviceId: "orders",
         name: "Create order",
-        apiType: "REST",
         method: "POST",
         url: "/orders",
+        rpcMethod: null,
         createdAt: "2025-01-01T00:00:00.000Z",
       },
     ],
@@ -44,6 +46,8 @@ const services = [
     projectId: "p",
     name: "Inventory",
     apiType: "REST" as const,
+    grpcTls: false,
+    protoFileName: null,
     framework: ".NET",
     baseUrl: "http://inventory",
     healthCheckUrl: null,
@@ -60,9 +64,9 @@ const services = [
         projectId: "p",
         serviceId: "inventory",
         name: "Reserve",
-        apiType: "REST",
         method: "POST",
         url: "/reserve",
+        rpcMethod: null,
         createdAt: "2025-01-01T00:00:00.000Z",
       },
     ],
@@ -72,7 +76,7 @@ const mock = {
   id: "mock-1",
   projectId: "p",
   name: "Create order",
-  apiType: "REST" as const,
+  apiType: "HTTP" as const,
   targetEndpointId: "orders-endpoint",
   headerTemplateId: null,
   customHeaders: [],
@@ -98,20 +102,35 @@ describe("mock API run view model", () => {
       nodesLocked: false,
       services,
       edges: [],
+      messageDestinations: [],
+      messageConnections: [],
       mockApis: previousMock ? [mock, previousMock] : [mock],
       headerTemplates: [],
       authorizationTemplates: [],
       viewport: { x: 0, y: 0, zoom: 1 },
     });
-    mockApiStore.setMockApis([mock]);
-    mockApiStore.setMockDraft([mock]);
+    mockApiStore.setMockApis(previousMock ? [mock, previousMock] : [mock]);
+    mockApiStore.setMockDraft(previousMock ? [mock, previousMock] : [mock]);
     const flow = {
       runId: "run-1",
       traceId: "trace-1",
       runStatus: status,
       status: "complete",
       incomplete: false,
-      spans: [],
+      spans: ["Orders", "Inventory"].map((serviceName, index) => ({
+        id: index + 1,
+        projectId: "p",
+        traceId: "trace-1",
+        spanId: `span-${index + 1}`,
+        parentSpanId: null,
+        serviceName,
+        operationName: "request",
+        startTime: "2026-01-01T00:00:00.000Z",
+        endTime: "2026-01-01T00:00:01.000Z",
+        statusCode: "OK",
+        attributes: {},
+        receivedAt: "2026-01-01T00:00:01.000Z",
+      })),
       edges: [
         {
           sourceService: "Orders",
@@ -140,9 +159,8 @@ describe("mock API run view model", () => {
     });
     const graphViewModel = useGraphViewModel({
       store: graphStore,
-      mockApis: () => (previousMock ? [mock, previousMock] : [mock]),
+      mockApis: () => [mock],
       runningMockId: () => mockApiStore.runningMockId,
-      runResults: () => mockApiStore.runResults,
     });
     const logService = ref<string[]>([]);
     const logSeverity = ref<string[]>([]);
@@ -186,31 +204,6 @@ describe("mock API run view model", () => {
     expect(nodes.find((node) => node.id === "orders")?.class).toContain("service-observed");
     expect(context.logsOpen.value).toBe(false);
     expect(context.calls.saveCanvas).toBe(2);
-  });
-
-  it("clears the previous call animation when triggering another mock API", async () => {
-    const previousMock = {
-      ...mock,
-      id: "mock-previous",
-      name: "Previous call",
-      targetEndpointId: "inventory-endpoint",
-    };
-    const context = setup("completed", previousMock);
-    context.mockApiStore.setRunResult("mock-previous", {
-      id: "previous-run",
-      traceId: "previous-trace",
-      status: "completed",
-      responseStatus: 201,
-      responseBody: "{}",
-      error: null,
-    });
-
-    await context.viewModel.runMock(mock);
-
-    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
-    expect(edges.find((edge) => edge.id === "mock-mock-previous")?.animated).toBe(false);
-    expect(edges.find((edge) => edge.id === "mock-mock-1")?.animated).toBe(true);
-    expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
   });
 
   it("filters logs to the failing downstream service and highlights its node", async () => {

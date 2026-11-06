@@ -24,12 +24,17 @@ export function useCanvasViewModel(options: {
   graphCanvas: Ref<GraphCanvas | null>;
   loading: Ref<boolean>;
   errorMessage: Ref<string>;
+  promptConnectionValue?: (message: string, defaultValue: string) => string | null;
   onError?: (message: string) => void;
 }) {
   const reportError = (message: string) => {
     options.errorMessage.value = message;
     options.onError?.(message);
   };
+  const promptConnectionValue = (message: string, defaultValue: string) =>
+    options.promptConnectionValue
+      ? options.promptConnectionValue(message, defaultValue)
+      : window.prompt(message, defaultValue);
 
   function syncNodes() {
     return options.graphViewModel.syncNodes();
@@ -72,6 +77,21 @@ export function useCanvasViewModel(options: {
     }
   }
 
+  async function loadMessageDestinationHealth() {
+    try {
+      const results = await options.apiClient.checkMessageDestinationHealth();
+      for (const result of results) {
+        const destination = options.graphStore.messageDestinations.find(
+          (item) => item.id === result.id,
+        );
+        if (destination) destination.health = result.online;
+      }
+      syncNodes();
+    } catch {
+      // Keep the last known broker status visible.
+    }
+  }
+
   async function loadCanvas() {
     options.loading.value = true;
     try {
@@ -88,6 +108,7 @@ export function useCanvasViewModel(options: {
       )
         await options.graphCanvas.value?.setViewport(options.graphStore.viewport);
       await loadServiceHealth();
+      await loadMessageDestinationHealth();
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : "Could not load the graph");
     } finally {
@@ -112,7 +133,7 @@ export function useCanvasViewModel(options: {
   }
 
   async function saveCanvas() {
-    await persistCanvas();
+    return await persistCanvas();
   }
 
   async function toggleNodesLocked() {
@@ -134,6 +155,37 @@ export function useCanvasViewModel(options: {
   }
 
   async function onConnect(connection: Connection) {
+    const message = messageConnection(connection);
+    if (message) {
+      const exists = options.graphStore.messageConnections.some(
+        (current) =>
+          current.type === message.type &&
+          current.destinationId === message.destinationId &&
+          (message.type === "publish"
+            ? current.type === "publish" &&
+              (current.subscriptionId
+                ? `subscription:${current.subscriptionId}`
+                : current.endpointId
+                  ? `endpoint:${current.endpointId}`
+                  : `service:${current.serviceId}`) ===
+                (message.subscriptionId
+                  ? `subscription:${message.subscriptionId}`
+                  : "endpointId" in message && message.endpointId
+                    ? `endpoint:${message.endpointId}`
+                    : `service:${"serviceId" in message ? message.serviceId : ""}`)
+            : current.type === "subscribe" &&
+              current.serviceId === message.serviceId &&
+              current.destinationId === message.destinationId),
+      );
+      if (exists) return;
+      options.graphStore.setMessageConnections([
+        ...options.graphStore.messageConnections,
+        { id: crypto.randomUUID(), ...message },
+      ]);
+      buildEdges();
+      await saveCanvas();
+      return;
+    }
     const edge = edgeConnection(connection);
     if (!edge) return;
     options.graphStore.setServiceEdges([
@@ -141,6 +193,7 @@ export function useCanvasViewModel(options: {
         (current) =>
           !(
             current.sourceEndpointId === edge.sourceEndpointId &&
+            current.sourceSubscriptionId === edge.sourceSubscriptionId &&
             current.targetEndpointId === edge.targetEndpointId
           ),
       ),
@@ -150,30 +203,138 @@ export function useCanvasViewModel(options: {
     await saveCanvas();
   }
 
+  function sourceFromHandle(sourceId: string, handle: string | null | undefined) {
+    const endpointId = handle?.startsWith("out:") ? handle.slice(4) : undefined;
+    const subscriptionId = handle?.startsWith("consumer-out:")
+      ? handle.slice("consumer-out:".length)
+      : undefined;
+    const callId = handle?.startsWith("outbound-call:")
+      ? handle.slice("outbound-call:".length)
+      : undefined;
+    if (callId) {
+      const edge = options.graphStore.serviceEdges.find(({ id }) => id === callId);
+      const publish = options.graphStore.messageConnections.find(
+        (item) => item.id === callId && item.type === "publish",
+      );
+      return edge
+        ? {
+            serviceId: edge.sourceServiceId,
+            endpointId: edge.sourceEndpointId ?? undefined,
+            subscriptionId: edge.sourceSubscriptionId ?? undefined,
+          }
+        : publish?.type === "publish"
+          ? {
+              serviceId: publish.serviceId,
+              endpointId: publish.endpointId,
+              subscriptionId: publish.subscriptionId,
+            }
+          : undefined;
+    }
+    if (endpointId) {
+      const serviceId = options.graphStore.services.find((service) =>
+        service.endpoints.some((endpoint) => endpoint.id === endpointId),
+      )?.id;
+      return serviceId ? { serviceId, endpointId } : undefined;
+    }
+    if (subscriptionId) {
+      const subscription = options.graphStore.messageConnections.find(
+        (item) => item.id === subscriptionId && item.type === "subscribe",
+      );
+      return subscription ? { serviceId: subscription.serviceId, subscriptionId } : undefined;
+    }
+    return handle === "service-out" ? { serviceId: sourceId } : undefined;
+  }
+
+  function messageConnection(connection: Connection) {
+    const queueIdForNode = (nodeId: string) =>
+      nodeId === "message-queue"
+        ? "legacy-queue"
+        : nodeId.startsWith("message-queue:")
+          ? nodeId.slice("message-queue:".length)
+          : undefined;
+    const sourceDestinationId =
+      queueIdForNode(connection.source) && connection.sourceHandle?.startsWith("subscribe-out:")
+        ? connection.sourceHandle.slice("subscribe-out:".length)
+        : undefined;
+    const targetDestinationId =
+      queueIdForNode(connection.target) && connection.targetHandle?.startsWith("publish-in:")
+        ? connection.targetHandle.slice("publish-in:".length)
+        : undefined;
+    if (targetDestinationId) {
+      const source = sourceFromHandle(connection.source, connection.sourceHandle);
+      if (!source || source.serviceId !== connection.source) return undefined;
+      const destination = options.graphStore.messageDestinations.find(
+        (item) =>
+          item.id === targetDestinationId &&
+          (item.queueId ?? "legacy-queue") === queueIdForNode(connection.target),
+      );
+      if (!destination) return undefined;
+      const routingKey =
+        destination.broker === "rabbitmq"
+          ? promptConnectionValue("RabbitMQ routing key", "events")?.trim()
+          : undefined;
+      if (destination.broker === "rabbitmq" && !routingKey) return undefined;
+      return {
+        type: "publish" as const,
+        destinationId: targetDestinationId,
+        serviceId: source.serviceId,
+        ...(source.endpointId ? { endpointId: source.endpointId } : {}),
+        ...(source.subscriptionId ? { subscriptionId: source.subscriptionId } : {}),
+        ...(routingKey ? { routingKey } : {}),
+      };
+    }
+    if (sourceDestinationId && connection.targetHandle?.startsWith("subscriber-in:")) {
+      if (!options.graphStore.services.some((service) => service.id === connection.target))
+        return undefined;
+      const destination = options.graphStore.messageDestinations.find(
+        (item) =>
+          item.id === sourceDestinationId &&
+          (item.queueId ?? "legacy-queue") === queueIdForNode(connection.source),
+      );
+      if (!destination) return undefined;
+      const connectionValue = promptConnectionValue(
+        destination.broker === "kafka" ? "Kafka consumer group" : "RabbitMQ binding key",
+        destination.broker === "kafka" ? "cairn-consumers" : "#",
+      )?.trim();
+      if (!connectionValue) return undefined;
+      const connectionDetails =
+        destination.broker === "kafka"
+          ? { consumerGroup: connectionValue }
+          : { bindingKey: connectionValue };
+      return {
+        type: "subscribe" as const,
+        destinationId: sourceDestinationId,
+        serviceId: connection.target,
+        ...connectionDetails,
+      };
+    }
+    return undefined;
+  }
+
   function edgeConnection(connection: Connection) {
-    const sourceEndpointId = connection.sourceHandle?.startsWith("out:")
-      ? connection.sourceHandle.slice(4)
-      : "";
+    const source = sourceFromHandle(connection.source, connection.sourceHandle);
     const targetEndpointId = connection.targetHandle?.startsWith("in:")
       ? connection.targetHandle.slice(3)
       : "";
-    const sourceService = options.graphStore.services.find((service) =>
-      service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
-    );
     const targetService = options.graphStore.services.find((service) =>
       service.endpoints.some((endpoint) => endpoint.id === targetEndpointId),
     );
     if (
-      !sourceService ||
+      !source ||
       !targetService ||
-      sourceService.id !== connection.source ||
+      source.serviceId !== connection.source ||
       targetService.id !== connection.target ||
-      sourceService.id === targetService.id ||
-      options.graphStore.collapsedServiceEndpoints[sourceService.id] ||
+      source.serviceId === targetService.id ||
+      options.graphStore.collapsedServiceEndpoints[source.serviceId] ||
       options.graphStore.collapsedServiceEndpoints[targetService.id]
     )
       return undefined;
-    return { sourceServiceId: sourceService.id, sourceEndpointId, targetEndpointId };
+    return {
+      sourceServiceId: source.serviceId,
+      sourceEndpointId: source.endpointId ?? null,
+      ...(source.subscriptionId ? { sourceSubscriptionId: source.subscriptionId } : {}),
+      targetEndpointId,
+    };
   }
 
   async function onEdgeUpdate(event: { edge: { id: string }; connection: Connection }) {
@@ -196,14 +357,21 @@ export function useCanvasViewModel(options: {
     const sourceService = options.graphStore.services.find((service) =>
       service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
     );
+    const sourceSubscription = options.graphStore.messageConnections.find(
+      (connection) => connection.id === sourceEndpointId && connection.type === "subscribe",
+    );
+    const sourceServiceId = sourceService?.id ?? sourceSubscription?.serviceId;
     const targetServiceId = options.graphViewModel.endpointTarget(targetEndpointId);
     if (
-      !sourceService ||
+      !sourceServiceId ||
       !targetServiceId ||
-      sourceService.id === targetServiceId ||
+      sourceServiceId === targetServiceId ||
       options.graphStore.serviceEdges.some(
         (edge) =>
-          edge.sourceEndpointId === sourceEndpointId && edge.targetEndpointId === targetEndpointId,
+          (sourceSubscription
+            ? edge.sourceSubscriptionId === sourceSubscription.id
+            : edge.sourceEndpointId === sourceEndpointId) &&
+          edge.targetEndpointId === targetEndpointId,
       )
     )
       return false;
@@ -211,8 +379,9 @@ export function useCanvasViewModel(options: {
       ...options.graphStore.serviceEdges,
       {
         id: crypto.randomUUID(),
-        sourceServiceId: sourceService.id,
-        sourceEndpointId,
+        sourceServiceId,
+        sourceEndpointId: sourceSubscription ? null : sourceEndpointId,
+        ...(sourceSubscription ? { sourceSubscriptionId: sourceSubscription.id } : {}),
         targetEndpointId,
       },
     ]);
@@ -223,8 +392,102 @@ export function useCanvasViewModel(options: {
 
   async function removeServiceCall(edgeId: string) {
     const remaining = options.graphStore.serviceEdges.filter(({ id }) => id !== edgeId);
-    if (remaining.length === options.graphStore.serviceEdges.length) return false;
+    const remainingMessages = options.graphStore.messageConnections.filter(
+      ({ id }) => id !== edgeId,
+    );
+    if (
+      remaining.length === options.graphStore.serviceEdges.length &&
+      remainingMessages.length === options.graphStore.messageConnections.length
+    )
+      return false;
     options.graphStore.setServiceEdges(remaining);
+    options.graphStore.setMessageConnections(remainingMessages);
+    buildEdges();
+    await saveCanvas();
+    return true;
+  }
+
+  async function addSubscriptionPublish(subscriptionId: string, destinationId: string) {
+    const subscription = options.graphStore.messageConnections.find(
+      (connection) => connection.id === subscriptionId && connection.type === "subscribe",
+    );
+    const destination = options.graphStore.messageDestinations.find(
+      ({ id }) => id === destinationId,
+    );
+    if (!subscription || !destination || subscription.serviceId === undefined) return false;
+    const routingKey =
+      destination.broker === "rabbitmq"
+        ? promptConnectionValue("RabbitMQ routing key", "events")?.trim()
+        : undefined;
+    if (destination.broker === "rabbitmq" && !routingKey) return false;
+    if (
+      options.graphStore.messageConnections.some(
+        (connection) =>
+          connection.type === "publish" &&
+          connection.subscriptionId === subscriptionId &&
+          connection.destinationId === destinationId,
+      )
+    )
+      return false;
+    options.graphStore.setMessageConnections([
+      ...options.graphStore.messageConnections,
+      {
+        id: crypto.randomUUID(),
+        type: "publish",
+        serviceId: subscription.serviceId,
+        subscriptionId,
+        destinationId,
+        ...(routingKey ? { routingKey } : {}),
+      },
+    ]);
+    buildEdges();
+    await saveCanvas();
+    return true;
+  }
+
+  async function setOutboundCall(
+    sourceId: string,
+    connectionId: string | undefined,
+    target: string,
+  ) {
+    const endpoint = options.graphStore.services
+      .flatMap((service) => service.endpoints.map((item) => ({ ...item, serviceId: service.id })))
+      .find((item) => item.id === sourceId);
+    const subscription = options.graphStore.messageConnections.find(
+      (item) => item.id === sourceId && item.type === "subscribe",
+    );
+    const sourceServiceId = endpoint?.serviceId ?? subscription?.serviceId;
+    if (!sourceServiceId) return false;
+
+    const edges = options.graphStore.serviceEdges.filter(({ id }) => id !== connectionId);
+    const messages = options.graphStore.messageConnections.filter(({ id }) => id !== connectionId);
+    const [targetType, targetId] = target.split(":", 2);
+    if (targetType === "endpoint") {
+      const targetServiceId = options.graphViewModel.endpointTarget(targetId ?? "");
+      if (!targetId || !targetServiceId || sourceServiceId === targetServiceId) return false;
+      edges.push({
+        id: crypto.randomUUID(),
+        sourceServiceId,
+        sourceEndpointId: subscription ? null : sourceId,
+        ...(subscription ? { sourceSubscriptionId: subscription.id } : {}),
+        targetEndpointId: targetId,
+      });
+    } else if (targetType === "destination") {
+      const destination = options.graphStore.messageDestinations.find(({ id }) => id === targetId);
+      if (!destination) return false;
+      const routingKey = destination.broker === "rabbitmq" ? "events" : undefined;
+      messages.push({
+        id: crypto.randomUUID(),
+        type: "publish",
+        destinationId: destination.id,
+        serviceId: sourceServiceId,
+        ...(subscription ? { subscriptionId: subscription.id } : { endpointId: sourceId }),
+        ...(routingKey ? { routingKey } : {}),
+      });
+    } else return false;
+
+    options.graphStore.setServiceEdges(edges);
+    options.graphStore.setMessageConnections(messages);
     buildEdges();
     await saveCanvas();
     return true;
@@ -236,15 +499,31 @@ export function useCanvasViewModel(options: {
     );
     if (!removed.size) return;
     const remaining = options.graphStore.serviceEdges.filter(({ id }) => !removed.has(id));
-    if (remaining.length === options.graphStore.serviceEdges.length) return;
+    const remainingMessages = options.graphStore.messageConnections.filter(
+      ({ id }) => !removed.has(`message-${id}`),
+    );
+    if (
+      remaining.length === options.graphStore.serviceEdges.length &&
+      remainingMessages.length === options.graphStore.messageConnections.length
+    )
+      return;
     options.graphStore.setServiceEdges(remaining);
+    options.graphStore.setMessageConnections(remainingMessages);
     await saveCanvas();
   }
 
   async function onEdgeDoubleClick({ edge }: { edge: { id: string } }) {
     const edges = options.graphStore.serviceEdges.filter((item) => item.id !== edge.id);
-    if (edges.length === options.graphStore.serviceEdges.length) return;
+    const messageConnections = options.graphStore.messageConnections.filter(
+      (item) => `message-${item.id}` !== edge.id,
+    );
+    if (
+      edges.length === options.graphStore.serviceEdges.length &&
+      messageConnections.length === options.graphStore.messageConnections.length
+    )
+      return;
     options.graphStore.setServiceEdges(edges);
+    options.graphStore.setMessageConnections(messageConnections);
     buildEdges();
     await saveCanvas();
   }
@@ -256,6 +535,7 @@ export function useCanvasViewModel(options: {
     toggleAllNodes,
     loadCanvas,
     loadServiceHealth,
+    loadMessageDestinationHealth,
     canvasPayload,
     saveCanvas,
     toggleNodesLocked,
@@ -266,6 +546,8 @@ export function useCanvasViewModel(options: {
     onEdgeUpdate,
     onEdgesChange,
     addServiceCall,
+    addSubscriptionPublish,
+    setOutboundCall,
     removeServiceCall,
   };
 }

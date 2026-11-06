@@ -21,7 +21,7 @@ describe("arrangeGraph", () => {
     expect(positions.get("caller")?.x).toBeLessThan(positions.get("target")!.x);
     expect(new Set([positions.get("alone")?.y, positions.get("caller")?.y]).size).toBe(2);
     const trigger = positions.get("mock-api-mock-1");
-    expect(trigger).toMatchObject({ x: 394, y: 44.5 });
+    expect(trigger).toMatchObject({ x: 394, y: 49 });
     expect(trigger!.x).toBeGreaterThan(positions.get("caller")!.x + 288);
     expect(positions.get("target")!.x - (trigger!.x + 254)).toBe(72);
   });
@@ -48,5 +48,39 @@ describe("arrangeGraph", () => {
     expect(positions.get("caller")?.x).toBe(positions.get("target")?.x);
     expect(positions.get("mock-api-mock-a")?.y).toBeLessThan(positions.get("mock-api-mock-b")!.y);
     expect(positions.get("target")!.y).toBeGreaterThan(positions.get("caller")!.y + 365);
+  });
+
+  it("places message destinations between publishers and consumers", () => {
+    const positions = arrangeGraph(
+      services as never,
+      [],
+      [],
+      [{ id: "orders", name: "Orders" }],
+      [
+        { type: "publish", destinationId: "orders", endpointId: "caller-endpoint" },
+        { type: "subscribe", destinationId: "orders", serviceId: "target" },
+      ],
+    );
+    const destination = positions.get("message-queue")!;
+    expect(positions.get("caller")!.x).toBeLessThan(destination.x);
+    expect(destination.x).toBeLessThan(positions.get("target")!.x);
+    expect(destination.x).not.toBe(positions.get("caller")!.x);
+    expect(destination.x).not.toBe(positions.get("target")!.x);
+  });
+
+  it("reserves the queue node's topic-dependent height during auto arrange", () => {
+    const positions = arrangeGraph(
+      [...services, { id: "zulu", name: "Zulu", endpoints: [{ id: "zulu-endpoint" }] }] as never,
+      [],
+      [],
+      [
+        { id: "orders", name: "Orders" },
+        { id: "payments", name: "Payments" },
+        { id: "shipments", name: "Shipments" },
+      ],
+    );
+    const queue = positions.get("message-queue")!;
+    const queueHeight = 58 + 3 * 47;
+    expect(positions.get("zulu")!.y).toBeGreaterThanOrEqual(queue.y + queueHeight + 88);
   });
 });

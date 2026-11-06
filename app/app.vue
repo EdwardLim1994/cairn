@@ -20,6 +20,7 @@
   --accent: #0f766e;
   --accent-ink: #fff;
   --accent-soft: #d6efeb;
+  --message-edge: #7c3aed;
   --danger: #b42318;
   --danger-soft: #fbe4e1;
   --warning: #855b00;
@@ -63,6 +64,7 @@ body {
   --accent: #2dd4bf;
   --accent-ink: #06201c;
   --accent-soft: #12312d;
+  --message-edge: #c4b5fd;
   --danger: #ff8a80;
   --danger-soft: #43211f;
   --warning: #f2c66d;
@@ -150,6 +152,9 @@ body {
 .vue-flow__edge.app__flow-edge--running .vue-flow__edge-path {
   stroke: var(--accent);
 }
+.vue-flow__edge.app__flow-edge--message.app__flow-edge--observed .vue-flow__edge-path {
+  stroke: var(--message-edge);
+}
 
 .vue-flow__edge-text {
   fill: var(--muted);
@@ -161,7 +166,11 @@ body {
   overflow: visible;
 }
 
-.vue-flow__node.app__flow-node--service-observed .app__graph-node--service {
+.app.app--dark .app__message-queue-kafka-icon {
+  filter: brightness(0) invert(1);
+}
+
+.vue-flow__node.app__flow-node--service-observed .app__graph-node {
   border-color: var(--accent);
   box-shadow:
     0 0 0 2px var(--accent-soft),
@@ -264,16 +273,28 @@ body {
 .app .app__endpoint-source {
   right: -5px;
 }
+.app .app__endpoint-source--connected {
+  background: var(--accent);
+}
+.app .app__endpoint-source--message {
+  background: var(--message-edge);
+}
+.app .app__endpoint-source--authoring {
+  border-color: var(--edge);
+  background: var(--panel);
+}
 .app .app__endpoint-handle--collapsed,
 .app .app__endpoint-source--collapsed {
   top: 75px;
+}
+.app .app__message-queue-handle--collapsed {
+  top: 81px;
 }
 .app .app__service-source {
   right: -5px;
   top: 28px;
 }
-.app .app__service-source--hidden {
-  opacity: 0;
-  pointer-events: none;
+.app .app__flow-edge--message .vue-flow__edge-path {
+  stroke-dasharray: 5 3;
 }
 </style>

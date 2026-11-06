@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type AnyMySqlColumn,
   boolean,
   datetime,
   double,
@@ -92,7 +93,7 @@ export const mockApis = mysqlTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
-    apiType: varchar("api_type", { length: 32 }).notNull().default("REST"),
+    apiType: varchar("api_type", { length: 32 }).notNull().default("HTTP"),
     targetEndpointId: varchar("target_endpoint_id", { length: 36 }).references(
       () => serviceEndpoints.id,
       { onDelete: "set null" },
@@ -132,7 +133,12 @@ export const graphNodePositions = mysqlTable(
     projectId: varchar("project_id", { length: 64 })
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    nodeType: mysqlEnum("node_type", ["service", "mock_api"]).notNull(),
+    nodeType: mysqlEnum("node_type", [
+      "service",
+      "mock_api",
+      "message_destination",
+      "message_queue",
+    ]).notNull(),
     entityId: varchar("entity_id", { length: 36 }).notNull(),
     positionX: double("position_x").notNull(),
     positionY: double("position_y").notNull(),
@@ -145,6 +151,54 @@ export const graphNodePositions = mysqlTable(
     ),
     index("graph_node_positions_project_idx").on(table.projectId),
   ],
+);
+
+export const messageDestinations = mysqlTable(
+  "message_destinations",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    queueId: varchar("queue_id", { length: 36 }).notNull().default("legacy-queue"),
+    queueName: varchar("queue_name", { length: 255 }).notNull().default("Message Queue"),
+    codeKey: varchar("code_key", { length: 128 }).notNull(),
+    broker: mysqlEnum("broker", ["kafka", "rabbitmq"]).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    connection: json("connection").$type<Record<string, string | boolean | undefined>>().notNull(),
+  },
+  (table) => [
+    uniqueIndex("message_destinations_project_code_key_unique").on(table.projectId, table.codeKey),
+    index("message_destinations_project_idx").on(table.projectId),
+  ],
+);
+
+export const messageConnections = mysqlTable(
+  "message_connections",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    projectId: varchar("project_id", { length: 64 })
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    destinationId: varchar("destination_id", { length: 36 })
+      .notNull()
+      .references(() => messageDestinations.id, { onDelete: "cascade" }),
+    type: mysqlEnum("type", ["publish", "subscribe"]).notNull(),
+    endpointId: varchar("endpoint_id", { length: 36 }).references(() => serviceEndpoints.id, {
+      onDelete: "cascade",
+    }),
+    subscriptionId: varchar("subscription_id", { length: 36 }).references(
+      (): AnyMySqlColumn => messageConnections.id,
+      { onDelete: "cascade" },
+    ),
+    serviceId: varchar("service_id", { length: 36 }).references(() => services.id, {
+      onDelete: "cascade",
+    }),
+    consumerGroup: varchar("consumer_group", { length: 255 }),
+    routingKey: varchar("routing_key", { length: 255 }),
+    bindingKey: varchar("binding_key", { length: 255 }),
+  },
+  (table) => [index("message_connections_project_idx").on(table.projectId)],
 );
 
 export const headerTemplates = mysqlTable(
@@ -231,6 +285,10 @@ export const serviceEdges = mysqlTable(
       .references(() => services.id, { onDelete: "cascade" }),
     sourceEndpointId: varchar("source_endpoint_id", { length: 36 }).references(
       () => serviceEndpoints.id,
+      { onDelete: "cascade" },
+    ),
+    sourceSubscriptionId: varchar("source_subscription_id", { length: 36 }).references(
+      () => messageConnections.id,
       { onDelete: "cascade" },
     ),
     targetEndpointId: varchar("target_endpoint_id", { length: 36 })

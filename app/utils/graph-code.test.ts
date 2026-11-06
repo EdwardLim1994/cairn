@@ -118,4 +118,80 @@ describe("serializeGraphCode", () => {
     expect(code).not.toContain("createdAt");
     expect(code).not.toContain("active");
   });
+
+  it("serializes message destinations as version 2 with secret references only", () => {
+    const services = [
+      {
+        id: "service-id",
+        codeKey: "orders-service",
+        name: "Orders",
+        framework: "Other",
+        baseUrl: "http://orders",
+        endpoints: [
+          {
+            id: "endpoint-id",
+            codeKey: "publish-order",
+            name: "Publish",
+            method: "POST",
+            apiType: "REST",
+            url: "/orders",
+          },
+        ],
+      },
+    ] as never;
+    const destinations = [
+      {
+        id: "destination-id",
+        codeKey: "orders-topic",
+        broker: "kafka",
+        name: "Orders topic",
+        connection: {
+          brokers: "kafka:9092",
+          securityProtocol: "SASL_SSL",
+          saslMechanism: "plain",
+          username: "cairn",
+          passwordVariable: "KAFKA_PASSWORD",
+        },
+      },
+    ] as never;
+    const code = serializeGraphCode(services, [], destinations, [
+      {
+        id: "connection-id",
+        type: "publish",
+        destinationId: "destination-id",
+        endpointId: "endpoint-id",
+      },
+      {
+        id: "consumer-connection-id",
+        type: "subscribe",
+        destinationId: "destination-id",
+        serviceId: "service-id",
+        consumerGroup: "orders-v1",
+      },
+    ] as never);
+    const manifest = JSON.parse(code);
+
+    expect(manifest).toMatchObject({
+      version: 2,
+      destinations: [{ key: "orders-topic", connection: { passwordVariable: "KAFKA_PASSWORD" } }],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationKey: "orders-topic",
+          serviceKey: "orders-service",
+          endpointKey: "publish-order",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "orders-topic",
+          serviceKey: "orders-service",
+          consumerGroup: "orders-v1",
+        },
+      ],
+    });
+    expect(code).not.toContain("destination-id");
+    expect(code).not.toContain("connection-id");
+    expect(code).not.toContain("positionX");
+    expect(code).not.toContain("KAFKA_PASSWORD_VALUE");
+  });
 });

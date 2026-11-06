@@ -31,7 +31,15 @@ export function createGetRunFlowUseCase(dependencies: {
   return async (id: string): Promise<RunFlowResponse> => {
     const data = await dependencies.getRunFlowData(await dependencies.ensureProject(), id);
     if (!data) throw new RunNotFoundError("Run not found");
-    const { run, spans, registeredServices, failedTargetService } = data;
+    const {
+      run,
+      spans,
+      registeredServices,
+      destinations,
+      messageConnections,
+      endpoints,
+      failedTargetService,
+    } = data;
     const now = (dependencies.now ?? Date.now)();
     const age = now - run.startedAt.getTime();
     const quiet = run.lastTelemetryAt
@@ -63,6 +71,41 @@ export function createGetRunFlowUseCase(dependencies: {
         errorServices.add(normalizeServiceName(span.serviceName, registeredServices));
     }
     if (failedTargetService) errorServices.add(failedTargetService);
+    const observedMessageConnectionIds = new Set<string>();
+    const destinationById = new Map(
+      destinations.map((destination) => [destination.id, destination]),
+    );
+    for (const connection of messageConnections) {
+      const destination = destinationById.get(connection.destinationId);
+      if (!destination) continue;
+      const serviceId =
+        connection.type === "publish"
+          ? (connection.serviceId ??
+            endpoints.find((endpoint) => endpoint.id === connection.endpointId)?.serviceId)
+          : connection.serviceId;
+      const serviceName = registeredServices.find((service) => service.id === serviceId)?.name;
+      if (!serviceName) continue;
+      const system = destination.broker === "rabbitmq" ? "rabbitmq" : "kafka";
+      const matches = spans.some((span) => {
+        if (span.traceId !== run.traceId) return false;
+        const attrs = span.attributes;
+        const spanSystem = attrs["messaging.system"] ?? attrs["messaging.system.name"];
+        const destinationName =
+          attrs["messaging.destination.name"] ??
+          attrs["messaging.destination"] ??
+          attrs["messaging.source.name"];
+        const operation = attrs["messaging.operation.type"] ?? attrs["messaging.operation"];
+        return (
+          normalizeServiceName(span.serviceName, registeredServices) === serviceName &&
+          spanSystem === system &&
+          destinationName === destination.name &&
+          (connection.type === "publish"
+            ? ["publish", "send"].includes(String(operation).toLowerCase())
+            : ["receive", "process", "consume"].includes(String(operation).toLowerCase()))
+        );
+      });
+      if (matches) observedMessageConnectionIds.add(connection.id);
+    }
     return {
       runId: run.id,
       traceId: run.traceId,
@@ -76,6 +119,7 @@ export function createGetRunFlowUseCase(dependencies: {
         receivedAt: span.receivedAt.toISOString(),
       })),
       edges: [...edges.values()],
+      observedMessageConnectionIds: [...observedMessageConnectionIds],
       errorServices: [...errorServices],
     };
   };

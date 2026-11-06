@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateTimeSchema } from "./common";
+import { messageConnectionInputSchema, messageDestinationInputSchema } from "./message-flows";
 import {
   authorizationTemplateSchema,
   headerTemplateSchema,
@@ -57,9 +58,23 @@ export const canvasGetResponseSchema = z.object({
       id: z.string(),
       sourceServiceId: z.string(),
       sourceEndpointId: z.string().nullable(),
+      sourceSubscriptionId: z.string().nullable().optional(),
       targetEndpointId: z.string(),
     }),
   ),
+  messageDestinations: z
+    .array(
+      messageDestinationInputSchema.and(
+        z.object({
+          projectId: z.string(),
+          health: z.boolean().nullable().optional(),
+        }),
+      ),
+    )
+    .default([]),
+  messageConnections: z
+    .array(messageConnectionInputSchema.and(z.object({ id: z.string() })))
+    .default([]),
   mockApis: z.array(
     z.object({
       id: z.string(),
@@ -88,21 +103,101 @@ export const canvasGetResponseSchema = z.object({
   authorizationTemplates: z.array(authorizationTemplateSchema).default([]),
 });
 
-export const canvasPutRequestSchema = z.object({
-  nodesLocked: z.boolean().default(false),
-  viewport: pointSchema.extend({ zoom: z.number().positive() }),
-  services: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })),
-  mockApiPositions: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })).optional(),
-  edges: z.array(
-    z.object({
-      sourceServiceId: z.string().min(1),
-      sourceEndpointId: z.string().min(1).nullable().optional(),
-      targetEndpointId: z.string().min(1),
-    }),
-  ),
-});
+export const canvasPutRequestSchema = z
+  .object({
+    nodesLocked: z.boolean().default(false),
+    viewport: pointSchema.extend({ zoom: z.number().positive() }),
+    services: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })),
+    mockApiPositions: z.array(z.object({ id: z.string().min(1), ...pointSchema.shape })).optional(),
+    messageDestinations: z.array(messageDestinationInputSchema).optional(),
+    messageConnections: z.array(messageConnectionInputSchema).optional(),
+    edges: z.array(
+      z.object({
+        sourceServiceId: z.string().min(1),
+        sourceEndpointId: z.string().min(1).nullable().optional(),
+        sourceSubscriptionId: z.string().min(1).nullable().optional(),
+        targetEndpointId: z.string().min(1),
+      }),
+    ),
+  })
+  .superRefine(({ messageDestinations = [], messageConnections = [] }, context) => {
+    const destinations = new Map(
+      messageDestinations.map((destination) => [destination.id, destination]),
+    );
+    for (const [index, connection] of messageConnections.entries()) {
+      const destination = destinations.get(connection.destinationId);
+      if (!destination) {
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "destinationId"],
+          message: "Unknown message destination",
+        });
+        continue;
+      }
+      if (
+        connection.type === "publish" &&
+        destination.broker === "kafka" &&
+        connection.routingKey !== undefined
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "routingKey"],
+          message: "Kafka publish connections do not use routing keys",
+        });
+      if (
+        connection.type === "subscribe" &&
+        destination.broker === "kafka" &&
+        connection.bindingKey !== undefined
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "bindingKey"],
+          message: "Kafka subscriptions do not use binding keys",
+        });
+      if (
+        connection.type === "subscribe" &&
+        destination.broker === "rabbitmq" &&
+        connection.consumerGroup !== undefined
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "consumerGroup"],
+          message: "RabbitMQ subscriptions do not use consumer groups",
+        });
+      if (
+        connection.type === "publish" &&
+        destination.broker === "rabbitmq" &&
+        connection.routingKey === undefined
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "routingKey"],
+          message: "RabbitMQ publish connections require a routing key",
+        });
+      if (
+        connection.type === "subscribe" &&
+        destination.broker === "kafka" &&
+        !connection.consumerGroup?.trim()
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "consumerGroup"],
+          message: "Kafka subscriptions require a consumer group",
+        });
+      if (
+        connection.type === "subscribe" &&
+        destination.broker === "rabbitmq" &&
+        connection.bindingKey === undefined
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["messageConnections", index, "bindingKey"],
+          message: "RabbitMQ subscriptions require a binding key",
+        });
+    }
+  });
 export const canvasPutResponseSchema = z.object({ saved: z.literal(true) });
 
 export type CanvasGetResponse = z.infer<typeof canvasGetResponseSchema>;
-export type CanvasPutRequest = z.infer<typeof canvasPutRequestSchema>;
+export type CanvasPutRequest = z.input<typeof canvasPutRequestSchema>;
 export type CanvasPutResponse = z.infer<typeof canvasPutResponseSchema>;

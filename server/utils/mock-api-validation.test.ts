@@ -26,7 +26,7 @@ describe("mock API input validation", () => {
   it("normalizes linked API defaults and preserves incomplete drafts", () => {
     expect(mockApiInput({ name: " List orders ", targetEndpointId: "endpoint-1" })).toEqual({
       name: "List orders",
-      apiType: "REST",
+      apiType: "HTTP",
       targetEndpointId: "endpoint-1",
       description: "",
       pathParameters: {},

@@ -86,7 +86,13 @@ describe("run endpoint use cases", () => {
     const getRunFlowData = vi.fn().mockResolvedValue({
       run,
       spans,
-      registeredServices: [{ name: "Order Service" }, { name: "Inventory Service" }],
+      registeredServices: [
+        { id: "orders", name: "Order Service" },
+        { id: "inventory", name: "Inventory Service" },
+      ],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
       failedTargetService: "Inventory Service",
     });
     const useCase = createGetRunFlowUseCase({
@@ -131,6 +137,9 @@ describe("run endpoint use cases", () => {
       },
       spans: [],
       registeredServices: [],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
       failedTargetService: undefined,
     });
     const useCase = createGetRunFlowUseCase({
@@ -149,6 +158,114 @@ describe("run endpoint use cases", () => {
         telemetryMaxWaitMs: () => 1,
       })("missing"),
     ).rejects.toBeInstanceOf(RunNotFoundError);
+  });
+
+  it("observes only trace-matched message connections and keeps downstream spans", async () => {
+    const now = 10_000;
+    const run = {
+      id: "run-message",
+      projectId: "project-1",
+      mockApiId: null,
+      traceId: "shared-trace",
+      status: "completed" as const,
+      responseStatus: 200,
+      responseHeaders: null,
+      responseBody: null,
+      error: null,
+      startedAt: new Date(now - 1000),
+      finishedAt: new Date(now - 500),
+      lastTelemetryAt: new Date(now - 100),
+    };
+    const span = (
+      id: string,
+      serviceName: string,
+      attributes: Record<string, unknown>,
+      parentSpanId: string | null = null,
+      traceId = "shared-trace",
+    ) => ({
+      id: id.length,
+      projectId: "project-1",
+      traceId,
+      spanId: id,
+      parentSpanId,
+      serviceName,
+      operationName: "message",
+      startTime: new Date(now - 900),
+      endTime: new Date(now - 800),
+      statusCode: "OK",
+      attributes,
+      receivedAt: new Date(now - 700),
+    });
+    const getRunFlowData = vi.fn().mockResolvedValue({
+      run,
+      spans: [
+        span("producer-span", "producer-service", {
+          "messaging.system": "kafka",
+          "messaging.destination.name": "orders",
+          "messaging.operation": "send",
+        }),
+        span(
+          "consumer-span",
+          "consumer-service",
+          {
+            "messaging.system": "kafka",
+            "messaging.source.name": "orders",
+            "messaging.operation": "process",
+          },
+          "producer-span",
+        ),
+        span("downstream-span", "Billing", {}, "consumer-span"),
+        span(
+          "unlinked-span",
+          "consumer-service",
+          {
+            "messaging.system": "kafka",
+            "messaging.source.name": "orders",
+            "messaging.operation": "process",
+          },
+          null,
+          "other-trace",
+        ),
+      ],
+      registeredServices: [
+        { id: "producer", name: "Producer Service" },
+        { id: "consumer", name: "Consumer Service" },
+        { id: "billing", name: "Billing" },
+      ],
+      destinations: [{ id: "destination", broker: "kafka", name: "orders" }],
+      endpoints: [{ id: "producer-endpoint", serviceId: "producer" }],
+      messageConnections: [
+        {
+          id: "publish-link",
+          type: "publish",
+          destinationId: "destination",
+          endpointId: "producer-endpoint",
+          serviceId: null,
+        },
+        {
+          id: "subscribe-link",
+          type: "subscribe",
+          destinationId: "destination",
+          endpointId: null,
+          serviceId: "consumer",
+        },
+      ],
+      failedTargetService: undefined,
+    });
+    const flow = await createGetRunFlowUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      getRunFlowData,
+      telemetryQuietMs: () => 50,
+      telemetryMaxWaitMs: () => 5000,
+      now: () => now,
+    })("run-message");
+    expect(flow.observedMessageConnectionIds).toEqual(["publish-link", "subscribe-link"]);
+    expect(flow.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sourceService: "Consumer Service", targetService: "Billing" }),
+      ]),
+    );
+    expect(flow.spans.map(({ traceId }) => traceId)).toContain("shared-trace");
   });
 
   it("maps pluralized subgraph labels to singular OpenTelemetry service names", async () => {
@@ -199,6 +316,9 @@ describe("run endpoint use cases", () => {
         },
       ],
       registeredServices: [{ name: "Apollo Router" }, { name: "Carts subgraph" }],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
       failedTargetService: undefined,
     });
     const getFlow = createGetRunFlowUseCase({

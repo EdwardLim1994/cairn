@@ -8,6 +8,8 @@ import {
   runs,
   serviceEndpoints,
   services,
+  messageConnections,
+  messageDestinations,
   spans,
 } from "../../db/schema";
 import { listMockApis } from "../mock-apis";
@@ -165,9 +167,21 @@ export async function getRunFlowData(projectId: string, id: string) {
     .where(and(eq(spans.projectId, projectId), eq(spans.traceId, run.traceId)))
     .orderBy(asc(spans.startTime));
   const registeredServices = await db
-    .select({ name: services.name })
+    .select({ id: services.id, name: services.name })
     .from(services)
     .where(eq(services.projectId, projectId));
+  const destinations = await db
+    .select()
+    .from(messageDestinations)
+    .where(eq(messageDestinations.projectId, projectId));
+  const connections = await db
+    .select()
+    .from(messageConnections)
+    .where(eq(messageConnections.projectId, projectId));
+  const endpoints = await db
+    .select({ id: serviceEndpoints.id, serviceId: serviceEndpoints.serviceId })
+    .from(serviceEndpoints)
+    .where(eq(serviceEndpoints.projectId, projectId));
   let failedTargetService: string | undefined;
   if (run.status === "failed" && run.mockApiId) {
     const [target] = await db
@@ -178,7 +192,15 @@ export async function getRunFlowData(projectId: string, id: string) {
       .where(and(eq(mockApis.id, run.mockApiId), eq(mockApis.projectId, projectId)));
     failedTargetService = target?.name;
   }
-  return { run, spans: records, registeredServices, failedTargetService };
+  return {
+    run,
+    spans: records,
+    registeredServices,
+    destinations,
+    messageConnections: connections,
+    endpoints,
+    failedTargetService,
+  };
 }
 
 export async function listMockApiCallHistory(projectId: string) {

@@ -8,6 +8,9 @@ import { getCanvas } from "./canvas";
 import * as schema from "../db/schema";
 import {
   graphNodePositions,
+  environmentVariables,
+  messageConnections,
+  messageDestinations,
   mockApis,
   projects,
   serviceEdges,
@@ -255,6 +258,128 @@ integration("graph code repository with MySQL", () => {
     expect(canvas.services.find(({ codeKey }) => codeKey === "target")?.positionX).toBe(
       x.get("target"),
     );
+  });
+
+  it("applies version 2 message topology, uses secret references, and preserves destination positions", async () => {
+    await db!.insert(environmentVariables).values({
+      id: "graph-code-kafka-password",
+      projectId,
+      name: "KAFKA_PASSWORD",
+      value: "private-value",
+    });
+    const manifest: GraphCodeManifest = {
+      version: 2,
+      services: [
+        {
+          key: "producer",
+          name: "Producer",
+          framework: "Other",
+          baseUrl: "http://producer",
+          endpoints: [
+            {
+              key: "publish",
+              name: "Publish",
+              method: "POST",
+              url: "/publish",
+              outboundConnections: [],
+            },
+          ],
+        },
+        {
+          key: "consumer",
+          name: "Consumer",
+          framework: "Other",
+          baseUrl: "http://consumer",
+          endpoints: [],
+        },
+      ],
+      destinations: [
+        {
+          key: "orders-topic",
+          broker: "kafka",
+          name: "Orders",
+          connection: {
+            brokers: "localhost:9092",
+            securityProtocol: "SASL_SSL",
+            saslMechanism: "plain",
+            username: "operator",
+            passwordVariable: "KAFKA_PASSWORD",
+          },
+        },
+      ],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationKey: "orders-topic",
+          serviceKey: "producer",
+          endpointKey: "publish",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "orders-topic",
+          serviceKey: "consumer",
+          consumerGroup: "orders-v1",
+        },
+      ],
+    };
+    await applyGraphCode(projectId, manifest, db!);
+    const [destination] = await db!
+      .select()
+      .from(messageDestinations)
+      .where(eq(messageDestinations.projectId, projectId));
+    const originalPosition = await db!
+      .select()
+      .from(graphNodePositions)
+      .where(eq(graphNodePositions.entityId, destination!.id));
+    await db!
+      .update(graphNodePositions)
+      .set({ positionX: 444, positionY: 222 })
+      .where(eq(graphNodePositions.entityId, destination!.id));
+
+    await applyGraphCode(
+      projectId,
+      {
+        ...manifest,
+        destinations: manifest.destinations!.map((item) => ({ ...item, name: "Orders v2" })),
+      },
+      db!,
+    );
+
+    const nextDestinations = await db!
+      .select()
+      .from(messageDestinations)
+      .where(eq(messageDestinations.projectId, projectId));
+    expect(nextDestinations).toHaveLength(1);
+    expect(nextDestinations[0]).toMatchObject({
+      id: destination!.id,
+      codeKey: "orders-topic",
+      name: "Orders v2",
+    });
+    expect(nextDestinations[0]?.connection).not.toHaveProperty("password");
+    expect(
+      await db!
+        .select()
+        .from(messageConnections)
+        .where(eq(messageConnections.projectId, projectId)),
+    ).toHaveLength(2);
+    const preserved = await db!
+      .select()
+      .from(graphNodePositions)
+      .where(eq(graphNodePositions.entityId, destination!.id));
+    expect(preserved[0]).toMatchObject({ positionX: 444, positionY: 222 });
+    expect(originalPosition[0]).toBeDefined();
+
+    await applyGraphCode(
+      projectId,
+      { version: 1, services: manifest.services } as GraphCodeManifest,
+      db!,
+    );
+    expect(
+      await db!
+        .select()
+        .from(messageDestinations)
+        .where(eq(messageDestinations.projectId, projectId)),
+    ).toEqual([]);
   });
 
   it("rolls back the whole import when persistence fails", async () => {

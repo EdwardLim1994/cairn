@@ -12,6 +12,9 @@ const service = {
   codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST" as const,
+  grpcTls: false,
+  protoFileName: null,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8081",
   healthCheckUrl: null,
@@ -28,9 +31,9 @@ const service = {
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
-      apiType: "REST",
       method: "GET",
       url: "/orders",
+      rpcMethod: null,
       createdAt: "2026-01-01T00:00:00.000Z",
     },
   ],
@@ -39,6 +42,7 @@ const mockApi = {
   id: "mock-1",
   projectId: "project-1",
   name: "Fetch orders",
+  apiType: "HTTP" as const,
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],
@@ -58,6 +62,8 @@ const canvas = {
   viewport: { x: 4, y: 5, zoom: 1.5 },
   services: [service],
   edges: [],
+  messageDestinations: [],
+  messageConnections: [],
   mockApis: [mockApi],
   headerTemplates: [],
   authorizationTemplates: [],
@@ -109,6 +115,7 @@ describe("canvas view model", () => {
       graphCanvas: ref(canvasElement),
       loading,
       errorMessage,
+      promptConnectionValue: (_message, defaultValue) => defaultValue,
     });
     return {
       apiClient,
@@ -150,6 +157,36 @@ describe("canvas view model", () => {
     expect(context.loading.value).toBe(false);
   });
 
+  it("loads broker health and shows offline status on destination nodes", async () => {
+    const destination = {
+      id: "kafka-1",
+      projectId: "project-1",
+      codeKey: "orders",
+      broker: "kafka" as const,
+      name: "Orders",
+      connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" as const },
+      x: 300,
+      y: 40,
+      health: null,
+    };
+    const context = setup((url) => {
+      if (url === "/api/canvas") return { ...canvas, messageDestinations: [destination] };
+      if (url === "/api/services/health") return [{ id: "service-1", online: true }];
+      if (url === "/api/message-destinations/health") return [{ id: "kafka-1", online: false }];
+      return [];
+    });
+
+    await context.model.loadCanvas();
+
+    expect(context.graphStore.messageDestinations[0]?.health).toBe(false);
+    expect(context.graphStore.nodes).toContainEqual(
+      expect.objectContaining({
+        id: "message-queue",
+        data: expect.objectContaining({ online: false }),
+      }),
+    );
+  });
+
   it("saves graph positions and updates viewport after movement", async () => {
     const context = setup();
     context.graphStore.applyCanvas(canvas);
@@ -179,7 +216,7 @@ describe("canvas view model", () => {
     expect(request?.options.body).toMatchObject({
       nodesLocked: true,
       services: [{ id: "service-1", x: 0, y: 0 }],
-      mockApiPositions: [{ id: "mock-1", x: -326, y: 44.5 }],
+      mockApiPositions: [{ id: "mock-1", x: -326, y: 49 }],
     });
     expect(context.canvasElement.fitViewCalls).toEqual([{ padding: 0.2, duration: 300 }]);
   });
@@ -249,6 +286,133 @@ describe("canvas view model", () => {
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
   });
 
+  it("creates typed publisher and consumer edges without labels", async () => {
+    const context = setup();
+    const paymentsService = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+      })),
+    };
+    context.graphStore.applyCanvas({
+      ...canvas,
+      services: [service, paymentsService],
+      messageDestinations: [
+        {
+          id: "rabbit",
+          projectId: "project-1",
+          codeKey: "orders",
+          broker: "rabbitmq",
+          name: "Orders",
+          connection: { host: "localhost", port: 5672, virtualHost: "/", tls: false },
+          x: 300,
+          y: 40,
+          health: null,
+        },
+      ],
+      messageConnections: [
+        {
+          id: "subscription-1",
+          type: "subscribe",
+          destinationId: "rabbit",
+          serviceId: "service-1",
+          bindingKey: "#",
+        },
+      ],
+    });
+
+    await context.model.onConnect({
+      source: "service-1",
+      target: "service-2",
+      sourceHandle: "consumer-out:subscription-1",
+      targetHandle: "in:endpoint-2",
+    });
+    expect(context.graphStore.serviceEdges).toContainEqual(
+      expect.objectContaining({
+        sourceServiceId: "service-1",
+        sourceSubscriptionId: "subscription-1",
+        targetEndpointId: "endpoint-2",
+      }),
+    );
+    expect(context.graphViewModel.buildEdges()).toContainEqual(
+      expect.objectContaining({
+        source: "service-1",
+        sourceHandle: `outbound-call:${context.graphStore.serviceEdges[0]?.id}`,
+        target: "service-2",
+        targetHandle: "in:endpoint-2",
+      }),
+    );
+    await context.model.onConnect({
+      source: "service-1",
+      target: "message-queue",
+      sourceHandle: "consumer-out:subscription-1",
+      targetHandle: "publish-in:rabbit",
+    });
+    expect(context.graphStore.messageConnections).toContainEqual(
+      expect.objectContaining({
+        type: "publish",
+        subscriptionId: "subscription-1",
+        destinationId: "rabbit",
+      }),
+    );
+    expect(context.graphViewModel.buildEdges()).toContainEqual(
+      expect.objectContaining({
+        source: "service-1",
+        sourceHandle: `outbound-call:${context.graphStore.messageConnections.find((item) => item.type === "publish" && item.subscriptionId === "subscription-1")?.id}`,
+        target: "message-queue",
+        targetHandle: "publish-in:rabbit",
+      }),
+    );
+
+    await context.model.onConnect({
+      source: "service-1",
+      target: "message-queue",
+      sourceHandle: "out:endpoint-1",
+      targetHandle: "publish-in:rabbit",
+    });
+    await context.model.onConnect({
+      source: "message-queue",
+      target: "service-2",
+      sourceHandle: "subscribe-out:rabbit",
+      targetHandle: "subscriber-in:new-subscription",
+    });
+
+    expect(context.graphStore.messageConnections).toContainEqual(
+      expect.objectContaining({
+        type: "publish",
+        destinationId: "rabbit",
+        endpointId: "endpoint-1",
+        routingKey: "events",
+      }),
+    );
+    expect(context.graphStore.messageConnections).toContainEqual(
+      expect.objectContaining({
+        type: "subscribe",
+        destinationId: "rabbit",
+        serviceId: "service-2",
+        bindingKey: "#",
+      }),
+    );
+    expect(context.graphViewModel.buildEdges()).toContainEqual(
+      expect.objectContaining({
+        source: "service-1",
+        target: "message-queue",
+        targetHandle: "publish-in:rabbit",
+      }),
+    );
+    expect(context.graphViewModel.buildEdges()).toContainEqual(
+      expect.objectContaining({
+        source: "message-queue",
+        sourceHandle: "subscribe-out:rabbit",
+        target: "service-2",
+      }),
+    );
+  });
+
   it("deletes a declared connection when its wire is double-clicked", async () => {
     const context = setup();
     context.graphStore.applyCanvas({
@@ -296,7 +460,7 @@ describe("canvas view model", () => {
     ]);
     expect(context.graphViewModel.buildEdges()[0]).toMatchObject({
       id: "legacy-edge",
-      sourceHandle: "service-out",
+      sourceHandle: "outbound-call:legacy-edge",
       targetHandle: "in:endpoint-2",
     });
 
@@ -373,7 +537,7 @@ describe("canvas view model", () => {
       }>
     ).find(({ id }) => id === edge?.id);
     expect(renderedEdge).toMatchObject({
-      sourceHandle: "out:endpoint-1",
+      sourceHandle: `outbound-call:${edge?.id}`,
       targetHandle: "in:endpoint-2",
     });
 
@@ -384,6 +548,56 @@ describe("canvas view model", () => {
         ({ id }) => id === edge!.id,
       ),
     ).toBe(false);
+  });
+
+  it("sets and replaces a combined endpoint or message outbound target", async () => {
+    const context = setup();
+    const paymentsService = {
+      ...service,
+      id: "service-2",
+      name: "Payments",
+      endpoints: service.endpoints.map((endpoint) => ({
+        ...endpoint,
+        id: "endpoint-2",
+        serviceId: "service-2",
+      })),
+    };
+    context.graphStore.applyCanvas({
+      ...canvas,
+      services: [service, paymentsService],
+      messageDestinations: [
+        {
+          id: "destination-1",
+          projectId: "project-1",
+          codeKey: "orders",
+          broker: "kafka",
+          name: "Orders",
+          connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+          x: 500,
+          y: 0,
+        },
+      ],
+    });
+
+    await expect(
+      context.model.setOutboundCall("endpoint-1", undefined, "destination:destination-1"),
+    ).resolves.toBe(true);
+    const publish = context.graphStore.messageConnections[0];
+    expect(publish).toMatchObject({
+      type: "publish",
+      endpointId: "endpoint-1",
+      destinationId: "destination-1",
+    });
+    await expect(
+      context.model.setOutboundCall("endpoint-1", publish!.id, "endpoint:endpoint-2"),
+    ).resolves.toBe(true);
+    expect(context.graphStore.messageConnections).toEqual([]);
+    expect(context.graphStore.serviceEdges).toContainEqual(
+      expect.objectContaining({
+        sourceEndpointId: "endpoint-1",
+        targetEndpointId: "endpoint-2",
+      }),
+    );
   });
 
   it("refreshes node internals and rebuilds edges for collapse actions", async () => {

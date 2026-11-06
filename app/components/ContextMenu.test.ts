@@ -77,4 +77,14 @@ describe("ContextMenu", () => {
     await openWrapper.get("[data-outside-close]").trigger("click");
     expect(openWrapper.emitted("update:open")).toEqual([[false]]);
   });
+
+  it("emits add-message-queue intent", async () => {
+    const wrapper = mount(ContextMenu, {
+      props: { open: true },
+      global: { components: { UContextMenu: UContextMenuStub } },
+      slots: { default: "Graph canvas" },
+    });
+    await wrapper.findAll('[role="menuitem"]')[1]!.trigger("click");
+    expect(wrapper.emitted("addMessageQueue")).toEqual([[]]);
+  });
 });

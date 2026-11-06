@@ -3,8 +3,19 @@ import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { getCanvas, saveCanvas } from ".";
+import { listBrokerHealthTargets } from "../message-destinations";
 import * as schema from "../../db/schema";
-import { mockApis, projects, serviceEdges, serviceEndpoints, services } from "../../db/schema";
+import {
+  environmentVariables,
+  graphNodePositions,
+  messageConnections,
+  messageDestinations,
+  mockApis,
+  projects,
+  serviceEdges,
+  serviceEndpoints,
+  services,
+} from "../../db/schema";
 import { CanvasConstraintError } from "./errors";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
@@ -172,6 +183,184 @@ integration("canvas repositories with MySQL", () => {
     const sourceEndpointIds = edges.map(({ sourceEndpointId }) => sourceEndpointId);
     expect(sourceEndpointIds).toContain(null);
     expect(sourceEndpointIds).toContain("canvas-source-endpoint");
+  });
+
+  it("round-trips message destinations, typed connections, secrets, and positions", async () => {
+    await db!
+      .insert(environmentVariables)
+      .values({ id: "canvas-broker-password", projectId, name: "KAFKA_PASSWORD", value: "secret" });
+    await saveCanvas(
+      projectId,
+      {
+        nodesLocked: false,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        services: [],
+        edges: [
+          {
+            sourceServiceId: "canvas-service-source",
+            sourceSubscriptionId: "canvas-source-subscription",
+            targetEndpointId: "canvas-target-endpoint",
+          },
+        ],
+        messageDestinations: [
+          {
+            id: "canvas-destination-kafka",
+            codeKey: "orders",
+            broker: "kafka",
+            name: "orders",
+            connection: { brokers: "localhost:9092", passwordVariable: "KAFKA_PASSWORD" },
+            x: 150,
+            y: 250,
+          },
+        ],
+        messageConnections: [
+          {
+            type: "publish",
+            destinationId: "canvas-destination-kafka",
+            endpointId: "canvas-source-endpoint",
+          },
+          {
+            type: "subscribe",
+            id: "canvas-source-subscription",
+            destinationId: "canvas-destination-kafka",
+            serviceId: "canvas-service-source",
+            consumerGroup: "orders-v1",
+          },
+          {
+            type: "publish",
+            id: "canvas-republish",
+            destinationId: "canvas-destination-kafka",
+            serviceId: "canvas-service-source",
+            subscriptionId: "canvas-source-subscription",
+          },
+        ],
+      },
+      db!,
+    );
+    const canvas = await getCanvas(projectId, db!);
+    expect(canvas.messageDestinations[0]).toMatchObject({
+      id: "canvas-destination-kafka",
+      broker: "kafka",
+      x: 150,
+      y: 250,
+    });
+    expect(canvas.messageConnections).toHaveLength(3);
+    expect(canvas.edges).toContainEqual(
+      expect.objectContaining({
+        sourceSubscriptionId: "canvas-source-subscription",
+        targetEndpointId: "canvas-target-endpoint",
+      }),
+    );
+    expect(await listBrokerHealthTargets(projectId, db!)).toMatchObject([
+      { id: "canvas-destination-kafka", password: "secret" },
+    ]);
+    expect(canvas.messageConnections).toContainEqual(
+      expect.objectContaining({ type: "publish", endpointId: "canvas-source-endpoint" }),
+    );
+    expect(canvas.messageConnections).toContainEqual(
+      expect.objectContaining({
+        type: "subscribe",
+        id: "canvas-source-subscription",
+        serviceId: "canvas-service-source",
+        consumerGroup: "orders-v1",
+      }),
+    );
+    expect(canvas.messageConnections).toContainEqual(
+      expect.objectContaining({
+        type: "publish",
+        id: "canvas-republish",
+        subscriptionId: "canvas-source-subscription",
+      }),
+    );
+    expect(
+      await db!
+        .select()
+        .from(messageConnections)
+        .where(eq(messageConnections.projectId, projectId)),
+    ).toHaveLength(3);
+    expect(
+      await db!
+        .select()
+        .from(graphNodePositions)
+        .where(eq(graphNodePositions.nodeType, "message_destination")),
+    ).toHaveLength(1);
+    await saveCanvas(
+      projectId,
+      {
+        nodesLocked: false,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        services: [],
+        edges: [],
+        messageDestinations: [],
+        messageConnections: [],
+      },
+      db!,
+    );
+    expect((await getCanvas(projectId, db!)).messageDestinations).toEqual([]);
+    expect(
+      await db!
+        .select()
+        .from(messageConnections)
+        .where(eq(messageConnections.projectId, projectId)),
+    ).toEqual([]);
+  });
+
+  it("rejects cross-project message references without partial writes", async () => {
+    const otherProjectId = "canvas-other-project";
+    await db!.insert(projects).values({ id: otherProjectId });
+    await db!.insert(services).values({
+      id: "canvas-other-service",
+      projectId: otherProjectId,
+      name: "Other",
+      framework: "Other",
+      baseUrl: "http://localhost",
+    });
+    await db!.insert(serviceEndpoints).values({
+      id: "canvas-other-endpoint",
+      projectId: otherProjectId,
+      serviceId: "canvas-other-service",
+      name: "Other endpoint",
+      method: "GET",
+      url: "/other",
+    });
+    await expect(
+      saveCanvas(
+        projectId,
+        {
+          nodesLocked: true,
+          viewport: { x: 4, y: 5, zoom: 1.2 },
+          services: [],
+          edges: [],
+          messageDestinations: [
+            {
+              id: "canvas-new-destination",
+              codeKey: "new",
+              broker: "kafka",
+              name: "new",
+              connection: { brokers: "localhost:9092" },
+              x: 1,
+              y: 2,
+            },
+          ],
+          messageConnections: [
+            {
+              type: "publish",
+              destinationId: "canvas-new-destination",
+              endpointId: "canvas-other-endpoint",
+            },
+          ],
+        },
+        db!,
+      ),
+    ).rejects.toBeInstanceOf(CanvasConstraintError);
+    expect(
+      await db!
+        .select()
+        .from(messageDestinations)
+        .where(eq(messageDestinations.id, "canvas-new-destination")),
+    ).toHaveLength(0);
+    expect((await getCanvas(projectId, db!)).viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+    await db!.delete(projects).where(eq(projects.id, otherProjectId));
   });
 
   it("keeps legacy calls service-level until reassignment, then reloads assigned endpoint", async () => {

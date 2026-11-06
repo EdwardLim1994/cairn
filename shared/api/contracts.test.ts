@@ -36,6 +36,7 @@ const validService = {
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
   grpcTls: false,
+  protoFileName: null,
   healthCheckUrl: null,
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
@@ -48,6 +49,7 @@ const validMockApi = {
   id: "mock-1",
   projectId: "project-1",
   name: "List orders",
+  apiType: "HTTP",
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],
@@ -312,6 +314,54 @@ describe("shared API contracts", () => {
     expect(canvasPutResponseSchema.safeParse({ saved: false }).success).toBe(false);
   });
 
+  it("accepts consumer-sourced service calls and message republishes", () => {
+    const request = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      services: [],
+      edges: [
+        {
+          sourceServiceId: "service-1",
+          sourceSubscriptionId: "subscription-1",
+          targetEndpointId: "endpoint-2",
+        },
+      ],
+      messageDestinations: [
+        {
+          id: "destination-1",
+          codeKey: "payments",
+          broker: "kafka" as const,
+          name: "Payments",
+          connection: { brokers: "localhost:9092" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageConnections: [
+        {
+          id: "subscription-1",
+          type: "subscribe" as const,
+          destinationId: "destination-1",
+          serviceId: "service-1",
+          consumerGroup: "orders",
+        },
+        {
+          id: "publish-1",
+          type: "publish" as const,
+          destinationId: "destination-1",
+          serviceId: "service-1",
+          subscriptionId: "subscription-1",
+        },
+      ],
+    };
+    expect(canvasPutRequestSchema.safeParse(request).success).toBe(true);
+    expect(
+      canvasPutRequestSchema.safeParse({
+        ...request,
+        messageConnections: [{ ...request.messageConnections[1], serviceId: undefined }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("accepts canvas load response shape", () => {
     expect(
       canvasGetResponseSchema.safeParse({
@@ -378,6 +428,7 @@ describe("shared API contracts", () => {
       framework: "Spring Boot",
       baseUrl: "http://localhost:8080",
       grpcTls: false,
+      protoFileName: null,
       healthCheckUrl: null,
       healthCheckHeaderTemplateId: null,
       healthCheckCustomHeaders: [],

@@ -8,7 +8,7 @@ services:
       MYSQL_ROOT_PASSWORD: cairn_test_root_only
     # Host-run tests read CAIRN_TEST_DATABASE_URL from .env. Keep its port aligned here.
     ports:
-      - "${CAIRN_TEST_MYSQL_PORT:-13307}:3306"
+      - "${CAIRN_TEST_MYSQL_PORT:-13309}:3306"
     tmpfs:
       - /var/lib/mysql
     healthcheck:

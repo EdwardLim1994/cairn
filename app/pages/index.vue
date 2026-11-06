@@ -10,9 +10,11 @@ import OtelAccessTokensDialog from "../components/OtelAccessTokensDialog.vue";
 import AppToastStack from "../components/AppToastStack.vue";
 import LatestRunDrawer from "../components/LatestRunDrawer.vue";
 import MockApiCallHistoryPanel from "../components/MockApiCallHistoryPanel.vue";
+import MessageQueueSettingsPanel from "../components/MessageQueueSettingsPanel.vue";
 import { createApiClient } from "../models/api-client";
 import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
 import type { GraphCodeManifest } from "#shared/api/graph-code";
+import type { CanvasGetResponse } from "#shared/api/canvas";
 import { storeToRefs } from "pinia";
 import { useGraphStore } from "../stores/graph";
 import { useGraphViewModel } from "../composables/useGraphViewModel";
@@ -72,7 +74,26 @@ const contextMenuOpen = computed({
   },
 });
 const serviceDialog = ref(false);
+const messageQueuePanel = ref(false);
+const editingMessageQueueId = ref("legacy-queue");
+const newMessageQueuePosition = ref({ x: 160, y: 120 });
 const editingServiceId = ref<string | null>(null);
+type SubscriberDraft = {
+  id: string;
+  destinationId: string;
+  consumerGroup?: string;
+  bindingKey?: string;
+};
+type SavedSubscriber = Extract<
+  CanvasGetResponse["messageConnections"][number],
+  { type: "subscribe" }
+>;
+const editingServiceSubscriptions = computed(() =>
+  graphStore.messageConnections.filter(
+    (connection): connection is SavedSubscriber =>
+      connection.type === "subscribe" && connection.serviceId === editingServiceId.value,
+  ),
+);
 const serviceDraft = ref<ServiceDraft>({
   name: "",
   apiType: "REST",
@@ -87,6 +108,8 @@ const serviceDraft = ref<ServiceDraft>({
 });
 const frameworkMenuOpen = ref(false);
 const mockPanel = ref(false);
+const focusedMockApiId = ref<string | null>(null);
+const focusMockApiRequest = ref(0);
 const expandedEnvironmentVariableId = ref<string | null>(null);
 const registeredMockApisOpen = ref(true);
 const sharedEnvironmentVariablesOpen = ref(true);
@@ -150,6 +173,7 @@ const {
   toggleAllNodes,
   loadCanvas,
   loadServiceHealth,
+  loadMessageDestinationHealth,
   saveCanvas,
   toggleNodesLocked,
   autoArrange,
@@ -158,7 +182,7 @@ const {
   onEdgeDoubleClick,
   onEdgeUpdate,
   onEdgesChange,
-  addServiceCall,
+  setOutboundCall: saveOutboundCall,
   removeServiceCall,
 } = canvasViewModel;
 const { closeSettings, closeSettingsOutside } = useSettingsPanelViewModel({
@@ -273,6 +297,74 @@ function beginAddService() {
   contextMenu.value = null;
 }
 
+function beginAddMessageDestination() {
+  if (!contextMenu.value) return;
+  editingMessageQueueId.value = crypto.randomUUID();
+  newMessageQueuePosition.value = {
+    x: contextMenu.value.flowX,
+    y: contextMenu.value.flowY,
+  };
+  messageQueuePanel.value = true;
+  contextMenu.value = null;
+}
+
+function openMessageQueuePanel(queueId: string) {
+  editingMessageQueueId.value = queueId;
+  messageQueuePanel.value = true;
+}
+
+const editingMessageQueueDestinations = computed(() =>
+  graphStore.messageDestinations.filter(
+    (destination) => (destination.queueId ?? "legacy-queue") === editingMessageQueueId.value,
+  ),
+);
+
+async function saveMessageQueue(
+  queueId: string,
+  destinations: typeof graphStore.messageDestinations,
+) {
+  const allDestinations = [
+    ...graphStore.messageDestinations.filter(
+      (destination) => (destination.queueId ?? "legacy-queue") !== queueId,
+    ),
+    ...destinations,
+  ];
+  const retainedIds = new Set(allDestinations.map(({ id }) => id));
+  graphStore.setMessageDestinations(allDestinations);
+  graphStore.setMessageConnections(
+    graphStore.messageConnections.filter(({ destinationId }) => retainedIds.has(destinationId)),
+  );
+  syncNodes();
+  if (!(await saveCanvas())) {
+    await loadCanvas();
+    return;
+  }
+  messageQueuePanel.value = false;
+}
+
+async function removeMessageQueue(queueId: string) {
+  const queueDestinations = graphStore.messageDestinations.filter(
+    (destination) => (destination.queueId ?? "legacy-queue") === queueId,
+  );
+  if (!queueDestinations.length) return;
+  const queueName = queueDestinations[0]?.queueName ?? "Message Queue";
+  if (!confirm(`Remove ${queueName} and all its topics and connections from the graph?`)) return;
+
+  const removedIds = new Set(queueDestinations.map(({ id }) => id));
+  graphStore.setMessageDestinations(
+    graphStore.messageDestinations.filter(({ id }) => !removedIds.has(id)),
+  );
+  graphStore.setMessageConnections(
+    graphStore.messageConnections.filter(({ destinationId }) => !removedIds.has(destinationId)),
+  );
+  syncNodes();
+  if (!(await saveCanvas())) {
+    await loadCanvas();
+    return;
+  }
+  messageQueuePanel.value = false;
+}
+
 const addPosition = ref({ x: 160, y: 120 });
 const serviceViewModel = useServiceViewModel({
   apiClient,
@@ -297,6 +389,9 @@ const graphInteractionViewModel = useGraphInteractionViewModel({
   graphCanvas,
   syncNodes,
   editService: (id) => editService(id),
+  editMessageDestination: openMessageQueuePanel,
+  editMessageQueue: openMessageQueuePanel,
+  editMockApi: (id) => openMockPanel(id),
 });
 const handleCanvasContextMenu = graphInteractionViewModel.handleCanvasContextMenu;
 
@@ -327,19 +422,47 @@ function removeEndpoint(index: number) {
   serviceViewModel.removeEndpoint(index);
 }
 
-async function addOutboundCall(sourceEndpointId: string, targetEndpointId: string) {
-  const sourceService = services.value.find((service) =>
-    service.endpoints.some((endpoint) => endpoint.id === sourceEndpointId),
-  );
-  if (sourceService?.id === editingServiceId.value)
-    await addServiceCall(sourceEndpointId, targetEndpointId);
+async function setOutboundCall(sourceId: string, connectionId: string | undefined, target: string) {
+  await saveOutboundCall(sourceId, connectionId, target);
 }
 
 async function removeOutboundCall(edgeId: string) {
   await removeServiceCall(edgeId);
 }
 
-function saveService() {
+function saveService(subscriptions: SubscriberDraft[] = []) {
+  if (editingServiceId.value) {
+    const retainedSubscriptionIds = new Set(subscriptions.map(({ id }) => id));
+    const removedSubscriptionIds = new Set(
+      editingServiceSubscriptions.value
+        .map(({ id }) => id)
+        .filter((id) => !retainedSubscriptionIds.has(id)),
+    );
+    if (removedSubscriptionIds.size) {
+      graphStore.setServiceEdges(
+        graphStore.serviceEdges.filter(
+          (edge) =>
+            !edge.sourceSubscriptionId || !removedSubscriptionIds.has(edge.sourceSubscriptionId),
+        ),
+      );
+    }
+    graphStore.setMessageConnections([
+      ...graphStore.messageConnections.filter((connection) => {
+        if (connection.type === "subscribe" && connection.serviceId === editingServiceId.value)
+          return false;
+        return !(
+          "subscriptionId" in connection &&
+          connection.subscriptionId &&
+          removedSubscriptionIds.has(connection.subscriptionId)
+        );
+      }),
+      ...subscriptions.map((subscription) => ({
+        ...subscription,
+        serviceId: editingServiceId.value!,
+      })),
+    ]);
+    graphViewModel.syncNodes();
+  }
   return serviceViewModel.saveService();
 }
 
@@ -351,15 +474,9 @@ async function handleServiceDelete(id: string) {
 }
 
 async function openMockPanel(focusMockApiId?: string) {
+  focusedMockApiId.value = focusMockApiId ?? null;
+  if (focusMockApiId) focusMockApiRequest.value++;
   await mockApiViewModel.openPanel(focusMockApiId);
-  if (focusMockApiId)
-    void nextTick(() => {
-      const card = document.getElementById(`mock-api-${focusMockApiId}`);
-      if (card instanceof HTMLDetailsElement) card.open = true;
-      document
-        .getElementById(`mock-endpoint-${focusMockApiId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
 }
 function addMockDraft(apiType: "HTTP" | "GRPC") {
   registeredMockApisOpen.value = true;
@@ -474,7 +591,12 @@ const endpointDetails = computed(() =>
 );
 
 function openGraphAsCode() {
-  graphCodeInitial.value = serializeGraphCode(services.value, serviceEdges.value);
+  graphCodeInitial.value = serializeGraphCode(
+    services.value,
+    serviceEdges.value,
+    graphStore.messageDestinations,
+    graphStore.messageConnections,
+  );
   graphCodeOpen.value = true;
 }
 
@@ -502,7 +624,10 @@ onMounted(async () => {
   );
   await loadCanvas();
   await loadLogs();
-  healthTimer = setInterval(() => void loadServiceHealth(), 10000);
+  healthTimer = setInterval(() => {
+    void loadServiceHealth();
+    void loadMessageDestinationHealth();
+  }, 10000);
 });
 
 onUnmounted(() => {
@@ -539,9 +664,21 @@ onUnmounted(() => {
       :applying="graphCodeApplying"
       @apply="applyGraphCode"
     />
+    <MessageQueueSettingsPanel
+      v-model:open="messageQueuePanel"
+      :queue-id="editingMessageQueueId"
+      :position="newMessageQueuePosition"
+      :destinations="editingMessageQueueDestinations"
+      @save="saveMessageQueue"
+      @remove="removeMessageQueue"
+    />
 
     <section class="absolute inset-0">
-      <ContextMenu v-model:open="contextMenuOpen" @add-service="beginAddService">
+      <ContextMenu
+        v-model:open="contextMenuOpen"
+        @add-service="beginAddService"
+        @add-message-queue="beginAddMessageDestination"
+      >
         <GraphCanvas
           ref="graphCanvas"
           v-model:nodes="nodes"
@@ -603,9 +740,12 @@ onUnmounted(() => {
       :header-templates="headerTemplates"
       :outbound-call-edges="serviceEdges"
       :endpoint-options="servicesForSelect"
+      :message-destinations="graphStore.messageDestinations"
+      :message-subscriptions="editingServiceSubscriptions"
+      :message-connections="graphStore.messageConnections"
       @add-endpoint="addEndpoint"
       @remove-endpoint="removeEndpoint"
-      @add-outbound-call="addOutboundCall"
+      @set-outbound-call="setOutboundCall"
       @remove-outbound-call="removeOutboundCall"
       @import-open-api="serviceViewModel.importOpenApiFile"
       @import-proto="serviceViewModel.importProtoFile"
@@ -627,6 +767,8 @@ onUnmounted(() => {
       :environment-variables-loading="environmentVariablesLoading"
       :editing-environment-variable-id="editingEnvironmentVariableId"
       :expanded-environment-variable-id="expandedEnvironmentVariableId"
+      :focus-mock-api-id="focusedMockApiId"
+      :focus-mock-api-request="focusMockApiRequest"
       :services-for-select="servicesForSelect"
       :endpoint-details="endpointDetails"
       :endpoint-path-parameter-names="endpointPathParameterNames"

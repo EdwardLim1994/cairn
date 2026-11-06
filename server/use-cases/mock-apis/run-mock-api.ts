@@ -236,6 +236,14 @@ export function createRunMockApiUseCase(dependencies: {
           : [];
       if (typeof authorization === "string") headers.set("Authorization", authorization);
       else for (const [name, value] of authorization) headers.set(name, value);
+      if (
+        apiType === "HTTP" &&
+        requestBody !== null &&
+        typeof requestBody === "object" &&
+        "query" in requestBody &&
+        typeof requestBody.query === "string"
+      )
+        headers.set("content-type", "application/json");
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       timeout = setTimeout(() => controller.abort(), timeoutMs);
       if (apiType === "GRPC") {
