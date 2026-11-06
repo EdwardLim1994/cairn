@@ -95,6 +95,7 @@ integration("canvas repositories with MySQL", () => {
         id: "canvas-edge-1",
         sourceServiceId: "canvas-service-source",
         sourceEndpointId: null,
+        sourceSubscriptionId: null,
         targetEndpointId: "canvas-target-endpoint",
       },
     ]);
@@ -282,7 +283,7 @@ integration("canvas repositories with MySQL", () => {
       await db!
         .select()
         .from(graphNodePositions)
-        .where(eq(graphNodePositions.nodeType, "message_destination")),
+        .where(eq(graphNodePositions.nodeType, "message_queue")),
     ).toHaveLength(1);
     await saveCanvas(
       projectId,

@@ -8,6 +8,7 @@ const entry: GraphMockApi = {
   id: "mock-1",
   projectId: "project-1",
   name: "List orders",
+  apiType: "HTTP",
   targetEndpointId: "endpoint-1",
   headerTemplateId: null,
   customHeaders: [],

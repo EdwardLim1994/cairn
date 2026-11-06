@@ -63,17 +63,12 @@
       "indexes": {
         "authorization_templates_project_name_unique": {
           "name": "authorization_templates_project_name_unique",
-          "columns": [
-            "project_id",
-            "name"
-          ],
+          "columns": ["project_id", "name"],
           "isUnique": true
         },
         "authorization_templates_project_idx": {
           "name": "authorization_templates_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -82,12 +77,8 @@
           "name": "authorization_templates_project_id_projects_id_fk",
           "tableFrom": "authorization_templates",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -95,9 +86,7 @@
       "compositePrimaryKeys": {
         "authorization_templates_id": {
           "name": "authorization_templates_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -146,17 +135,12 @@
       "indexes": {
         "environment_variables_project_name_unique": {
           "name": "environment_variables_project_name_unique",
-          "columns": [
-            "project_id",
-            "name"
-          ],
+          "columns": ["project_id", "name"],
           "isUnique": true
         },
         "environment_variables_project_idx": {
           "name": "environment_variables_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -165,12 +149,8 @@
           "name": "environment_variables_project_id_projects_id_fk",
           "tableFrom": "environment_variables",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -178,9 +158,7 @@
       "compositePrimaryKeys": {
         "environment_variables_id": {
           "name": "environment_variables_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -239,17 +217,12 @@
       "indexes": {
         "header_templates_project_name_unique": {
           "name": "header_templates_project_name_unique",
-          "columns": [
-            "project_id",
-            "name"
-          ],
+          "columns": ["project_id", "name"],
           "isUnique": true
         },
         "header_templates_project_idx": {
           "name": "header_templates_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -258,12 +231,8 @@
           "name": "header_templates_project_id_projects_id_fk",
           "tableFrom": "header_templates",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -271,9 +240,7 @@
       "compositePrimaryKeys": {
         "header_templates_id": {
           "name": "header_templates_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -350,19 +317,12 @@
       "indexes": {
         "logs_project_service_time_idx": {
           "name": "logs_project_service_time_idx",
-          "columns": [
-            "project_id",
-            "service_name",
-            "timestamp"
-          ],
+          "columns": ["project_id", "service_name", "timestamp"],
           "isUnique": false
         },
         "logs_project_trace_idx": {
           "name": "logs_project_trace_idx",
-          "columns": [
-            "project_id",
-            "trace_id"
-          ],
+          "columns": ["project_id", "trace_id"],
           "isUnique": false
         }
       },
@@ -371,12 +331,8 @@
           "name": "logs_project_id_projects_id_fk",
           "tableFrom": "logs",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -384,9 +340,7 @@
       "compositePrimaryKeys": {
         "logs_id": {
           "name": "logs_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -478,17 +432,12 @@
       "indexes": {
         "mock_api_call_history_run_unique": {
           "name": "mock_api_call_history_run_unique",
-          "columns": [
-            "run_id"
-          ],
+          "columns": ["run_id"],
           "isUnique": true
         },
         "mock_api_call_history_project_triggered_idx": {
           "name": "mock_api_call_history_project_triggered_idx",
-          "columns": [
-            "project_id",
-            "triggered_at"
-          ],
+          "columns": ["project_id", "triggered_at"],
           "isUnique": false
         }
       },
@@ -497,12 +446,8 @@
           "name": "mock_api_call_history_project_id_projects_id_fk",
           "tableFrom": "mock_api_call_history",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -510,12 +455,8 @@
           "name": "mock_api_call_history_run_id_runs_id_fk",
           "tableFrom": "mock_api_call_history",
           "tableTo": "runs",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -523,9 +464,7 @@
       "compositePrimaryKeys": {
         "mock_api_call_history_id": {
           "name": "mock_api_call_history_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -662,9 +601,7 @@
       "indexes": {
         "mock_apis_project_idx": {
           "name": "mock_apis_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -673,12 +610,8 @@
           "name": "mock_apis_project_id_projects_id_fk",
           "tableFrom": "mock_apis",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -686,12 +619,8 @@
           "name": "mock_apis_target_endpoint_id_service_endpoints_id_fk",
           "tableFrom": "mock_apis",
           "tableTo": "service_endpoints",
-          "columnsFrom": [
-            "target_endpoint_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_endpoint_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -699,12 +628,8 @@
           "name": "mock_apis_header_template_id_header_templates_id_fk",
           "tableFrom": "mock_apis",
           "tableTo": "header_templates",
-          "columnsFrom": [
-            "header_template_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["header_template_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -712,12 +637,8 @@
           "name": "mock_apis_auth_template_fk",
           "tableFrom": "mock_apis",
           "tableTo": "authorization_templates",
-          "columnsFrom": [
-            "authorization_template_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["authorization_template_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -725,9 +646,7 @@
       "compositePrimaryKeys": {
         "mock_apis_id": {
           "name": "mock_apis_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -783,16 +702,12 @@
       "indexes": {
         "otel_access_tokens_digest_unique": {
           "name": "otel_access_tokens_digest_unique",
-          "columns": [
-            "digest"
-          ],
+          "columns": ["digest"],
           "isUnique": true
         },
         "otel_access_tokens_project_idx": {
           "name": "otel_access_tokens_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -801,12 +716,8 @@
           "name": "otel_access_tokens_project_id_projects_id_fk",
           "tableFrom": "otel_access_tokens",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -814,9 +725,7 @@
       "compositePrimaryKeys": {
         "otel_access_tokens_id": {
           "name": "otel_access_tokens_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -903,9 +812,7 @@
       "compositePrimaryKeys": {
         "projects_id": {
           "name": "projects_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -1004,18 +911,12 @@
       "indexes": {
         "runs_project_trace_idx": {
           "name": "runs_project_trace_idx",
-          "columns": [
-            "project_id",
-            "trace_id"
-          ],
+          "columns": ["project_id", "trace_id"],
           "isUnique": false
         },
         "runs_project_started_idx": {
           "name": "runs_project_started_idx",
-          "columns": [
-            "project_id",
-            "started_at"
-          ],
+          "columns": ["project_id", "started_at"],
           "isUnique": false
         }
       },
@@ -1024,12 +925,8 @@
           "name": "runs_project_id_projects_id_fk",
           "tableFrom": "runs",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1037,12 +934,8 @@
           "name": "runs_mock_api_id_mock_apis_id_fk",
           "tableFrom": "runs",
           "tableTo": "mock_apis",
-          "columnsFrom": [
-            "mock_api_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mock_api_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1050,9 +943,7 @@
       "compositePrimaryKeys": {
         "runs_id": {
           "name": "runs_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -1100,18 +991,12 @@
       "indexes": {
         "service_edges_project_idx": {
           "name": "service_edges_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         },
         "service_edges_project_source_endpoint_target_unique": {
           "name": "service_edges_project_source_endpoint_target_unique",
-          "columns": [
-            "project_id",
-            "source_endpoint_id",
-            "target_endpoint_id"
-          ],
+          "columns": ["project_id", "source_endpoint_id", "target_endpoint_id"],
           "isUnique": true
         }
       },
@@ -1120,12 +1005,8 @@
           "name": "service_edges_project_id_projects_id_fk",
           "tableFrom": "service_edges",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1133,12 +1014,8 @@
           "name": "service_edges_source_service_id_services_id_fk",
           "tableFrom": "service_edges",
           "tableTo": "services",
-          "columnsFrom": [
-            "source_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_service_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1146,12 +1023,8 @@
           "name": "service_edges_target_endpoint_id_service_endpoints_id_fk",
           "tableFrom": "service_edges",
           "tableTo": "service_endpoints",
-          "columnsFrom": [
-            "target_endpoint_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_endpoint_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1159,12 +1032,8 @@
           "name": "service_edges_source_endpoint_id_service_endpoints_id_fk",
           "tableFrom": "service_edges",
           "tableTo": "service_endpoints",
-          "columnsFrom": [
-            "source_endpoint_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_endpoint_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1172,9 +1041,7 @@
       "compositePrimaryKeys": {
         "service_edges_id": {
           "name": "service_edges_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -1245,10 +1112,7 @@
       "indexes": {
         "endpoints_project_service_idx": {
           "name": "endpoints_project_service_idx",
-          "columns": [
-            "project_id",
-            "service_id"
-          ],
+          "columns": ["project_id", "service_id"],
           "isUnique": false
         }
       },
@@ -1257,12 +1121,8 @@
           "name": "service_endpoints_project_id_projects_id_fk",
           "tableFrom": "service_endpoints",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1270,12 +1130,8 @@
           "name": "service_endpoints_service_id_services_id_fk",
           "tableFrom": "service_endpoints",
           "tableTo": "services",
-          "columnsFrom": [
-            "service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["service_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1283,9 +1139,7 @@
       "compositePrimaryKeys": {
         "service_endpoints_id": {
           "name": "service_endpoints_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -1387,9 +1241,7 @@
       "indexes": {
         "services_project_idx": {
           "name": "services_project_idx",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": false
         }
       },
@@ -1398,12 +1250,8 @@
           "name": "services_project_id_projects_id_fk",
           "tableFrom": "services",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1411,12 +1259,8 @@
           "name": "services_health_check_header_template_id_header_templates_id_fk",
           "tableFrom": "services",
           "tableTo": "header_templates",
-          "columnsFrom": [
-            "health_check_header_template_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["health_check_header_template_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1424,9 +1268,7 @@
       "compositePrimaryKeys": {
         "services_id": {
           "name": "services_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -1525,19 +1367,12 @@
       "indexes": {
         "spans_project_trace_span_unique": {
           "name": "spans_project_trace_span_unique",
-          "columns": [
-            "project_id",
-            "trace_id",
-            "span_id"
-          ],
+          "columns": ["project_id", "trace_id", "span_id"],
           "isUnique": true
         },
         "spans_project_trace_idx": {
           "name": "spans_project_trace_idx",
-          "columns": [
-            "project_id",
-            "trace_id"
-          ],
+          "columns": ["project_id", "trace_id"],
           "isUnique": false
         }
       },
@@ -1546,12 +1381,8 @@
           "name": "spans_project_id_projects_id_fk",
           "tableFrom": "spans",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1559,9 +1390,7 @@
       "compositePrimaryKeys": {
         "spans_id": {
           "name": "spans_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},

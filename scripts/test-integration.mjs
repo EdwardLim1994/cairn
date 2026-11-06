@@ -39,4 +39,4 @@ if (integrationTests.length === 0) {
   console.error("No *.integration.test.ts files were found under server/.");
   process.exit(1);
 }
-run(["test", "run", ...integrationTests]);
+run(["test", "run", "--no-file-parallelism", ...integrationTests]);

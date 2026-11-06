@@ -37,7 +37,7 @@ type ExecutionTarget = {
   mockApiName: string;
   baseUrl: string | null;
   serviceName: string | null;
-  grpcTls: boolean;
+  grpcTls: boolean | null;
   protoStorageKey: string | null;
 };
 
@@ -256,7 +256,7 @@ export function createRunMockApiUseCase(dependencies: {
           proto,
           rpcMethod: target.rpcMethod!,
           target: grpcTarget,
-          tls: target.grpcTls,
+          tls: target.grpcTls ?? false,
           request: requestBody,
           traceparent: `00-${traceId}-${spanId}-01`,
           timeoutMs,

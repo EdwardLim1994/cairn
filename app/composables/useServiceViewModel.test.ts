@@ -348,7 +348,7 @@ describe("service view model", () => {
 
     expect(context.calls[0]?.options.method).toBe("PUT");
     expect(graphStore.services[0]?.name).toBe("Updated Orders");
-    expect(wrapper.emitted("save")).toEqual([[]]);
+    expect(wrapper.emitted("save")).toEqual([[[]]]);
   });
 
   it("imports valid OpenAPI files through the service settings control with per-operation warnings", async () => {

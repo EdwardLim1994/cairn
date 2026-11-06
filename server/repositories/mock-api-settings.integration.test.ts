@@ -67,6 +67,7 @@ integration("mock API settings save with MySQL", () => {
         mockApis: [
           {
             id: "draft-api",
+            apiType: "HTTP",
             name: "List orders",
             targetEndpointId: "mock-settings-endpoint",
             headerTemplateId: "draft-auth",
@@ -110,6 +111,7 @@ integration("mock API settings save with MySQL", () => {
         mockApis: [
           {
             id: "draft-auth-api",
+            apiType: "HTTP",
             name: "Authenticated API",
             targetEndpointId: "mock-settings-endpoint",
             authorizationTemplateId: "draft-auth",
@@ -169,6 +171,7 @@ integration("mock API settings save with MySQL", () => {
           mockApis: [
             {
               id: "draft-foreign-assignment",
+              apiType: "HTTP",
               name: "Invalid assignment",
               targetEndpointId: "mock-settings-endpoint",
               authorizationTemplateId: "foreign-auth-template",
@@ -208,6 +211,7 @@ integration("mock API settings save with MySQL", () => {
         mockApis: [
           {
             id: "draft-delete-api",
+            apiType: "HTTP",
             name: "Temporary API",
             targetEndpointId: "mock-settings-endpoint",
             authorizationTemplateId: "draft-delete-auth",
@@ -235,6 +239,7 @@ integration("mock API settings save with MySQL", () => {
         mockApis: [
           {
             id: apiId,
+            apiType: "HTTP",
             name: "Temporary API",
             targetEndpointId: "mock-settings-endpoint",
             authorizationTemplateId: null,
@@ -290,6 +295,7 @@ integration("mock API settings save with MySQL", () => {
           mockApis: [
             {
               id: "draft-invalid-api",
+              apiType: "HTTP",
               name: "Invalid",
               targetEndpointId: null,
               headerTemplateId: null,
@@ -320,6 +326,7 @@ integration("mock API settings save with MySQL", () => {
         mockApis: [
           {
             id: "draft-unmatched",
+            apiType: "HTTP",
             name: "Imported list",
             targetEndpointId: null,
             headerTemplateId: null,

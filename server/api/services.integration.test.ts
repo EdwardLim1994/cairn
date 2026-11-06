@@ -283,10 +283,10 @@ integration("service REST controllers with MySQL", () => {
     } as never);
     const result = await healthRoute({} as never);
     expect(result).toEqual([{ id: expect.any(String), online: true }]);
-    expect(fetchStub).toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: "/actuator/health" }),
-      expect.any(Object),
+    expect(String(fetchStub.mock.calls[0]?.[0])).toBe(
+      "http://localhost:8081/actuator/health/readiness",
     );
+    expect(fetchStub.mock.calls[0]?.[1]?.method).toBe("GET");
   });
 
   it("checks Other services with scoped templates and shared variables", async () => {

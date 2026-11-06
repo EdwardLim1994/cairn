@@ -1,25 +1,29 @@
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type { CanvasGetResponse } from "#shared/api/canvas";
 import { useGraphStore } from "./graph";
 
-const endpoint = {
+const endpoint: CanvasGetResponse["services"][number]["endpoints"][number] = {
   id: "endpoint-1",
   codeKey: "list-orders",
   projectId: "project-1",
   serviceId: "service-1",
   name: "List orders",
-  apiType: "REST",
   method: "GET",
   url: "/orders",
+  rpcMethod: null,
   createdAt: "2025-01-01T00:00:00.000Z",
 };
-const service = {
+const service: CanvasGetResponse["services"][number] = {
   id: "service-1",
   codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
+  apiType: "REST" as const,
   framework: "Spring Boot",
   baseUrl: "http://localhost:8080",
+  grpcTls: false,
+  protoFileName: null,
   healthCheckUrl: null,
   healthCheckHeaderTemplateId: null,
   healthCheckCustomHeaders: [],
@@ -38,6 +42,8 @@ describe("graph store", () => {
     const canvas = {
       nodesLocked: true,
       services: [service],
+      messageDestinations: [],
+      messageConnections: [],
       edges: [
         {
           id: "edge-1",
@@ -73,6 +79,8 @@ describe("graph store", () => {
     store.applyCanvas({
       nodesLocked: false,
       services: [service],
+      messageDestinations: [],
+      messageConnections: [],
       edges: [],
       mockApis: [],
       headerTemplates: [],
