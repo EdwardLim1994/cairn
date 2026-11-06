@@ -55,7 +55,9 @@ jobs:
           AUTH_USERNAME: integration-test
           AUTH_PASSWORD: integration-test
           AUTH_SESSION_SECRET: integration-test-session-secret-32chars
-        run: bun run vp test run --coverage
+        run: |
+          bun run test:coverage
+          bun run test:integration
 
       - name: SonarCloud scan
         uses: SonarSource/sonarqube-scan-action@v8.3.0
