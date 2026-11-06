@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { idParamsSchema, isoDateTimeSchema } from "./common";
+import { isoDateTimeSchema } from "./common";
+
+export { idParamsSchema as mockApiCallHistoryIdRequestSchema } from "./common";
 
 export const mockApiCallHistoryListRequestSchema = z.void();
-export const mockApiCallHistoryIdRequestSchema = idParamsSchema;
 export const mockApiCallHistoryDeleteResponseSchema = z.object({ id: z.string() });
 export const mockApiCallHistoryClearResponseSchema = z.object({
   deleted: z.number().int().nonnegative(),

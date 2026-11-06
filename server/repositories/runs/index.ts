@@ -86,16 +86,17 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
   );
 }
 
-export async function createRun(
-  projectId: string,
-  mockApiId: string,
-  id: string,
-  traceId: string,
-  mockApiName: string,
-  method: string,
-  url: string,
-  requestBody: unknown,
-) {
+export async function createRun(input: {
+  projectId: string;
+  mockApiId: string;
+  id: string;
+  traceId: string;
+  mockApiName: string;
+  method: string;
+  url: string;
+  requestBody: unknown;
+}) {
+  const { projectId, mockApiId, id, traceId, mockApiName, method, url, requestBody } = input;
   const db = getDb();
   await db.transaction(async (transaction) => {
     await transaction.insert(runs).values({ id, projectId, mockApiId, traceId, status: "running" });

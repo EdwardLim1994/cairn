@@ -78,9 +78,9 @@ function toggleEntry(id: string) {
       </UButton>
     </header>
 
-    <div v-if="loading" role="status" class="p-4 text-sm text-[var(--muted)]">
+    <output v-if="loading" class="block p-4 text-sm text-[var(--muted)]">
       Loading call history...
-    </div>
+    </output>
     <div v-else-if="entries.length === 0" class="p-4 text-sm text-[var(--muted)]">
       No mock API calls recorded yet.
     </div>

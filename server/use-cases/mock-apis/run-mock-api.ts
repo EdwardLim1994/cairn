@@ -99,16 +99,16 @@ export function createRunMockApiUseCase(dependencies: {
   ensureProject: () => Promise<string>;
   getTarget: (projectId: string, id: string) => Promise<ExecutionTarget | undefined>;
   getVariables: (projectId: string) => Promise<Array<{ name: string; value: string }>>;
-  createRun: (
-    projectId: string,
-    mockApiId: string,
-    id: string,
-    traceId: string,
-    mockApiName: string,
-    method: string,
-    url: string,
-    requestBody: unknown,
-  ) => Promise<void>;
+  createRun: (input: {
+    projectId: string;
+    mockApiId: string;
+    id: string;
+    traceId: string;
+    mockApiName: string;
+    method: string;
+    url: string;
+    requestBody: unknown;
+  }) => Promise<void>;
   finishRun: (
     id: string,
     result: {
@@ -221,16 +221,16 @@ export function createRunMockApiUseCase(dependencies: {
       const headers = new Headers(
         resolveHeaderRows(target.headerTemplateHeaders ?? [], target.customHeaders, variables),
       );
-      await dependencies.createRun(
+      await dependencies.createRun({
         projectId,
-        id,
-        runId,
+        mockApiId: id,
+        id: runId,
         traceId,
-        target.mockApiName,
-        methodName,
-        targetUrl,
+        mockApiName: target.mockApiName,
+        method: methodName,
+        url: targetUrl,
         requestBody,
-      );
+      });
       const authorization =
         apiType === "HTTP"
           ? await authorizationHeader(target, projectId, variables, dependencies.fetch, timeoutMs)

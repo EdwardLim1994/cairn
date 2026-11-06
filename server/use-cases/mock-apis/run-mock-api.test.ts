@@ -91,16 +91,16 @@ describe("mock API run use case", () => {
         traceparent: `00-${"a".repeat(32)}-${"b".repeat(16)}-01`,
       }),
     );
-    expect(deps.createRun).toHaveBeenCalledWith(
-      "project-1",
-      "mock-1",
-      "run-1",
-      "a".repeat(32),
-      "Create order",
-      "GRPC",
-      "localhost:50051",
-      { token: "abc", enabled: true },
-    );
+    expect(deps.createRun).toHaveBeenCalledWith({
+      projectId: "project-1",
+      mockApiId: "mock-1",
+      id: "run-1",
+      traceId: "a".repeat(32),
+      mockApiName: "Create order",
+      method: "GRPC",
+      url: "localhost:50051",
+      requestBody: { token: "abc", enabled: true },
+    });
   });
 
   it("records canonical gRPC status names on failed calls", async () => {
@@ -149,16 +149,16 @@ describe("mock API run use case", () => {
       responseBody: "ok",
       error: null,
     });
-    expect(deps.createRun).toHaveBeenCalledWith(
-      "project-1",
-      "mock-1",
-      "run-1",
-      "a".repeat(32),
-      "Create order",
-      "POST",
-      "http://localhost:8081/orders/42",
-      { token: "abc", enabled: true },
-    );
+    expect(deps.createRun).toHaveBeenCalledWith({
+      projectId: "project-1",
+      mockApiId: "mock-1",
+      id: "run-1",
+      traceId: "a".repeat(32),
+      mockApiName: "Create order",
+      method: "POST",
+      url: "http://localhost:8081/orders/42",
+      requestBody: { token: "abc", enabled: true },
+    });
     expect(deps.fetch).toHaveBeenCalledWith(
       "http://localhost:8081/orders/42",
       expect.objectContaining({
@@ -217,16 +217,16 @@ describe("mock API run use case", () => {
     );
     const request = vi.mocked(deps.fetch).mock.calls[0]![1] as RequestInit;
     expect(new Headers(request.headers).get("content-type")).toBe("application/json");
-    expect(deps.createRun).toHaveBeenCalledWith(
-      "project-1",
-      "mock-1",
-      "run-1",
-      "a".repeat(32),
-      "Create order",
-      "POST",
-      "http://localhost:8081/graphql",
-      expect.objectContaining({ operationName: "GetOrder" }),
-    );
+    expect(deps.createRun).toHaveBeenCalledWith({
+      projectId: "project-1",
+      mockApiId: "mock-1",
+      id: "run-1",
+      traceId: "a".repeat(32),
+      mockApiName: "Create order",
+      method: "POST",
+      url: "http://localhost:8081/graphql",
+      requestBody: expect.objectContaining({ operationName: "GetOrder" }),
+    });
     expect(deps.finishRun).toHaveBeenCalledWith(
       "run-1",
       expect.objectContaining({ status: "completed", responseStatus: 200, responseBody }),
@@ -242,7 +242,7 @@ describe("mock API run use case", () => {
     expect(request.method).toBe("GET");
     expect(request.body).toBeUndefined();
     expect(new Headers(request.headers).has("content-type")).toBe(false);
-    expect(vi.mocked(deps.createRun).mock.calls[0]?.[7]).toBeNull();
+    expect(vi.mocked(deps.createRun).mock.calls[0]?.[0].requestBody).toBeNull();
   });
 
   it("records detailed HTTP failures and their logs", async () => {
@@ -258,7 +258,7 @@ describe("mock API run use case", () => {
       "run-1",
       expect.objectContaining({ status: "failed" }),
     );
-    expect(vi.mocked(deps.createRun).mock.calls[0]?.[7]).toEqual({
+    expect(vi.mocked(deps.createRun).mock.calls[0]?.[0].requestBody).toEqual({
       token: "abc",
       enabled: true,
     });
