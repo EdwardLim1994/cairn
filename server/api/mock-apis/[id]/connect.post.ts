@@ -3,8 +3,8 @@ import { getEnvironmentVariableValues } from "../../../repositories/environment-
 import { getMockApiExecutionTarget } from "../../../repositories/runs";
 import { getAppConfig } from "../../../utils/config";
 import { ensureProject } from "../../../utils/project";
-import { createConnectWebSocketMockApiUseCase } from "../../../use-cases/mock-apis/connect-websocket-mock-api";
 import {
+  createConnectWebSocketMockApiUseCase,
   WebSocketConnectionFailedError,
   WebSocketMockApiNotFoundError,
   WebSocketMockApiNotReadyError,
