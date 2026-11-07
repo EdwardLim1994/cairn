@@ -66,7 +66,7 @@ export async function getCanvas(
       const position = positionByNode.get(`service:${service.id}`);
       return {
         ...service,
-        apiType: service.apiType as "REST" | "GRPC",
+        apiType: service.apiType as "REST" | "GRPC" | "WEBSOCKET",
         positionX: position?.positionX ?? 0,
         positionY: position?.positionY ?? 0,
         createdAt: service.createdAt.toISOString(),
@@ -115,7 +115,7 @@ export async function getCanvas(
       const position = api.id ? positionByNode.get(`mock_api:${api.id}`) : undefined;
       return {
         ...api,
-        apiType: api.apiType as "HTTP" | "GRPC",
+        apiType: api.apiType as "HTTP" | "GRPC" | "WEBSOCKET",
         positionX: position?.positionX ?? null,
         positionY: position?.positionY ?? null,
       };

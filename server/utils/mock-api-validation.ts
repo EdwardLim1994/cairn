@@ -58,11 +58,12 @@ export function mockApiInput(value: unknown) {
   const requestedApiType = input.apiType === undefined ? "HTTP" : input.apiType;
   if (
     typeof requestedApiType !== "string" ||
-    !["REST", "HTTP", "GRAPHQL", "GRPC"].includes(requestedApiType)
+    !["REST", "HTTP", "GRAPHQL", "GRPC", "WEBSOCKET"].includes(requestedApiType)
   )
     throw createError({ statusCode: 400, statusMessage: "Unsupported mock API type" });
   // GraphQL requests are transported as HTTP POST requests to the router endpoint.
-  const apiType = requestedApiType === "GRPC" ? "GRPC" : "HTTP";
+  const apiType =
+    requestedApiType === "GRPC" || requestedApiType === "WEBSOCKET" ? requestedApiType : "HTTP";
   const targetEndpointId = input.targetEndpointId ?? null;
   if (targetEndpointId !== null && (typeof targetEndpointId !== "string" || !targetEndpointId))
     throw createError({ statusCode: 400, statusMessage: "Service endpoint is invalid" });

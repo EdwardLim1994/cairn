@@ -4,7 +4,7 @@
 [![Integration tests](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml)
 [![SonarCloud Scan](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml)
 
-A Nuxt single page app for editing a microservice graph, triggering registered REST and unary gRPC calls, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+A Nuxt single page app for editing a microservice graph, triggering registered REST and unary gRPC calls, managing raw WebSocket sessions, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
 
 GitHub Actions reports unit/component tests and MySQL-backed integration tests in separate workflows, so their README badges show independent status. The unit workflow also checks formatting, lint, and types. The SonarCloud workflow runs unit and component tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
@@ -70,11 +70,19 @@ Use your actual `PROJECT_ID` in `OTEL_RESOURCE_ATTRIBUTES`. Service SDKs should 
 
 ## Message destinations
 
-Register REST or gRPC services and their endpoints; GraphQL subgraphs and routers can be registered as HTTP services with their `/graphql` endpoint. Connect endpoint calls in the graph, then add Kafka topic or RabbitMQ topic exchange nodes from the context menu. Connect a service endpoint or an event-producing service to a destination, then connect the destination to each consuming service. Kafka consumer groups and RabbitMQ routing and binding keys label those declared connections. `graphql-java-microservices.graph.json` provides a ready-to-import graph for the GraphQL Java stack, including its gRPC services, subgraphs, Apollo Router, and Kafka flows.
+Register REST or gRPC services and their endpoints; GraphQL subgraphs and routers can be registered as HTTP services with their `/graphql` endpoint. Connect endpoint calls in the graph, then add Kafka topic or RabbitMQ topic exchange nodes from the context menu. Connect a service endpoint or an event-producing service to a destination, then connect the destination to each consuming service. Kafka consumer groups and RabbitMQ routing and binding keys label those declared connections. `graphql-java-microservices.graph.json` provides a ready-to-import graph for the GraphQL Java stack, including its gRPC services, subgraphs, Apollo Router, Kafka flows, and the notification push WebSocket mock API.
 
 Destinations and declared connections persist with the project graph. RabbitMQ nodes represent logical topic exchanges; Cairn does not create or inspect queues or bindings. Broker health reports connection status only. Declared connections show configured intent. A trace shows observed message flow only when telemetry spans share the propagated trace ID.
 
 The Collector ingestion routes are `POST /v1/traces` and `POST /v1/logs`. Both require an active, unexpired bearer token. `/api/runs/:id/flow` reports pending data, then returns observed service edges and error services when telemetry is quiet or the maximum wait expires. `/api/logs` accepts optional `service`, `severity`, and `search` query parameters.
+
+## WebSocket mock APIs
+
+Register a service with the WebSocket framework option and add an endpoint using its complete `ws://` or `wss://` address. Create a WebSocket mock API, select that endpoint, and enter the exact text message to send. Custom headers, shared header templates, and supported authorization templates are applied to the connection handshake.
+
+Use Connect on the graph trigger node to open the Cairn server's outbound connection. Trigger sends the saved text message after the connection is established. Disconnect asks for confirmation before closing it. Cairn accepts one active mock API session per registered endpoint; different endpoint IDs can stay connected concurrently. An unexpected remote close disables Trigger and requires an explicit reconnect. The response panel to the left of the trigger node shows incoming text messages only, including messages received while the panel is hidden.
+
+Live sessions and their bounded message buffers are held in process memory. They end when Cairn restarts, and endpoint exclusivity is enforced only within one Cairn process. Run a single app instance when using WebSocket mock APIs; multi-instance session coordination is not implemented.
 
 ## Local development
 

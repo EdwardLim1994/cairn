@@ -134,7 +134,8 @@ export async function saveMockApiSettings(
       input.mockApis.some(
         (api) =>
           api.targetEndpointId &&
-          endpointTypes.get(api.targetEndpointId) !== (api.apiType === "GRPC" ? "GRPC" : "REST"),
+          endpointTypes.get(api.targetEndpointId) !==
+            (api.apiType === "GRPC" ? "GRPC" : api.apiType === "WEBSOCKET" ? "WEBSOCKET" : "REST"),
       )
     )
       throw new Error("Mock API type must match service API type");
@@ -339,9 +340,13 @@ export async function saveMockApiSettings(
           const readiness = evaluateMockApiReadiness(
             {
               ...api,
-              apiType: api.apiType as "REST" | "GRAPHQL",
+              apiType: api.apiType as "REST" | "GRAPHQL" | "WEBSOCKET",
               targetApiType: api.targetEndpointId
-                ? (endpointTypes.get(api.targetEndpointId) as "REST" | "GRAPHQL" | undefined)
+                ? (endpointTypes.get(api.targetEndpointId) as
+                    | "REST"
+                    | "GRAPHQL"
+                    | "WEBSOCKET"
+                    | undefined)
                 : null,
               headerTemplateExists: !api.headerTemplateId || template.length > 0,
               authorizationTemplateExists: !api.authorizationTemplateId || authTemplate.length > 0,

@@ -245,6 +245,17 @@ describe("service view model", () => {
     expect(context.draft.value.endpoints[0]?.url).toBe("/");
   });
 
+  it("adds an endpoint with the selected WebSocket target address", () => {
+    const context = setup();
+    context.draft.value.apiType = "WEBSOCKET";
+    context.draft.value.baseUrl = "wss://example.test/socket";
+    context.draft.value.endpoints = [];
+
+    context.vm.addEndpoint();
+
+    expect(context.draft.value.endpoints).toEqual([{ name: "", url: "wss://example.test/socket" }]);
+  });
+
   it("imports unary methods, skips duplicates and streaming methods, and preserves drafts on import errors", async () => {
     const context = setup();
     context.draft.value.apiType = "GRPC";

@@ -31,7 +31,7 @@ const endpointResponseSchema = endpointInputSchema.extend({
 const serviceFieldsSchema = z.object({
   codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
-  apiType: z.enum(["REST", "GRPC"]).default("REST"),
+  apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]).default("REST"),
   framework: z.string().trim().min(1).max(100),
   baseUrl: z.string().trim().min(1).max(2048),
   grpcTls: z.boolean().optional().default(false),
@@ -59,6 +59,12 @@ function validateService(service: z.infer<typeof serviceFieldsSchema>, context: 
         message: "Expected a host:port gRPC target",
       });
   }
+  if (service.apiType === "WEBSOCKET" && !validWebSocketUrl(service.baseUrl))
+    context.addIssue({
+      code: "custom",
+      path: ["baseUrl"],
+      message: "Expected a ws:// or wss:// WebSocket URL",
+    });
   for (const [index, endpoint] of service.endpoints.entries()) {
     if (service.apiType === "REST" && (!endpoint.method || !endpoint.url || endpoint.rpcMethod))
       context.addIssue({
@@ -72,6 +78,29 @@ function validateService(service: z.infer<typeof serviceFieldsSchema>, context: 
         path: ["endpoints", index],
         message: "gRPC endpoints need an RPC method",
       });
+    if (
+      service.apiType === "WEBSOCKET" &&
+      (!endpoint.url || !validWebSocketUrl(endpoint.url) || endpoint.method || endpoint.rpcMethod)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["endpoints", index],
+        message: "WebSocket endpoints need a ws:// or wss:// URL",
+      });
+  }
+}
+
+function validWebSocketUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "ws:" || url.protocol === "wss:") &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
   }
 }
 export const serviceInputSchema = serviceFieldsSchema.superRefine(validateService);
@@ -92,7 +121,7 @@ export const serviceListResponseSchema = z.array(
     codeKey: z.string(),
     projectId: z.string(),
     name: z.string(),
-    apiType: z.enum(["REST", "GRPC"]),
+    apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]),
     protoFileName: z.string().nullable(),
     framework: z.string(),
     baseUrl: z.string(),

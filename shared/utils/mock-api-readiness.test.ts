@@ -49,6 +49,36 @@ describe("mock API readiness", () => {
     expect(invalidVariables.reasons.map(({ code }) => code)).toContain("graphql-variables-invalid");
   });
 
+  it("requires a WebSocket text message and preserves message variable readiness", () => {
+    const ready = evaluateMockApiReadiness(
+      {
+        ...base,
+        apiType: "WEBSOCKET",
+        endpointApiType: "WEBSOCKET",
+        requestJson: "subscribe {{channel}}\n",
+        customHeaders: [],
+      },
+      "wss://example.test/events",
+      [],
+      new Map([["channel", "orders"]]),
+    );
+    expect(ready).toEqual({ status: "ready", reasons: [] });
+    const missing = evaluateMockApiReadiness(
+      { ...base, apiType: "WEBSOCKET", endpointApiType: "WEBSOCKET", requestJson: "  " },
+      "wss://example.test/events",
+      [],
+      new Map(),
+    );
+    expect(missing.reasons.map(({ code }) => code)).toContain("websocket-message-missing");
+    const wrongEndpoint = evaluateMockApiReadiness(
+      { ...base, apiType: "WEBSOCKET", endpointApiType: "REST", requestJson: "hello" },
+      "/events",
+      [],
+      new Map(),
+    );
+    expect(wrongEndpoint.reasons.map(({ code }) => code)).toContain("endpoint-type-mismatch");
+  });
+
   it("reports missing endpoint, path values, and referenced variables", () => {
     const result = evaluateMockApiReadiness(
       { ...base, targetEndpointId: null },

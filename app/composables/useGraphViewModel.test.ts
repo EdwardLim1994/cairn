@@ -132,6 +132,60 @@ describe("graph view model", () => {
     });
   });
 
+  it("keeps response visibility exclusive while preserving per-endpoint session status", () => {
+    const first = { ...mockApi, id: "ws-1", apiType: "WEBSOCKET" as const };
+    const second = { ...mockApi, id: "ws-2", apiType: "WEBSOCKET" as const };
+    const apis = [first, second] as unknown as CanvasGetResponse["mockApis"];
+    const { model } = createModel(apis);
+    const nodes = model.mockApiNodes();
+    expect(nodes).toHaveLength(2);
+    const data = nodes.map(
+      (node) => node.data as { id: string; websocketState: string; responseOpen: boolean },
+    );
+    expect(data.map(({ websocketState }) => websocketState)).toEqual([
+      "disconnected",
+      "disconnected",
+    ]);
+
+    const isolatedModel = useGraphViewModel({
+      store: useGraphStore(),
+      mockApis: () => apis,
+      runningMockId: () => null,
+      websocketState: (id) => (id === "ws-1" ? "connected" : "disconnected"),
+      responsePanelOpenId: () => "ws-2",
+    });
+    const isolatedData = isolatedModel
+      .mockApiNodes()
+      .map((node) => node.data as (typeof data)[number]);
+    expect(isolatedData.map(({ websocketState }) => websocketState)).toEqual([
+      "connected",
+      "disconnected",
+    ]);
+    expect(isolatedData.map(({ responseOpen }) => responseOpen)).toEqual([false, true]);
+  });
+
+  it("provides each trigger node with its own latest run response", () => {
+    const { store } = createModel();
+    const model = useGraphViewModel({
+      store,
+      mockApis: () => [mockApi],
+      runningMockId: () => null,
+      runResults: () => ({
+        "mock-1": {
+          status: "completed",
+          responseStatus: 200,
+          responseBody: '{"orders":[]}',
+          error: null,
+          traceId: "trace-1",
+        },
+      }),
+    });
+    const node = model.mockApiNodes()[0]!;
+    expect(
+      (node.data as { latestResponse: { responseBody: string } }).latestResponse.responseBody,
+    ).toBe('{"orders":[]}');
+  });
+
   it("builds declared, per-API target, and observed service edges", () => {
     const { store, model } = createModel();
     store.setObservations({

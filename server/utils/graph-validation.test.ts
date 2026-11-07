@@ -53,7 +53,7 @@ describe("graph input validation", () => {
         apiType: "GRAPHQL",
         endpoints: [],
       }),
-    ).toThrow("Service API type must be REST or gRPC");
+    ).toThrow("Service API type must be REST, gRPC, or WebSocket");
   });
 
   it("validates gRPC targets and fully qualified method paths", () => {
@@ -79,6 +79,30 @@ describe("graph input validation", () => {
         endpoints: [],
       }),
     ).toThrow("Target address must use host:port format");
+  });
+
+  it("validates WebSocket service and endpoint URLs", () => {
+    expect(
+      serviceInput({
+        name: "Notifications",
+        apiType: "WEBSOCKET",
+        framework: "Other",
+        baseUrl: "wss://example.test/socket",
+        endpoints: [{ name: "Events", url: "ws://example.test/events" }],
+      }),
+    ).toMatchObject({
+      apiType: "WEBSOCKET",
+      endpoints: [{ method: null, url: "ws://example.test/events", rpcMethod: null }],
+    });
+    expect(() =>
+      serviceInput({
+        name: "Notifications",
+        apiType: "WEBSOCKET",
+        framework: "Other",
+        baseUrl: "https://example.test/socket",
+        endpoints: [{ name: "Events", url: "https://example.test/events" }],
+      }),
+    ).toThrow(/ws:\/\/ or wss:\/\//);
   });
 
   it("validates finite numbers and falls back for omitted values", () => {

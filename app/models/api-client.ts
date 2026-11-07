@@ -30,6 +30,9 @@ import {
   mockApiUpdateResponseSchema,
   mockApiSettingsSaveRequestSchema,
   mockApiSettingsSaveResponseSchema,
+  websocketSessionResponseSchema,
+  websocketDisconnectResponseSchema,
+  websocketTriggerResponseSchema,
 } from "#shared/api/mock-apis";
 import {
   mockApiCallHistoryClearResponseSchema,
@@ -192,6 +195,36 @@ export function createApiClient(transport: ApiTransport) {
         undefined,
         z.void(),
         mockApiRunResponseSchema,
+      );
+    },
+    connectWebSocketMockApi: (rawId: string) => {
+      const { id } = mockApiIdRequestSchema.parse({ id: rawId });
+      return send(
+        `/api/mock-apis/${encodeURIComponent(id)}/connect`,
+        "POST",
+        undefined,
+        z.void(),
+        websocketSessionResponseSchema,
+      );
+    },
+    disconnectWebSocketMockApi: (rawId: string) => {
+      const { id } = mockApiIdRequestSchema.parse({ id: rawId });
+      return send(
+        `/api/mock-apis/${encodeURIComponent(id)}/disconnect`,
+        "POST",
+        undefined,
+        z.void(),
+        websocketDisconnectResponseSchema,
+      );
+    },
+    triggerWebSocketMockApi: (rawId: string) => {
+      const { id } = mockApiIdRequestSchema.parse({ id: rawId });
+      return send(
+        `/api/mock-apis/${encodeURIComponent(id)}/trigger`,
+        "POST",
+        undefined,
+        z.void(),
+        websocketTriggerResponseSchema,
       );
     },
     listMockApiCallHistory: () =>

@@ -292,6 +292,58 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.emitted("setMockEndpoint")).toEqual([[entry]]);
   });
 
+  it("filters WebSocket endpoints and edits the exact text message", async () => {
+    const entry: MockApiDraft = {
+      id: "mock-ws",
+      apiType: "WEBSOCKET",
+      name: "Watch events",
+      targetEndpointId: "socket-endpoint",
+      active: true,
+      customHeaders: [],
+      description: "",
+      requestJson: "  subscribe {{channel}}\n",
+      pathParameters: {},
+    };
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [entry],
+        environmentVariables: [],
+        headerTemplates: [],
+        variablesOpen: false,
+        apisOpen: true,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [
+          { id: "http-endpoint", label: "Orders | List (GET)", apiType: "HTTP" },
+          { id: "grpc-endpoint", label: "Orders | Read (gRPC)", apiType: "GRPC" },
+          { id: "socket-endpoint", label: "Events | Stream (WebSocket)", apiType: "WEBSOCKET" },
+        ],
+        endpointDetails: [
+          { id: "http-endpoint", url: "/orders", apiType: "REST" },
+          { id: "socket-endpoint", url: "wss://example.test/events", apiType: "WEBSOCKET" },
+        ],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    const card = wrapper.get("#mock-api-mock-ws");
+    await card.get('[aria-expanded="false"]').trigger("click");
+    expect(card.find("#mock-api-template-mock-ws").exists()).toBe(true);
+    expect(card.find("#mock-api-authorization-mock-ws").exists()).toBe(true);
+    expect(card.findAll("button").some((button) => button.text() === "Add header")).toBe(true);
+    const endpoint = card.get("#mock-api-endpoint-mock-ws");
+    expect(
+      Array.from((endpoint.element as HTMLSelectElement).options).map(({ value }) => value),
+    ).toEqual(["", "socket-endpoint"]);
+    const message = card.get('[aria-label="WebSocket message"]');
+    expect((message.element as HTMLTextAreaElement).value).toBe("  subscribe {{channel}}\n");
+    await message.setValue("  next frame\n");
+    expect(entry.requestJson).toBe("  next frame\n");
+  });
+
   it("deactivates invalid staged APIs and does not reactivate them when variables return", async () => {
     const entry: MockApiDraft = {
       apiType: "HTTP",
@@ -354,6 +406,7 @@ describe("MockApiSettingsPanel", () => {
     expect(wrapper.text()).toContain("Registered mock APIs");
     expect(wrapper.text()).toContain("Fetch orders");
     expect(wrapper.text()).toContain("Import APIs");
+    expect(wrapper.text()).toContain("+ New WebSocket API");
     expect(wrapper.text()).toContain("Import environment");
     expect(wrapper.text()).toContain("New variable");
     expect(wrapper.find('[aria-label="Close"]').exists()).toBe(false);
@@ -374,6 +427,33 @@ describe("MockApiSettingsPanel", () => {
       "mock-api-path-mock-1-orderId",
     );
     expect(wrapper.get("fieldset legend").text()).toBe("Request (JSON)");
+  });
+
+  it("emits a WebSocket mock API draft intent", async () => {
+    const wrapper = mount(MockApiSettingsPanel, {
+      props: {
+        mockDraft: [],
+        environmentVariables: [],
+        headerTemplates: [],
+        variablesOpen: false,
+        apisOpen: true,
+        variableDraft: { name: "", value: "" },
+        environmentVariablesLoading: false,
+        editingEnvironmentVariableId: null,
+        expandedEnvironmentVariableId: null,
+        servicesForSelect: [],
+        endpointDetails: [],
+        endpointPathParameterNames: () => [],
+      },
+      global: { components: settingsUiStubs },
+    });
+
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "+ New WebSocket API")!
+      .trigger("click");
+
+    expect(wrapper.emitted("addMockApi")).toEqual([["WEBSOCKET"]]);
   });
 
   it("shows type-specific authorization fields and supports template type edits", async () => {

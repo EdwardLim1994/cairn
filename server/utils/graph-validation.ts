@@ -13,7 +13,7 @@ export type EndpointInput = {
 export type ServiceInput = {
   codeKey?: string;
   name: string;
-  apiType: "REST" | "GRPC";
+  apiType: "REST" | "GRPC" | "WEBSOCKET";
   framework: string;
   baseUrl: string;
   grpcTls: boolean;
@@ -82,7 +82,24 @@ function endpointPath(value: unknown): string {
   return text;
 }
 
-function endpoint(value: unknown, apiType: "REST" | "GRPC"): EndpointInput {
+function webSocketUrl(value: unknown, label: string): string {
+  const text = requiredText(value, label, 2048);
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    throw createError({ statusCode: 400, statusMessage: `${label} must be a valid WebSocket URL` });
+  }
+  if (!new Set(["ws:", "wss:"]).has(url.protocol) || url.username || url.password) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `${label} must be a valid ws:// or wss:// URL without credentials`,
+    });
+  }
+  return url.toString();
+}
+
+function endpoint(value: unknown, apiType: "REST" | "GRPC" | "WEBSOCKET"): EndpointInput {
   const input = record(value, "Endpoint");
   const common = {
     id: typeof input.id === "string" ? input.id : undefined,
@@ -95,6 +112,13 @@ function endpoint(value: unknown, apiType: "REST" | "GRPC"): EndpointInput {
       method: null,
       url: null,
       rpcMethod: requiredText(input.rpcMethod, "RPC method", 512),
+    };
+  if (apiType === "WEBSOCKET")
+    return {
+      ...common,
+      method: null,
+      url: webSocketUrl(input.url, "WebSocket endpoint URL"),
+      rpcMethod: null,
     };
   const method = requiredText(input.method, "Endpoint method", 10).toUpperCase();
   if (!methods.has(method))
@@ -139,13 +163,24 @@ export function serviceInput(value: unknown): ServiceInput {
   const input = record(value, "Service");
   if (!Array.isArray(input.endpoints))
     throw createError({ statusCode: 400, statusMessage: "Endpoints must be an array" });
-  if (input.apiType !== undefined && input.apiType !== "REST" && input.apiType !== "GRPC")
-    throw createError({ statusCode: 400, statusMessage: "Service API type must be REST or gRPC" });
-  const apiType = input.apiType === "GRPC" ? "GRPC" : "REST";
+  if (
+    input.apiType !== undefined &&
+    input.apiType !== "REST" &&
+    input.apiType !== "GRPC" &&
+    input.apiType !== "WEBSOCKET"
+  )
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Service API type must be REST, gRPC, or WebSocket",
+    });
+  const apiType =
+    input.apiType === "GRPC" || input.apiType === "WEBSOCKET" ? input.apiType : "REST";
   const baseUrl =
     apiType === "REST"
       ? httpUrl(input.baseUrl, "Base URL")
-      : requiredText(input.baseUrl, "gRPC target", 2048);
+      : apiType === "WEBSOCKET"
+        ? webSocketUrl(input.baseUrl, "WebSocket base URL")
+        : requiredText(input.baseUrl, "gRPC target", 2048);
   if (apiType === "GRPC" && !/^(?:\[[^\]]+\]|[^:/?#\s]+):\d{1,5}$/.test(baseUrl))
     throw createError({
       statusCode: 400,

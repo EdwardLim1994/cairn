@@ -6,6 +6,62 @@ describe("serializeGraphCode", () => {
     expect(serializeGraphCode([], [])).toBe("");
   });
 
+  it("serializes a WebSocket mock API with its endpoint reference and message", () => {
+    const services = [
+      {
+        id: "push-service-id",
+        codeKey: "push-service",
+        projectId: "project-1",
+        name: "Push Service",
+        apiType: "WEBSOCKET",
+        framework: "Spring Boot",
+        baseUrl: "ws://localhost",
+        healthCheckUrl: null,
+        healthCheckHeaderTemplateId: null,
+        healthCheckCustomHeaders: [],
+        active: true,
+        positionX: 0,
+        positionY: 0,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        endpoints: [
+          {
+            id: "push-endpoint-id",
+            codeKey: "notifications",
+            name: "Notifications",
+            method: null,
+            url: "ws://localhost/ws/notifications",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ] as never;
+    const mockApis = [
+      {
+        id: "api-1",
+        name: "Notification Stream",
+        apiType: "WEBSOCKET",
+        targetEndpointId: "push-endpoint-id",
+        requestJson: "ping",
+        description: "Graph code key: notification-stream",
+      },
+    ] as never;
+
+    expect(JSON.parse(serializeGraphCode(services, [], [], [], mockApis))).toMatchObject({
+      version: 2,
+      destinations: [],
+      messageConnections: [],
+      mockApis: [
+        {
+          key: "notification-stream",
+          name: "Notification Stream",
+          serviceKey: "push-service",
+          endpointKey: "notifications",
+          message: "ping",
+        },
+      ],
+    });
+  });
+
   it("serializes keyed endpoint calls without database or canvas state", () => {
     const services = [
       {

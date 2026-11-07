@@ -7,6 +7,7 @@ import {
 import { ensureProject } from "../../utils/project";
 import { serviceInput } from "../../utils/graph-validation";
 import { createUpdateServiceUseCase } from "../../use-cases/services/update-service";
+import { webSocketSessionRegistry } from "../../utils/websocket-sessions";
 
 const updateServiceUseCase = createUpdateServiceUseCase({ ensureProject, updateService });
 
@@ -17,6 +18,7 @@ export default defineEventHandler(async (event) => {
     const result = await updateServiceUseCase(id, input);
     if (result === "not-found")
       throw createError({ statusCode: 404, statusMessage: "Service not found" });
+    webSocketSessionRegistry.closeProject(await ensureProject());
     return serviceUpdateResponseSchema.parse({ id });
   } catch (error) {
     if (error instanceof ServiceEndpointOwnershipError)

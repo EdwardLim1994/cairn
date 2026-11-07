@@ -32,6 +32,10 @@ const emit = defineEmits<{
   toggleServiceEndpoints: [serviceId: string];
   openServiceEndpoint: [endpointId: string | undefined];
   runMockApi: [entry: GraphMockApi];
+  connectWebSocket: [id: string];
+  disconnectWebSocket: [id: string];
+  triggerWebSocket: [id: string];
+  toggleResponsePanel: [id: string];
 }>();
 
 const modelNodes = computed({
@@ -132,7 +136,17 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
       />
     </template>
     <template #node-mockApiTrigger="{ data }">
-      <MockApiTriggerNode :data="data" @trigger="emit('runMockApi', data.entry)" />
+      <MockApiTriggerNode
+        :data="data"
+        @trigger="
+          data.entry.apiType === 'WEBSOCKET'
+            ? emit('triggerWebSocket', $event)
+            : emit('runMockApi', data.entry)
+        "
+        @connect="emit('connectWebSocket', $event)"
+        @disconnect="emit('disconnectWebSocket', $event)"
+        @toggle-response="emit('toggleResponsePanel', $event)"
+      />
     </template>
     <template #node-messageQueue="{ data }">
       <MessageQueueNode :data="data" />

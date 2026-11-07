@@ -8,7 +8,21 @@ type ViewModelOptions = {
   store: Store;
   mockApis: () => GraphMockApi[];
   runningMockId: () => string | null;
-  runResults?: () => Record<string, { status: string }>;
+  runResults?: () => Record<
+    string,
+    {
+      status: string;
+      responseStatus?: number | null;
+      grpcStatusName?: string | null;
+      responseBody?: string | null;
+      error?: string | null;
+      traceId?: string;
+    }
+  >;
+  websocketState?: (id: string) => "connecting" | "connected" | "disconnected";
+  responsePanelOpenId?: () => string | null;
+  websocketUnread?: (id: string) => boolean;
+  websocketMessages?: (id: string) => Array<{ id: number; data: string; receivedAt: string }>;
 };
 
 function frameworkLabel(framework: string) {
@@ -40,6 +54,10 @@ export function useGraphViewModel({
   mockApis,
   runningMockId,
   runResults,
+  websocketState,
+  responsePanelOpenId,
+  websocketUnread,
+  websocketMessages,
 }: ViewModelOptions) {
   function endpointTarget(endpointId: string) {
     for (const service of store.services) {
@@ -53,9 +71,14 @@ export function useGraphViewModel({
       service.endpoints.map((endpoint) => ({
         id: endpoint.id!,
         serviceId: service.id,
-        apiType: (service.apiType ?? "REST") === "REST" ? "HTTP" : "GRPC",
+        apiType:
+          service.apiType === "WEBSOCKET"
+            ? "WEBSOCKET"
+            : (service.apiType ?? "REST") === "REST"
+              ? "HTTP"
+              : "GRPC",
         method: endpoint.method,
-        label: `${service.name}  |  ${endpoint.name} (${(service.apiType ?? "REST") === "REST" ? endpoint.method : "gRPC"})`,
+        label: `${service.name}  |  ${endpoint.name} (${service.apiType === "WEBSOCKET" ? "WebSocket" : (service.apiType ?? "REST") === "REST" ? endpoint.method : "gRPC"})`,
       })),
     );
   }
@@ -170,6 +193,11 @@ export function useGraphViewModel({
           ready: entry.status === "ready",
           running: runningMockId() === entry.id,
           busy: Boolean(runningMockId()),
+          websocketState: websocketState?.(entry.id) ?? "disconnected",
+          responseOpen: responsePanelOpenId?.() === entry.id,
+          unread: websocketUnread?.(entry.id) ?? false,
+          messages: websocketMessages?.(entry.id) ?? [],
+          latestResponse: runResults?.()[entry.id],
           entry,
         },
         class: "app__flow-node app__flow-node--mock-trigger",

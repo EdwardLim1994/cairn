@@ -56,4 +56,16 @@ describe("mock API input validation", () => {
       mockApiInput({ name: "x", targetEndpointId: "id", requestJson: BigInt(1) }),
     ).toThrow(/valid JSON/);
   });
+
+  it("preserves WebSocket messages as exact text values", () => {
+    const message = '  subscribe {{channel}}\n{"limit": 2}  ';
+    expect(
+      mockApiInput({
+        name: "Watch events",
+        apiType: "WEBSOCKET",
+        targetEndpointId: "socket-endpoint",
+        requestJson: message,
+      }),
+    ).toMatchObject({ apiType: "WEBSOCKET", requestJson: message });
+  });
 });

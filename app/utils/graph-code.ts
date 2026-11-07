@@ -76,8 +76,9 @@ export function serializeGraphCode(
   edges: CanvasGetResponse["edges"],
   destinations: CanvasGetResponse["messageDestinations"] = [],
   messageConnections: CanvasGetResponse["messageConnections"] = [],
+  mockApis: CanvasGetResponse["mockApis"] = [],
 ) {
-  if (!services.length && !destinations.length) return "";
+  if (!services.length && !destinations.length && !mockApis.length) return "";
   const endpointRefs = new Map(
     services.flatMap((service) =>
       service.endpoints.map((endpoint) => [
@@ -89,7 +90,23 @@ export function serializeGraphCode(
   const serviceDefinitions = services.map((service) =>
     serviceDefinition(service, endpointRefs, edges),
   );
-  if (!destinations.length)
+  const websocketMockApis = mockApis.flatMap((api) => {
+    if (api.apiType !== "WEBSOCKET" || !api.targetEndpointId || typeof api.requestJson !== "string")
+      return [];
+    const endpoint = endpointRefs.get(api.targetEndpointId);
+    if (!endpoint) return [];
+    const graphCodeKey = /^Graph code key: (.+)$/.exec(api.description)?.[1];
+    return [
+      {
+        key: graphCodeKey ?? `websocket-${api.id}`,
+        name: api.name,
+        serviceKey: endpoint.serviceKey,
+        endpointKey: endpoint.endpointKey,
+        message: api.requestJson,
+      },
+    ];
+  });
+  if (!destinations.length && !websocketMockApis.length)
     return JSON.stringify({ version: 1, services: serviceDefinitions }, null, 2);
   const destinationById = new Map(destinations.map((destination) => [destination.id, destination]));
   const definitions = destinations.map(
@@ -113,10 +130,11 @@ export function serializeGraphCode(
   });
   return JSON.stringify(
     {
-      version: destinations.length ? 2 : 1,
+      version: 2,
       services: serviceDefinitions,
       destinations: definitions,
       messageConnections: connections,
+      ...(websocketMockApis.length ? { mockApis: websocketMockApis } : {}),
     },
     null,
     2,

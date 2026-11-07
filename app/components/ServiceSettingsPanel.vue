@@ -15,7 +15,7 @@ type EndpointDraft = {
 };
 type ServiceDraft = {
   name: string;
-  apiType: "REST" | "GRPC";
+  apiType: "REST" | "GRPC" | "WEBSOCKET";
   framework: string;
   baseUrl: string;
   grpcTls: boolean;
@@ -87,6 +87,7 @@ const frameworks = [
 const apiTypes = [
   { label: "REST", value: "REST" },
   { label: "gRPC", value: "GRPC" },
+  { label: "WebSocket", value: "WEBSOCKET" },
 ];
 const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const emit = defineEmits<{
@@ -279,9 +280,52 @@ function removeProto() {
 }
 
 function endpointSubtitle(endpoint: EndpointDraft) {
-  return draft.value.apiType === "REST"
-    ? `${endpoint.method ?? ""} ${endpoint.url ?? ""}`.trim()
-    : (endpoint.rpcMethod ?? "RPC method");
+  if (draft.value.apiType === "REST")
+    return `${endpoint.method ?? ""} ${endpoint.url ?? ""}`.trim();
+  if (draft.value.apiType === "WEBSOCKET") return endpoint.url ?? "WebSocket URL";
+  return endpoint.rpcMethod ?? "RPC method";
+}
+
+function selectApiType(value: string) {
+  if (value !== "REST" && value !== "GRPC" && value !== "WEBSOCKET") return;
+  if (value === draft.value.apiType) return;
+  draft.value.apiType = value;
+  if (value === "GRPC") {
+    draft.value.baseUrl = /^\S+:\d+$/.test(draft.value.baseUrl)
+      ? draft.value.baseUrl
+      : "localhost:50051";
+    draft.value.protoContent = null;
+    draft.value.protoFileName = null;
+    draft.value.clearProto = false;
+    draft.value.endpoints = draft.value.endpoints.map((endpoint) => ({
+      ...endpoint,
+      method: null,
+      url: null,
+      rpcMethod: endpoint.rpcMethod ?? "",
+    }));
+    return;
+  }
+  if (value === "WEBSOCKET") {
+    draft.value.baseUrl = /^wss?:\/\//i.test(draft.value.baseUrl)
+      ? draft.value.baseUrl
+      : "ws://localhost:3000/socket";
+    draft.value.endpoints = draft.value.endpoints.map((endpoint) => ({
+      ...endpoint,
+      method: null,
+      url: /^wss?:\/\//i.test(endpoint.url ?? "") ? endpoint.url : draft.value.baseUrl,
+      rpcMethod: null,
+    }));
+    return;
+  }
+  draft.value.baseUrl = /^https?:\/\//i.test(draft.value.baseUrl)
+    ? draft.value.baseUrl
+    : "http://localhost:3000";
+  draft.value.endpoints = draft.value.endpoints.map((endpoint) => ({
+    ...endpoint,
+    method: endpoint.method ?? "GET",
+    url: endpoint.url && endpoint.url.startsWith("/") ? endpoint.url : "/",
+    rpcMethod: null,
+  }));
 }
 
 function frameworkIconSource(framework: string) {
@@ -380,7 +424,8 @@ function handleOpenChange(open: boolean) {
           <span class="text-[10px] font-medium text-[var(--muted)]">API type</span>
           <USelect
             id="service-api-type"
-            v-model="draft.apiType"
+            :model-value="draft.apiType"
+            @update:model-value="selectApiType(String($event))"
             :items="apiTypes"
             :ui="{
               base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
@@ -428,7 +473,11 @@ function handleOpenChange(open: boolean) {
           </div>
           <label for="service-base-url" class="min-w-0 flex flex-1 flex-col gap-1">
             <span class="text-[10px] font-medium text-[var(--muted)]">{{
-              draft.apiType === "REST" ? "Base URL" : "Target address"
+              draft.apiType === "REST"
+                ? "Base URL"
+                : draft.apiType === "WEBSOCKET"
+                  ? "WebSocket target address"
+                  : "Target address"
             }}</span>
             <UInput
               id="service-base-url"
@@ -436,7 +485,13 @@ function handleOpenChange(open: boolean) {
               :ui="{
                 base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
               }"
-              :placeholder="draft.apiType === 'REST' ? 'http://localhost:4000' : 'localhost:50051'"
+              :placeholder="
+                draft.apiType === 'REST'
+                  ? 'http://localhost:4000'
+                  : draft.apiType === 'WEBSOCKET'
+                    ? 'ws://localhost:4000/socket'
+                    : 'localhost:50051'
+              "
             />
           </label>
         </div>
@@ -705,18 +760,20 @@ function handleOpenChange(open: boolean) {
           </label>
         </div>
         <label
-          v-if="draft.apiType === 'REST'"
+          v-if="draft.apiType === 'REST' || draft.apiType === 'WEBSOCKET'"
           :for="`service-endpoint-url-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[10px] font-medium text-[var(--muted)]">URL</span>
+          <span class="text-[10px] font-medium text-[var(--muted)]">{{
+            draft.apiType === "WEBSOCKET" ? "WebSocket URL" : "URL"
+          }}</span>
           <UInput
             :id="`service-endpoint-url-${endpoint.id || index}`"
             v-model="endpoint.url"
             :ui="{
               base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
-            placeholder="/orders"
+            :placeholder="draft.apiType === 'WEBSOCKET' ? 'ws://localhost:4000/events' : '/orders'"
           />
         </label>
         <label

@@ -223,8 +223,9 @@ describe("ServiceSettingsPanel", () => {
   });
 
   it("renders service fields and endpoint details and supports framework editing", async () => {
-    const panelDraft: Omit<typeof draft, "apiType"> & { apiType: "REST" | "GRPC" } =
-      structuredClone(draft);
+    const panelDraft: Omit<typeof draft, "apiType"> & {
+      apiType: "REST" | "GRPC" | "WEBSOCKET";
+    } = structuredClone(draft);
     const wrapper = mountPanel({
       draft: panelDraft,
       frameworkMenuOpen: false,
@@ -246,6 +247,29 @@ describe("ServiceSettingsPanel", () => {
     await framework.setValue(".NET");
     expect(panelDraft.framework).toBe(".NET");
     expect(wrapper.emitted("update:frameworkMenuOpen")).toEqual([[true], [false]]);
+  });
+
+  it("configures WebSocket service addresses and endpoint drafts", async () => {
+    const panelDraft: Omit<typeof draft, "apiType"> & {
+      apiType: "REST" | "GRPC" | "WEBSOCKET";
+    } = structuredClone(draft);
+    const wrapper = mountPanel({
+      draft: panelDraft,
+      frameworkMenuOpen: false,
+      editingServiceId: null,
+    });
+
+    await wrapper.get("#service-api-type").setValue("WEBSOCKET");
+    expect(panelDraft).toMatchObject({
+      apiType: "WEBSOCKET",
+      baseUrl: "ws://localhost:3000/socket",
+      endpoints: [{ method: null, url: "ws://localhost:3000/socket", rpcMethod: null }],
+    });
+    await wrapper.get('[aria-expanded="false"]').trigger("click");
+    expect(wrapper.text()).toContain("WebSocket URL");
+    expect(wrapper.get("#service-endpoint-url-endpoint-1").attributes("placeholder")).toBe(
+      "ws://localhost:4000/events",
+    );
   });
 
   it("adds Kafka subscribers to the service draft and includes them when saving", async () => {

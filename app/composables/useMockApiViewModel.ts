@@ -31,11 +31,22 @@ export function useMockApiViewModel(options: {
   onError: (message: string) => void;
 }) {
   let nextWarningId = 0;
+  function postmanServices() {
+    return options
+      .services()
+      .filter((service) => service.apiType !== "WEBSOCKET")
+      .map(({ apiType, baseUrl, endpoints }) => ({
+        apiType: apiType === "GRPC" ? ("GRPC" as const) : ("REST" as const),
+        baseUrl,
+        endpoints,
+      }));
+  }
+
   function retryUnmatchedImports() {
     const previous = options.store.mockDraft;
     const retried = retryUnmatchedPostmanDrafts(
       options.store.mockDraft,
-      options.services(),
+      postmanServices(),
       options.store.environmentVariables.map(({ name, value }) => ({ name, value })),
     ) as MockApiDraft[];
     const resolvedNames = new Set(
@@ -99,6 +110,7 @@ export function useMockApiViewModel(options: {
   }
 
   function formatRequestJson(entry: MockApiDraft) {
+    if (entry.apiType === "WEBSOCKET") return;
     try {
       const request =
         typeof entry.requestJson === "string"
@@ -110,8 +122,13 @@ export function useMockApiViewModel(options: {
     }
   }
 
+  function websocketMessageValue(value: unknown) {
+    return typeof value === "string" ? value : "";
+  }
+
   function addMockDraft(apiType: MockApiDraft["apiType"] = "HTTP") {
-    const serviceApiType = apiType === "HTTP" ? "REST" : "GRPC";
+    const serviceApiType =
+      apiType === "HTTP" ? "REST" : apiType === "WEBSOCKET" ? "WEBSOCKET" : "GRPC";
     const endpointId = options
       .services()
       .filter((service) => (service.apiType ?? "REST") === serviceApiType)
@@ -123,7 +140,7 @@ export function useMockApiViewModel(options: {
       apiType,
       targetEndpointId: endpointId ?? null,
       description: "",
-      requestJson: "{}",
+      requestJson: apiType === "WEBSOCKET" ? "" : "{}",
       pathParameters: {},
       customHeaders: [],
       active: Boolean(endpointId),
@@ -136,7 +153,7 @@ export function useMockApiViewModel(options: {
   function importCollection(content: string) {
     const result = parsePostmanCollection(
       content,
-      options.services(),
+      postmanServices(),
       options.store.environmentVariables.map(({ name, value }) => ({ name, value })),
     );
     options.store.mockDraft.push(
@@ -252,7 +269,10 @@ export function useMockApiViewModel(options: {
         ...entry,
         pathParameters: { ...entry.pathParameters },
         customHeaders: [...entry.customHeaders],
-        requestJson: JSON.stringify(entry.requestJson ?? {}, null, 2),
+        requestJson:
+          entry.apiType === "WEBSOCKET"
+            ? websocketMessageValue(entry.requestJson)
+            : JSON.stringify(entry.requestJson ?? {}, null, 2),
       })),
     );
     resetEnvironmentCardEdit();
@@ -265,7 +285,10 @@ export function useMockApiViewModel(options: {
       options.store.mockApis.map((entry) => ({
         ...entry,
         pathParameters: { ...entry.pathParameters },
-        requestJson: JSON.stringify(entry.requestJson ?? {}, null, 2),
+        requestJson:
+          entry.apiType === "WEBSOCKET"
+            ? websocketMessageValue(entry.requestJson)
+            : JSON.stringify(entry.requestJson ?? {}, null, 2),
       })),
     );
     resetEnvironmentCardEdit();
@@ -356,9 +379,11 @@ export function useMockApiViewModel(options: {
     return options.store.mockDraft.map((entry) => {
       try {
         const requestJson =
-          typeof entry.requestJson === "string"
-            ? JSON.parse(entry.requestJson.trim() || "{}")
-            : (entry.requestJson ?? {});
+          entry.apiType === "WEBSOCKET"
+            ? websocketMessageValue(entry.requestJson)
+            : typeof entry.requestJson === "string"
+              ? JSON.parse(entry.requestJson.trim() || "{}")
+              : (entry.requestJson ?? {});
         return { ...entry, requestJson };
       } catch {
         throw new Error(`Request for ${entry.name || "mock API"} must be valid JSON`);

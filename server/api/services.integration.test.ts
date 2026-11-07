@@ -10,6 +10,7 @@ import {
   graphNodePositions,
   headerTemplates,
   projects,
+  serviceEndpoints,
   services as servicesTable,
 } from "../db/schema";
 
@@ -137,6 +138,69 @@ integration("service REST controllers with MySQL", () => {
       name: "Orders updated",
       endpoints: [{ codeKey: "list-orders", name: "List all orders" }],
     });
+  });
+
+  it("persists WebSocket service types and preserves service and endpoint IDs through update and delete", async () => {
+    const created = (await createRoute({
+      context: {
+        body: {
+          name: "Notifications",
+          apiType: "WEBSOCKET",
+          framework: "Other",
+          baseUrl: "wss://example.test/socket",
+          endpoints: [{ codeKey: "events", name: "Events", url: "wss://example.test/events" }],
+        },
+      },
+    } as never)) as { id: string };
+
+    const initial = (await listRoute({} as never)) as Array<{
+      id: string;
+      apiType: string;
+      endpoints: Array<{ id: string; codeKey: string; url: string | null }>;
+    }>;
+    const initialService = initial.find(({ id }) => id === created.id)!;
+    const endpointId = initialService.endpoints[0]!.id;
+    expect(initialService).toMatchObject({
+      apiType: "WEBSOCKET",
+      endpoints: [{ codeKey: "events", url: "wss://example.test/events" }],
+    });
+
+    await updateRoute({
+      context: {
+        params: { id: created.id },
+        body: {
+          name: "Notifications updated",
+          apiType: "WEBSOCKET",
+          framework: "Other",
+          baseUrl: "wss://example.test/socket",
+          endpoints: [
+            {
+              id: endpointId,
+              codeKey: "events",
+              name: "Events updated",
+              url: "wss://example.test/events",
+            },
+          ],
+        },
+      },
+    } as never);
+
+    const updated = (await listRoute({} as never)) as typeof initial;
+    expect(updated.find(({ id }) => id === created.id)).toMatchObject({
+      id: created.id,
+      apiType: "WEBSOCKET",
+      name: "Notifications updated",
+      endpoints: [{ id: endpointId, codeKey: "events", name: "Events updated" }],
+    });
+
+    await expect(
+      deleteRoute({ context: { params: { id: created.id } } } as never),
+    ).resolves.toEqual({
+      id: created.id,
+    });
+    await expect(
+      getDb().select().from(serviceEndpoints).where(eq(serviceEndpoints.id, endpointId)),
+    ).resolves.toEqual([]);
   });
 
   it("persists proto files across list reloads, replaces old versions, and removes files on delete", async () => {

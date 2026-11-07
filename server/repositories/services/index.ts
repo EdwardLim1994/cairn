@@ -121,7 +121,7 @@ export async function updateService(
 
   const newProtoStorageKey =
     input.apiType === "GRPC" && input.protoContent ? `services/${id}/${randomUUID()}.proto` : null;
-  const clearProto = input.apiType === "REST" || input.clearProto;
+  const clearProto = input.apiType !== "GRPC" || input.clearProto;
   let protoFileName = existing.protoFileName;
   if (clearProto) protoFileName = null;
   else if (newProtoStorageKey) protoFileName = input.protoFileName ?? null;

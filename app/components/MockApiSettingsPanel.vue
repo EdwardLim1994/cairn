@@ -31,9 +31,13 @@ const props = defineProps<{
   expandedEnvironmentVariableId: string | null;
   focusMockApiId?: string | null;
   focusMockApiRequest?: number;
-  servicesForSelect: { id: string; label: string; apiType?: "HTTP" | "GRPC" }[];
+  servicesForSelect: { id: string; label: string; apiType?: "HTTP" | "GRPC" | "WEBSOCKET" }[];
   endpointPathParameterNames: (entry: MockApiDraft) => string[];
-  endpointDetails: { id: string; url: string | null; apiType?: "REST" | "GRPC" }[];
+  endpointDetails: {
+    id: string;
+    url: string | null;
+    apiType?: "REST" | "GRPC" | "WEBSOCKET";
+  }[];
 }>();
 const emit = defineEmits<{
   discard: [];
@@ -49,7 +53,7 @@ const emit = defineEmits<{
   deleteHeaderTemplate: [template: HeaderTemplateDraft];
   addAuthorizationTemplate: [];
   deleteAuthorizationTemplate: [template: AuthorizationTemplateDraft];
-  addMockApi: [apiType: "HTTP" | "GRPC"];
+  addMockApi: [apiType: "HTTP" | "GRPC" | "WEBSOCKET"];
   removeMockApi: [index: number];
   setMockEndpoint: [entry: MockApiDraft];
   formatRequest: [entry: MockApiDraft];
@@ -92,6 +96,16 @@ function collapseVariableCard(variable: EnvironmentVariable) {
 
 function mockApiKey(entry: MockApiDraft, index: number) {
   return entry.id || `mock-api-${index}`;
+}
+
+function mockApiTypeLabel(entry: MockApiDraft) {
+  if (entry.apiType === "WEBSOCKET") return "WebSocket";
+  return entry.apiType === "GRPC" ? "gRPC" : "HTTP";
+}
+
+function supportsHandshakeSettings(entry: MockApiDraft) {
+  const apiType = entry.apiType ?? "HTTP";
+  return apiType === "HTTP" || apiType === "WEBSOCKET";
 }
 
 watch(
@@ -777,6 +791,15 @@ watchEffect(() => {
                 >
                   + New gRPC API
                 </UButton>
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                  @click="emit('addMockApi', 'WEBSOCKET')"
+                >
+                  + New WebSocket API
+                </UButton>
               </div>
               <div id="registered-mock-apis-content" class="flex flex-col gap-y-3">
                 <SettingsAccordionCard
@@ -784,7 +807,7 @@ watchEffect(() => {
                   :key="entry.id || `new-${index}`"
                   :id="entry.id ? `mock-api-${entry.id}` : undefined"
                   :title="entry.name || `Mock API ${index + 1}`"
-                  :subtitle="`${entry.apiType ?? 'HTTP'} · ${servicesForSelect.find((option) => option.id === entry.targetEndpointId)?.label ?? 'Select service endpoint'}`"
+                  :subtitle="`${mockApiTypeLabel(entry)} · ${servicesForSelect.find((option) => option.id === entry.targetEndpointId)?.label ?? 'Select service endpoint'}`"
                   :delete-label="`Remove ${entry.name || `Mock API ${index + 1}`}`"
                   :open="expandedCardId === `mock:${mockApiKey(entry, index)}`"
                   compact
@@ -850,7 +873,7 @@ watchEffect(() => {
                     </label>
                   </template>
                   <label
-                    v-if="(entry.apiType ?? 'HTTP') === 'HTTP'"
+                    v-if="supportsHandshakeSettings(entry)"
                     :for="`mock-api-template-${entry.id || index}`"
                     class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[10px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
@@ -865,7 +888,7 @@ watchEffect(() => {
                     />
                   </label>
                   <UAccordion
-                    v-if="(entry.apiType ?? 'HTTP') === 'HTTP'"
+                    v-if="supportsHandshakeSettings(entry)"
                     :id="`mock-api-authorization-${entry.id || index}`"
                     class="w-full min-w-0"
                     :items="[{ value: 'authorization', label: 'Authorization' }]"
@@ -906,7 +929,7 @@ watchEffect(() => {
                     </template>
                   </UAccordion>
                   <HeaderRowsEditor
-                    v-if="(entry.apiType ?? 'HTTP') === 'HTTP'"
+                    v-if="supportsHandshakeSettings(entry)"
                     v-model="entry.customHeaders"
                   />
                   <div
@@ -928,23 +951,38 @@ watchEffect(() => {
                   <fieldset
                     class="min-w-0 flex flex-1 flex-col gap-1 m-0 border-0 p-0 [&>legend]:text-[10px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
                   >
-                    <legend>Request (JSON)</legend>
-                    <div class="flex justify-end">
-                      <UButton
-                        type="button"
-                        color="neutral"
-                        variant="outline"
-                        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
-                        @click="emit('formatRequest', entry)"
-                      >
-                        Format JSON
-                      </UButton>
-                    </div>
-                    <RequestJsonEditor
-                      :model-value="String(entry.requestJson ?? '')"
-                      :variables="environmentVariables"
-                      @update:model-value="entry.requestJson = $event"
-                    />
+                    <legend>
+                      {{ entry.apiType === "WEBSOCKET" ? "Message" : "Request (JSON)" }}
+                    </legend>
+                    <template v-if="entry.apiType === 'WEBSOCKET'">
+                      <UTextarea
+                        v-model="entry.requestJson"
+                        aria-label="WebSocket message"
+                        :rows="6"
+                        placeholder="Text message to send"
+                        :ui="{
+                          base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 font-mono text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                        }"
+                      />
+                    </template>
+                    <template v-else>
+                      <div class="flex justify-end">
+                        <UButton
+                          type="button"
+                          color="neutral"
+                          variant="outline"
+                          class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+                          @click="emit('formatRequest', entry)"
+                        >
+                          Format JSON
+                        </UButton>
+                      </div>
+                      <RequestJsonEditor
+                        :model-value="String(entry.requestJson ?? '')"
+                        :variables="environmentVariables"
+                        @update:model-value="entry.requestJson = $event"
+                      />
+                    </template>
                   </fieldset>
                   <label
                     :for="`mock-api-description-${entry.id || index}`"

@@ -155,11 +155,22 @@ const apiClient = createApiClient(async (url, options) => {
   }
 });
 const observabilityViewModel = useObservabilityViewModel({ store: observabilityStore, apiClient });
+const websocketStates = ref<Record<string, "connecting" | "connected" | "disconnected">>({});
+const websocketMessages = ref<
+  Record<string, Array<{ id: number; data: string; receivedAt: string }>>
+>({});
+const websocketUnread = ref<Record<string, boolean>>({});
+const responsePanelOpenId = ref<string | null>(null);
+const websocketStreams = new Map<string, EventSource>();
 const graphViewModel = useGraphViewModel({
   store: graphStore,
   mockApis: () => mockApis.value,
   runningMockId: () => runningMockId.value,
   runResults: () => runResults.value,
+  websocketState: (id) => websocketStates.value[id] ?? "disconnected",
+  responsePanelOpenId: () => responsePanelOpenId.value,
+  websocketUnread: (id) => websocketUnread.value[id] ?? false,
+  websocketMessages: (id) => websocketMessages.value[id] ?? [],
 });
 const canvasViewModel = useCanvasViewModel({
   apiClient,
@@ -482,7 +493,7 @@ async function openMockPanel(focusMockApiId?: string) {
   if (focusMockApiId) focusMockApiRequest.value++;
   await mockApiViewModel.openPanel(focusMockApiId);
 }
-function addMockDraft(apiType: "HTTP" | "GRPC") {
+function addMockDraft(apiType: "HTTP" | "GRPC" | "WEBSOCKET") {
   registeredMockApisOpen.value = true;
   mockApiViewModel.addMockDraft(apiType);
 }
@@ -558,6 +569,84 @@ async function runMock(entry: MockApi) {
   return result;
 }
 
+function closeWebSocketStream(id: string) {
+  websocketStreams.get(id)?.close();
+  websocketStreams.delete(id);
+}
+
+function openWebSocketStream(id: string) {
+  closeWebSocketStream(id);
+  const stream = new EventSource(`/api/mock-apis/${encodeURIComponent(id)}/events`);
+  websocketStreams.set(id, stream);
+  stream.addEventListener("message", (event) => {
+    const message = JSON.parse((event as MessageEvent).data) as {
+      id: number;
+      data: string;
+      receivedAt: string;
+    };
+    const currentMessages = websocketMessages.value[id] ?? [];
+    if (!currentMessages.some(({ id: messageId }) => messageId === message.id)) {
+      websocketMessages.value[id] = [...currentMessages, message].slice(-100);
+    }
+    if (responsePanelOpenId.value !== id) websocketUnread.value[id] = true;
+    graphViewModel.syncNodes();
+  });
+  stream.addEventListener("state", (event) => {
+    const { state } = JSON.parse((event as MessageEvent).data) as {
+      state: "connecting" | "connected" | "disconnected";
+    };
+    websocketStates.value[id] = state;
+    if (state === "disconnected") closeWebSocketStream(id);
+    graphViewModel.syncNodes();
+  });
+}
+
+async function connectWebSocket(id: string) {
+  websocketStates.value[id] = "connecting";
+  graphViewModel.syncNodes();
+  try {
+    await apiClient.connectWebSocketMockApi(id);
+    websocketStates.value[id] = "connected";
+    openWebSocketStream(id);
+  } catch (cause) {
+    websocketStates.value[id] = "disconnected";
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not connect WebSocket";
+  }
+  graphViewModel.syncNodes();
+}
+
+async function disconnectWebSocket(id: string) {
+  if (!window.confirm("Close this WebSocket connection?")) return;
+  try {
+    await apiClient.disconnectWebSocketMockApi(id);
+    websocketStates.value[id] = "disconnected";
+    closeWebSocketStream(id);
+  } catch (cause) {
+    errorMessage.value = cause instanceof Error ? cause.message : "Could not disconnect WebSocket";
+  }
+  graphViewModel.syncNodes();
+}
+
+async function triggerWebSocket(id: string) {
+  try {
+    await apiClient.triggerWebSocketMockApi(id);
+  } catch (cause) {
+    errorMessage.value =
+      cause instanceof Error ? cause.message : "Could not send WebSocket message";
+  }
+}
+
+function toggleResponsePanel(id: string) {
+  responsePanelOpenId.value = responsePanelOpenId.value === id ? null : id;
+  websocketUnread.value[id] = false;
+  graphViewModel.syncNodes();
+}
+
+onUnmounted(() => {
+  for (const stream of websocketStreams.values()) stream.close();
+  websocketStreams.clear();
+});
+
 function prettyResponse(value: string | null) {
   if (!value) return "No response body";
   try {
@@ -600,6 +689,7 @@ function openGraphAsCode() {
     serviceEdges.value,
     graphStore.messageDestinations,
     graphStore.messageConnections,
+    mockApis.value,
   );
   graphCodeOpen.value = true;
 }
@@ -700,6 +790,10 @@ onUnmounted(() => {
           @toggle-service-endpoints="toggleServiceEndpoints"
           @open-service-endpoint="openServiceEndpoint"
           @run-mock-api="runMock"
+          @connect-web-socket="connectWebSocket"
+          @disconnect-web-socket="disconnectWebSocket"
+          @trigger-web-socket="triggerWebSocket"
+          @toggle-response-panel="toggleResponsePanel"
         />
       </ContextMenu>
       <div

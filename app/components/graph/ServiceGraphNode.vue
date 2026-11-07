@@ -19,7 +19,7 @@ const props = defineProps<{
   data: {
     serviceId: string;
     name: string;
-    apiType: "REST" | "GRPC";
+    apiType: "REST" | "GRPC" | "WEBSOCKET";
     framework: string;
     online: boolean | null;
     endpoints: Endpoint[];
@@ -213,10 +213,14 @@ const emit = defineEmits<{
         :class="
           data.apiType === 'REST'
             ? `app__method-tag--${endpoint.method?.toLowerCase()}`
-            : 'app__method-tag--grpc'
+            : data.apiType === 'WEBSOCKET'
+              ? 'rounded bg-[var(--accent-soft)] text-[var(--accent)]'
+              : 'app__method-tag--grpc'
         "
       >
-        {{ data.apiType === "REST" ? endpoint.method : "gRPC" }}
+        {{
+          data.apiType === "REST" ? endpoint.method : data.apiType === "WEBSOCKET" ? "WS" : "gRPC"
+        }}
       </span>
       <button
         type="button"

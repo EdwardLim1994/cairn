@@ -18,7 +18,7 @@ const serviceSchema = z
   .object({
     key: keySchema,
     name: z.string().trim().min(1).max(255),
-    apiType: z.enum(["REST", "GRPC"]).default("REST"),
+    apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]).default("REST"),
     framework: frameworkSchema,
     baseUrl: z.string().trim().min(1).max(2048),
     grpcTls: z.boolean().default(false),
@@ -41,6 +41,12 @@ const serviceSchema = z
   .superRefine((service, context) => {
     if (service.apiType === "REST" && !/^https?:\/\//i.test(service.baseUrl))
       context.addIssue({ code: "custom", path: ["baseUrl"], message: "Expected HTTP URL" });
+    if (service.apiType === "WEBSOCKET" && !validWebSocketUrl(service.baseUrl))
+      context.addIssue({
+        code: "custom",
+        path: ["baseUrl"],
+        message: "Expected ws:// or wss:// URL",
+      });
     if (service.apiType === "GRPC") {
       const match = /^(?:\[[^\]]+\]|[^:/?#\s]+):(\d{1,5})$/.exec(service.baseUrl);
       const port = match ? Number(match[1]) : 0;
@@ -64,8 +70,31 @@ const serviceSchema = z
           path: ["endpoints", index],
           message: "gRPC endpoints need an RPC method",
         });
+      if (
+        service.apiType === "WEBSOCKET" &&
+        (!endpoint.url || !validWebSocketUrl(endpoint.url) || endpoint.method || endpoint.rpcMethod)
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["endpoints", index],
+          message: "WebSocket endpoints need a ws:// or wss:// URL",
+        });
     });
   });
+
+function validWebSocketUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "ws:" || url.protocol === "wss:") &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
 
 const destinationSchema = z.discriminatedUnion("broker", [
   z.object({
@@ -103,12 +132,21 @@ const messageConnectionSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+const mockApiSchema = z.object({
+  key: keySchema,
+  name: z.string().trim().min(1).max(255),
+  serviceKey: keySchema,
+  endpointKey: keySchema,
+  message: z.string().min(1),
+});
+
 const graphCodeV1Schema = z.object({ version: z.literal(1), services: z.array(serviceSchema) });
 const graphCodeV2Schema = z.object({
   version: z.literal(2),
   services: z.array(serviceSchema),
   destinations: z.array(destinationSchema),
   messageConnections: z.array(messageConnectionSchema),
+  mockApis: z.array(mockApiSchema).optional(),
 });
 
 type SchemaContext = z.RefinementCtx;
@@ -309,7 +347,27 @@ export const graphCodeManifestSchema = z
   .discriminatedUnion("version", [graphCodeV1Schema, graphCodeV2Schema])
   .superRefine((manifest, context) => {
     const serviceByKey = validateServices(manifest.services, context);
-    if (manifest.version === 2) validateGraphCodeV2(manifest, serviceByKey, context);
+    if (manifest.version === 2) {
+      validateGraphCodeV2(manifest, serviceByKey, context);
+      const mockApiKeys = new Set<string>();
+      manifest.mockApis?.forEach((api, index) => {
+        if (mockApiKeys.has(api.key))
+          context.addIssue({
+            code: "custom",
+            path: ["mockApis", index, "key"],
+            message: `Duplicate mock API key: ${api.key}`,
+          });
+        mockApiKeys.add(api.key);
+        const service = serviceByKey.get(api.serviceKey);
+        const endpoint = service?.endpoints.find(({ key }) => key === api.endpointKey);
+        if (!service || service.apiType !== "WEBSOCKET" || !endpoint)
+          context.addIssue({
+            code: "custom",
+            path: ["mockApis", index],
+            message: "WebSocket mock APIs must target a registered WebSocket service endpoint",
+          });
+      });
+    }
   });
 
 export type GraphCodeManifest = {
@@ -317,4 +375,5 @@ export type GraphCodeManifest = {
   services: Array<z.input<typeof serviceSchema>>;
   destinations?: Array<z.input<typeof destinationSchema>>;
   messageConnections?: Array<z.input<typeof messageConnectionSchema>>;
+  mockApis?: Array<z.input<typeof mockApiSchema>>;
 };

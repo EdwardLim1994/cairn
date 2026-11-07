@@ -3,7 +3,7 @@ import type { AuthorizationTemplateInput } from "#shared/api/mock-apis";
 export type MockApiDraft = {
   id?: string;
   name: string;
-  apiType?: "HTTP" | "GRPC";
+  apiType?: "HTTP" | "GRPC" | "WEBSOCKET";
   targetEndpointId: string | null;
   headerTemplateId?: string | null;
   authorizationTemplateId?: string | null;

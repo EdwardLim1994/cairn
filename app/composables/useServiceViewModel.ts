@@ -7,7 +7,7 @@ type ApiClient = ReturnType<typeof createApiClient>;
 type EndpointDraft = ServiceEndpointDraft & { requestJson?: unknown };
 export type ServiceDraft = {
   name: string;
-  apiType: "REST" | "GRPC";
+  apiType: "REST" | "GRPC" | "WEBSOCKET";
   framework: string;
   baseUrl: string;
   grpcTls: boolean;
@@ -106,10 +106,13 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   function addEndpoint() {
+    const apiType = options.draft.value.apiType;
     options.draft.value.endpoints.push(
-      options.draft.value.apiType === "GRPC"
+      apiType === "GRPC"
         ? { name: "", rpcMethod: "" }
-        : { name: "", method: "GET", url: "/" },
+        : apiType === "WEBSOCKET"
+          ? { name: "", url: options.draft.value.baseUrl }
+          : { name: "", method: "GET", url: "/" },
     );
   }
 

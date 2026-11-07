@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { readFileSync } from "node:fs";
 import { graphCodeManifestSchema } from "./graph-code";
 
 const validManifest = {
@@ -25,6 +26,57 @@ const validManifest = {
 const validEndpoint = validManifest.services[0]!.endpoints[0]!;
 
 describe("service graph code schema", () => {
+  it("accepts the checked-in GraphQL Java microservices manifest and links the notification trigger", () => {
+    const source = readFileSync(
+      new URL("../../graphql-java-microservices.graph.json", import.meta.url),
+      "utf8",
+    );
+    const parsed = graphCodeManifestSchema.parse(JSON.parse(source));
+    expect(parsed.version).toBe(2);
+    if (parsed.version !== 2) return;
+    const push = parsed.services.find(({ key }) => key === "push-service");
+    expect(push?.apiType).toBe("WEBSOCKET");
+    expect(push?.baseUrl).toBe("ws://localhost:51061");
+    expect(push?.healthCheck).toEqual({
+      url: "http://localhost:51061/actuator/health/readiness",
+      headers: [],
+    });
+    expect(push?.endpoints[0]?.url).toBe(
+      "ws://localhost:51061/ws/notifications?token=test-token-u1",
+    );
+    expect(parsed.destinations).toContainEqual(
+      expect.objectContaining({
+        key: "notification-created",
+        name: "notification.created",
+        broker: "kafka",
+      }),
+    );
+    expect(parsed.messageConnections).toContainEqual(
+      expect.objectContaining({
+        serviceKey: "notification-service",
+        destinationKey: "notification-created",
+        type: "publish",
+      }),
+    );
+    expect(parsed.messageConnections).toContainEqual(
+      expect.objectContaining({
+        serviceKey: "push-service",
+        destinationKey: "notification-created",
+        consumerGroup: "push-service",
+        type: "subscribe",
+      }),
+    );
+    expect(parsed.mockApis).toEqual([
+      {
+        key: "notification-stream",
+        name: "Notification Stream",
+        serviceKey: "push-service",
+        endpointKey: "user-notifications",
+        message: "ping",
+      },
+    ]);
+  });
+
   it("accepts valid graph manifests", () => {
     expect(graphCodeManifestSchema.safeParse(validManifest).success).toBe(true);
   });
@@ -49,6 +101,71 @@ describe("service graph code schema", () => {
             endpoints: [{ ...service.endpoints[0], method: "POST", url: "/graphql" }],
           },
         ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts ws and wss service endpoints and rejects other URL schemes", () => {
+    const websocketService = {
+      ...validManifest.services[0],
+      apiType: "WEBSOCKET",
+      baseUrl: "wss://example.test/socket",
+      endpoints: [
+        { ...validEndpoint, method: null, url: "ws://example.test/events", rpcMethod: null },
+      ],
+    };
+    expect(
+      graphCodeManifestSchema.safeParse({ version: 1, services: [websocketService] }).success,
+    ).toBe(true);
+    expect(
+      graphCodeManifestSchema.safeParse({
+        version: 1,
+        services: [
+          {
+            ...websocketService,
+            endpoints: [{ ...websocketService.endpoints[0], url: "https://example.test/events" }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts WebSocket mock APIs targeting declared WebSocket endpoints", () => {
+    const websocketService = {
+      ...validManifest.services[0],
+      key: "push",
+      apiType: "WEBSOCKET",
+      baseUrl: "ws://localhost",
+      endpoints: [
+        {
+          ...validEndpoint,
+          key: "notifications",
+          method: null,
+          rpcMethod: null,
+          url: "ws://localhost/ws/notifications",
+        },
+      ],
+    };
+    const manifest = {
+      version: 2,
+      services: [websocketService],
+      destinations: [],
+      messageConnections: [],
+      mockApis: [
+        {
+          key: "stream",
+          name: "Notification Stream",
+          serviceKey: "push",
+          endpointKey: "notifications",
+          message: "ping",
+        },
+      ],
+    };
+    expect(graphCodeManifestSchema.safeParse(manifest).success).toBe(true);
+    expect(
+      graphCodeManifestSchema.safeParse({
+        ...manifest,
+        mockApis: [{ ...manifest.mockApis[0], endpointKey: "missing" }],
       }).success,
     ).toBe(false);
   });

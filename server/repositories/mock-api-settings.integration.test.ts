@@ -13,6 +13,7 @@ import {
   services,
 } from "../db/schema";
 import { saveMockApiSettings } from "./mock-api-settings";
+import { listMockApis } from "./mock-apis/index";
 
 const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
 const integration = describe.skipIf(!connectionString);
@@ -46,6 +47,21 @@ integration("mock API settings save with MySQL", () => {
       name: "List",
       method: "GET",
       url: "/orders",
+    });
+    await db.insert(services).values({
+      id: "mock-settings-websocket-service",
+      projectId,
+      name: "Events",
+      apiType: "WEBSOCKET",
+      framework: "Other",
+      baseUrl: "wss://example.test/events",
+    });
+    await db.insert(serviceEndpoints).values({
+      id: "mock-settings-websocket-endpoint",
+      projectId,
+      serviceId: "mock-settings-websocket-service",
+      name: "Event stream",
+      url: "wss://example.test/events",
     });
   });
 
@@ -97,6 +113,46 @@ integration("mock API settings save with MySQL", () => {
     expect(variable?.value).toBe("secret");
     expect(api?.headerTemplateId).toBe(template?.id);
     expect(api?.active).toBe(true);
+  });
+
+  it("saves and reloads exact WebSocket message text on a matching endpoint", async () => {
+    const message = '  subscribe {{channel}}\n{"limit": 2}  ';
+    await saveMockApiSettings(
+      projectId,
+      {
+        environmentVariables: [{ id: "draft-channel", name: "channel", value: "orders" }],
+        headerTemplates: [],
+        authorizationTemplates: [],
+        mockApis: [
+          {
+            id: "draft-websocket-api",
+            apiType: "WEBSOCKET",
+            name: "Watch order events",
+            targetEndpointId: "mock-settings-websocket-endpoint",
+            headerTemplateId: null,
+            customHeaders: [],
+            active: true,
+            description: "",
+            requestJson: message,
+            pathParameters: {},
+            importMethod: null,
+            importUrl: null,
+            matchUrl: null,
+          },
+        ],
+      },
+      db,
+    );
+
+    const apis = await listMockApis(projectId, db);
+    expect(apis).toMatchObject([
+      {
+        apiType: "WEBSOCKET",
+        targetEndpointId: "mock-settings-websocket-endpoint",
+        requestJson: message,
+        status: "ready",
+      },
+    ]);
   });
 
   it("maps and persists authorization template drafts with API assignments", async () => {

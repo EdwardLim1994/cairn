@@ -11,7 +11,7 @@ export {
 } from "./common";
 
 const headerSchema = z.object({ name: z.string(), value: z.string() });
-const mockApiTypeSchema = z.enum(["HTTP", "GRPC"]);
+const mockApiTypeSchema = z.enum(["HTTP", "GRPC", "WEBSOCKET"]);
 export const readinessReasonSchema = z.object({ code: z.string(), message: z.string() });
 const mockApiInputFields = z.object({
   name: z.string().trim().min(1).max(255),
@@ -77,6 +77,13 @@ export const mockApiRunResponseSchema = z.object({
   responseBody: z.string().nullable(),
   error: z.string().nullable(),
 });
+export const websocketSessionResponseSchema = z.object({
+  mockApiId: z.string(),
+  endpointId: z.string(),
+  state: z.literal("connected"),
+});
+export const websocketDisconnectResponseSchema = z.object({ disconnected: z.boolean() });
+export const websocketTriggerResponseSchema = z.object({ triggered: z.literal(true) });
 
 export const headerTemplateSchema = z.object({
   id: z.string(),

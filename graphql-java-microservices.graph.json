@@ -44,6 +44,15 @@
         "securityProtocol": "PLAINTEXT",
         "brokers": "host.docker.internal:19092"
       }
+    },
+    {
+      "broker": "kafka",
+      "key": "notification-created",
+      "name": "notification.created",
+      "connection": {
+        "securityProtocol": "PLAINTEXT",
+        "brokers": "host.docker.internal:19092"
+      }
     }
   ],
   "messageConnections": [
@@ -133,6 +142,26 @@
       "consumerGroup": "notification-service",
       "destinationKey": "review-added",
       "type": "subscribe"
+    },
+    {
+      "serviceKey": "notification-service",
+      "destinationKey": "notification-created",
+      "type": "publish"
+    },
+    {
+      "serviceKey": "push-service",
+      "consumerGroup": "push-service",
+      "destinationKey": "notification-created",
+      "type": "subscribe"
+    }
+  ],
+  "mockApis": [
+    {
+      "key": "notification-stream",
+      "name": "Notification Stream",
+      "serviceKey": "push-service",
+      "endpointKey": "user-notifications",
+      "message": "ping"
     }
   ],
   "version": 2,
@@ -376,6 +405,25 @@
           "key": "list-notifications",
           "name": "List notifications",
           "rpcMethod": "shop.notification.NotificationService/ListNotifications",
+          "outboundConnections": []
+        }
+      ]
+    },
+    {
+      "apiType": "WEBSOCKET",
+      "baseUrl": "ws://localhost:51061",
+      "key": "push-service",
+      "name": "Notification Push Service",
+      "framework": "Spring Boot",
+      "healthCheck": {
+        "url": "http://localhost:51061/actuator/health/readiness",
+        "headers": []
+      },
+      "endpoints": [
+        {
+          "key": "user-notifications",
+          "name": "User notifications WebSocket",
+          "url": "ws://localhost:51061/ws/notifications?token=test-token-u1",
           "outboundConnections": []
         }
       ]

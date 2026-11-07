@@ -9,6 +9,7 @@ import {
   graphNodePositions,
   messageConnections,
   messageDestinations,
+  mockApis,
   serviceEdges,
   serviceEndpoints,
   services,
@@ -127,6 +128,42 @@ async function upsertServices(
     await tx.delete(services).where(inArray(services.id, removedServiceIds));
   }
   return { nextServiceIds, nextEndpointIds };
+}
+
+async function upsertMockApis(
+  tx: Transaction,
+  projectId: string,
+  definitions: NonNullable<GraphCodeManifest["mockApis"]>,
+  endpointIds: Map<string, string>,
+) {
+  if (!definitions.length) return;
+  const rows = await tx.select().from(mockApis).where(eq(mockApis.projectId, projectId));
+  const oldByKey = new Map(
+    rows.flatMap((row) => {
+      const key = /^Graph code key: (.+)$/.exec(row.description)?.[1];
+      return key ? [[key, row] as const] : [];
+    }),
+  );
+  for (const definition of definitions) {
+    const id = oldByKey.get(definition.key)?.id ?? randomUUID();
+    const endpointId = endpointIds.get(`${definition.serviceKey}\0${definition.endpointKey}`);
+    if (!endpointId)
+      throw new GraphCodeConstraintError(`Unknown WebSocket endpoint for ${definition.name}`);
+    const values = {
+      projectId,
+      name: definition.name,
+      apiType: "WEBSOCKET" as const,
+      targetEndpointId: endpointId,
+      customHeaders: [],
+      active: true,
+      pathParameters: {},
+      requestJson: definition.message,
+      description: `Graph code key: ${definition.key}`,
+    };
+    if (oldByKey.has(definition.key))
+      await tx.update(mockApis).set(values).where(eq(mockApis.id, id));
+    else await tx.insert(mockApis).values({ id, ...values });
+  }
 }
 
 async function upsertDestinations(
@@ -373,6 +410,12 @@ export async function applyGraphCode(
       manifest.services,
       oldServices,
       oldEndpoints,
+    );
+    await upsertMockApis(
+      tx,
+      projectId,
+      manifest.version === 2 ? (manifest.mockApis ?? []) : [],
+      nextEndpointIds,
     );
 
     const nextEdges = manifest.services.flatMap((service) =>

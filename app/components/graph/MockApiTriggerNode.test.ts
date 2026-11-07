@@ -34,6 +34,15 @@ const data = {
   entry,
 };
 
+const websocketData = {
+  ...data,
+  entry: { ...entry, apiType: "WEBSOCKET" as const, requestJson: "hello" },
+  websocketState: "disconnected" as const,
+  responseOpen: false,
+  unread: false,
+  messages: [],
+};
+
 describe("MockApiTriggerNode", () => {
   it("shows the API name and emits its identity when triggered", async () => {
     const wrapper = mount(MockApiTriggerNode, {
@@ -43,7 +52,9 @@ describe("MockApiTriggerNode", () => {
 
     expect(wrapper.text()).toContain("List orders");
     expect(wrapper.text()).not.toContain("Trigger");
-    expect(wrapper.get("button").attributes("aria-label")).toBe("Trigger List orders");
+    expect(wrapper.get('[aria-label="Trigger List orders"]').attributes("aria-label")).toBe(
+      "Trigger List orders",
+    );
     await wrapper.get('[aria-label="Trigger List orders"]').trigger("click");
 
     expect(wrapper.emitted("trigger")).toEqual([["mock-1"]]);
@@ -56,7 +67,7 @@ describe("MockApiTriggerNode", () => {
       },
       global: { stubs: { Handle: true, UIcon: true } },
     });
-    const inactiveButton = wrapper.get("button");
+    const inactiveButton = wrapper.get('[aria-label="Trigger List orders"]');
     expect(inactiveButton.attributes("disabled")).toBeDefined();
     await inactiveButton.trigger("click");
 
@@ -64,11 +75,80 @@ describe("MockApiTriggerNode", () => {
       props: { data: { ...data, busy: true } },
       global: { stubs: { Handle: true, UIcon: true } },
     });
-    const busyButton = busyWrapper.get("button");
+    const busyButton = busyWrapper.get('[aria-label="Trigger List orders"]');
     expect(busyButton.attributes("disabled")).toBeDefined();
     await busyButton.trigger("click");
 
     expect(wrapper.emitted("trigger")).toBeUndefined();
     expect(busyWrapper.emitted("trigger")).toBeUndefined();
+  });
+
+  it("requires a connection before triggering and emits connection actions", async () => {
+    const wrapper = mount(MockApiTriggerNode, {
+      props: { data: websocketData },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+    expect(wrapper.get('[aria-label="Trigger List orders"]').attributes("disabled")).toBeDefined();
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Connect"))!
+      .trigger("click");
+    expect(wrapper.emitted("connect")).toEqual([["mock-1"]]);
+
+    const connectedWrapper = mount(MockApiTriggerNode, {
+      props: { data: { ...websocketData, websocketState: "connected" } },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+    expect(
+      connectedWrapper.get('[aria-label="Trigger List orders"]').attributes("disabled"),
+    ).toBeUndefined();
+    await connectedWrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Disconnect"))!
+      .trigger("click");
+    await connectedWrapper.get('[aria-label="Trigger List orders"]').trigger("click");
+    expect(connectedWrapper.emitted("disconnect")).toEqual([["mock-1"]]);
+    expect(connectedWrapper.emitted("trigger")).toEqual([["mock-1"]]);
+  });
+
+  it("shows incoming responses and the unread indicator", () => {
+    const wrapper = mount(MockApiTriggerNode, {
+      props: {
+        data: {
+          ...websocketData,
+          responseOpen: true,
+          unread: true,
+          messages: [{ id: 1, data: "connected", receivedAt: "now" }],
+        },
+      },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+    expect(wrapper.text()).toContain("Latest response");
+    expect(wrapper.text()).toContain("connected");
+    expect(wrapper.find('[aria-label="New response"]').exists()).toBe(true);
+  });
+
+  it("shows the latest HTTP response in a panel beside the node", async () => {
+    const wrapper = mount(MockApiTriggerNode, {
+      props: {
+        data: {
+          ...data,
+          responseOpen: true,
+          latestResponse: {
+            status: "completed",
+            responseStatus: 200,
+            responseBody: '{"ok":true}',
+            error: null,
+            traceId: "trace-1",
+          },
+        },
+      },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+    expect(wrapper.text()).toContain("Latest response");
+    expect(wrapper.text()).toContain('"ok": true');
+    expect(wrapper.find("aside").classes()).toContain("right-full");
+    await wrapper.get('[aria-label="Hide latest response"]').trigger("click");
+    expect(wrapper.emitted("toggleResponse")).toEqual([["mock-1"]]);
   });
 });

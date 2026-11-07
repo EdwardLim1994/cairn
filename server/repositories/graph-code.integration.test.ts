@@ -438,4 +438,60 @@ integration("graph code repository with MySQL", () => {
       ),
     ).rejects.toThrow("unknown project variable");
   });
+
+  it("creates and updates WebSocket mock APIs by graph-code key", async () => {
+    const manifest: GraphCodeManifest = {
+      version: 2,
+      services: [
+        {
+          key: "push",
+          name: "Notification Push Service",
+          apiType: "WEBSOCKET",
+          framework: "Spring Boot",
+          baseUrl: "ws://localhost",
+          endpoints: [
+            {
+              key: "notifications",
+              name: "User notifications",
+              url: "ws://localhost/ws/notifications?token=test-token-u1",
+              outboundConnections: [],
+            },
+          ],
+        },
+      ],
+      destinations: [],
+      messageConnections: [],
+      mockApis: [
+        {
+          key: "notification-stream",
+          name: "Notification Stream",
+          serviceKey: "push",
+          endpointKey: "notifications",
+          message: "ping",
+        },
+      ],
+    };
+
+    await applyGraphCode(projectId, manifest, db!);
+    manifest.mockApis![0]!.message = "ping updated";
+    await applyGraphCode(projectId, manifest, db!);
+    const rows = await db!.select().from(mockApis).where(eq(mockApis.projectId, projectId));
+    expect(
+      rows.filter(({ description }) => description === "Graph code key: notification-stream"),
+    ).toMatchObject([
+      {
+        name: "Notification Stream",
+        apiType: "WEBSOCKET",
+        requestJson: "ping updated",
+      },
+    ]);
+    const canvas = await getCanvas(projectId, db!);
+    expect(canvas.mockApis.filter(({ name }) => name === "Notification Stream")).toHaveLength(1);
+    const trigger = canvas.mockApis.find(({ name }) => name === "Notification Stream");
+    expect(trigger?.status).toBe("ready");
+    const serviceEndpoint = canvas.services
+      .flatMap(({ endpoints }) => endpoints)
+      .find(({ name }) => name === "User notifications");
+    expect(trigger?.targetEndpointId).toBe(serviceEndpoint?.id);
+  });
 });

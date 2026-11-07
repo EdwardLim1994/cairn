@@ -4,6 +4,7 @@ import { useMockApiStore } from "../stores/mockApis";
 import { useMockApiViewModel } from "./useMockApiViewModel";
 import { ref } from "vue";
 import { createApiClient } from "../models/api-client";
+import type { GraphMockApi, GraphService } from "../models/graph";
 
 const service = {
   id: "service-1",
@@ -36,17 +37,32 @@ const service = {
     },
   ],
 };
+const websocketService: GraphService = {
+  ...service,
+  id: "websocket-service-1",
+  apiType: "WEBSOCKET",
+  baseUrl: "wss://example.test/events",
+  endpoints: service.endpoints.map((endpoint) => ({
+    ...endpoint,
+    id: "websocket-endpoint-1",
+    serviceId: "websocket-service-1",
+    method: null,
+    url: "wss://example.test/events",
+  })),
+};
 
 describe("mock API view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function setup(failVariables = false, failSave = false) {
+  function setup(failVariables = false, failSave = false, services: GraphService[] = [service]) {
     const store = useMockApiStore();
     const errors: string[] = [];
     const operations: string[] = [];
     const calls: { url: string; method: string }[] = [];
+    const savedBodies: unknown[] = [];
     const apiClient = createApiClient(async (url, options) => {
       calls.push({ url, method: options.method });
+      if (url === "/api/mock-api-settings") savedBodies.push(options.body);
       if (url === "/api/environment-variables" && options.method === "GET") {
         if (failVariables) throw new Error("offline");
         return [
@@ -94,7 +110,7 @@ describe("mock API view model", () => {
     const viewModel = useMockApiViewModel({
       store,
       apiClient,
-      services: () => [service],
+      services: () => services,
       environmentCardDraft,
       editingEnvironmentVariableId,
       expandedEnvironmentVariableId,
@@ -113,6 +129,7 @@ describe("mock API view model", () => {
       errors,
       operations,
       calls,
+      savedBodies,
       viewModel,
       environmentCardDraft,
       editingEnvironmentVariableId,
@@ -208,6 +225,62 @@ describe("mock API view model", () => {
     expect(store.mockDraft).toEqual([draft]);
     viewModel.removeMockDraft(0);
     expect(store.mockDraft).toEqual([]);
+  });
+
+  it("targets WebSocket endpoints and keeps their text request exact through save and discard", async () => {
+    const { store, viewModel, savedBodies } = setup(false, false, [service, websocketService]);
+    const draft = viewModel.addMockDraft("WEBSOCKET");
+    const message = '  subscribe {{channel}}\n{"limit": 2}  ';
+    draft.name = "Watch events";
+    draft.requestJson = message;
+
+    await viewModel.saveMockDraft();
+
+    const savedSettings = savedBodies[0] as {
+      mockApis: Array<{ apiType: string; targetEndpointId: string | null; requestJson: unknown }>;
+    };
+    expect(savedSettings.mockApis[0]).toMatchObject({
+      apiType: "WEBSOCKET",
+      targetEndpointId: "websocket-endpoint-1",
+      requestJson: message,
+    });
+
+    const savedApi: GraphMockApi = {
+      id: "saved-websocket-api",
+      projectId: "project-1",
+      name: "Watch events",
+      apiType: "WEBSOCKET",
+      targetEndpointId: "websocket-endpoint-1",
+      headerTemplateId: null,
+      authorizationTemplateId: null,
+      customHeaders: [],
+      active: true,
+      status: "ready",
+      readinessReasons: [],
+      importMethod: null,
+      importUrl: null,
+      matchUrl: null,
+      pathParameters: {},
+      requestJson: message,
+      description: "",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    store.setMockApis([savedApi]);
+    viewModel.discardMockSettings();
+    expect(store.mockDraft[0]?.requestJson).toBe(message);
+  });
+
+  it("selects a WebSocket endpoint when adding a WebSocket mock API draft", () => {
+    const { viewModel } = setup(false, false, [service, websocketService]);
+
+    const draft = viewModel.addMockDraft("WEBSOCKET");
+
+    expect(draft).toMatchObject({
+      apiType: "WEBSOCKET",
+      targetEndpointId: "websocket-endpoint-1",
+      requestJson: "",
+      active: true,
+    });
   });
 
   it("imports matching Postman requests and returns individual mismatch warnings", async () => {

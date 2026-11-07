@@ -20,6 +20,7 @@ export async function getMockApiExecutionTarget(projectId: string, id: string) {
     .select({
       mockApiId: mockApis.id,
       apiType: mockApis.apiType,
+      serviceApiType: services.apiType,
       active: mockApis.active,
       targetEndpointId: mockApis.targetEndpointId,
       headerTemplateId: mockApis.headerTemplateId,

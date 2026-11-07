@@ -133,11 +133,11 @@ export function useMockApiRunViewModel(options: {
         responseBody: null,
         error: cause instanceof Error ? cause.message : "Call failed",
       });
-      options.graphViewModel.buildEdges();
+      options.graphViewModel.syncNodes();
       await showServiceLogs(targetService);
     } finally {
       options.mockApiStore.setRunningMockId(null);
-      options.graphViewModel.buildEdges();
+      options.graphViewModel.syncNodes();
       await options.saveCanvas();
     }
   }

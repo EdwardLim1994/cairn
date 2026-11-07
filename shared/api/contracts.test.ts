@@ -405,6 +405,24 @@ describe("shared API contracts", () => {
     ).toBe(true);
     expect(
       serviceCreateRequestSchema.safeParse({
+        apiType: "WEBSOCKET",
+        name: "Notifications",
+        framework: "Other",
+        baseUrl: "wss://example.test/socket",
+        endpoints: [{ name: "Events", url: "wss://example.test/socket" }],
+      }).success,
+    ).toBe(true);
+    expect(
+      serviceCreateRequestSchema.safeParse({
+        apiType: "WEBSOCKET",
+        name: "Notifications",
+        framework: "Other",
+        baseUrl: "https://example.test/socket",
+        endpoints: [{ name: "Events", url: "https://example.test/socket" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      serviceCreateRequestSchema.safeParse({
         name: "Orders",
         framework: "Spring Boot",
         baseUrl: "http://localhost:8080",
@@ -462,6 +480,14 @@ describe("shared API contracts", () => {
         name: "Get orders",
         targetEndpointId: "endpoint-1",
         requestJson: { limit: 3 },
+      }).success,
+    ).toBe(true);
+    expect(
+      mockApiCreateRequestSchema.safeParse({
+        name: "Watch order events",
+        apiType: "WEBSOCKET",
+        targetEndpointId: "socket-endpoint",
+        requestJson: "subscribe orders",
       }).success,
     ).toBe(true);
     expect(mockApiCreateRequestSchema.safeParse({ name: "Missing endpoint" }).success).toBe(false);

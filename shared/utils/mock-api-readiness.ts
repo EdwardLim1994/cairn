@@ -4,10 +4,10 @@ import { mergeHeaderRows, resolveHeaderRows, type HeaderRow } from "./headers";
 
 export type ReadinessReason = { code: string; message: string };
 export type MockApiReadinessInput = {
-  apiType?: "REST" | "HTTP" | "GRAPHQL" | "GRPC";
-  targetApiType?: "REST" | "GRAPHQL" | "GRPC" | null;
+  apiType?: "REST" | "HTTP" | "GRAPHQL" | "GRPC" | "WEBSOCKET";
+  targetApiType?: "REST" | "GRAPHQL" | "GRPC" | "WEBSOCKET" | null;
   targetEndpointId: string | null;
-  endpointApiType?: "REST" | "GRAPHQL" | "GRPC" | null;
+  endpointApiType?: "REST" | "GRAPHQL" | "GRPC" | "WEBSOCKET" | null;
   headerTemplateId?: string | null;
   headerTemplateExists?: boolean;
   authorizationTemplateId?: string | null;
@@ -122,6 +122,7 @@ function addHeaderReasons(
 
 function expectedEndpointType(apiType: MockApiReadinessInput["apiType"]) {
   if (apiType === "GRPC") return "GRPC";
+  if (apiType === "WEBSOCKET") return "WEBSOCKET";
   if (apiType === "GRAPHQL") return "GRAPHQL";
   return "REST";
 }
@@ -145,10 +146,10 @@ function addEndpointReasons(
     return;
   }
   if (api.apiType !== "GRPC" && !endpointUrl) {
-    reasons.push({ code: "endpoint-missing", message: "Select a REST endpoint" });
+    reasons.push({ code: "endpoint-missing", message: "Select a service endpoint" });
     return;
   }
-  if (api.apiType !== "GRPC" && endpointUrl) {
+  if (api.apiType !== "GRPC" && api.apiType !== "WEBSOCKET" && endpointUrl) {
     addPathParameterReasons(api, endpointUrl, variables, reasons);
     if (api.apiType && api.targetApiType && expectedType !== api.targetApiType)
       reasons.push({
@@ -225,7 +226,11 @@ export function evaluateMockApiReadiness(
       reasons,
     );
 
-  if (api.apiType === "GRAPHQL") {
+  if (api.apiType === "WEBSOCKET") {
+    if (typeof api.requestJson !== "string" || !api.requestJson.trim())
+      reasons.push({ code: "websocket-message-missing", message: "Enter a WebSocket message" });
+    else addMissingVariables(api.requestJson, "WebSocket message", variables, reasons);
+  } else if (api.apiType === "GRAPHQL") {
     addGraphqlReasons(api, variables, reasons);
   } else addMissingVariables(api.requestJson, "Request body", variables, reasons);
   if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
