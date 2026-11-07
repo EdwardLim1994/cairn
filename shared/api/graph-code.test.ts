@@ -215,4 +215,53 @@ describe("service graph code schema", () => {
     expect(messages).toContain("Unknown endpoint reference: orders.missing-endpoint");
     expect(messages.some((message) => message.includes("Unrecognized key"))).toBe(true);
   });
+
+  it("validates broker-specific publish and subscription fields", () => {
+    const result = graphCodeManifestSchema.safeParse({
+      version: 2,
+      services: validManifest.services,
+      destinations: [
+        { key: "orders", broker: "kafka", name: "Orders", connection: { brokers: "kafka:9092" } },
+        { key: "events", broker: "rabbitmq", name: "Events", connection: { host: "rabbitmq" } },
+      ],
+      messageConnections: [
+        {
+          type: "publish",
+          destinationKey: "events",
+          serviceKey: "orders",
+          endpointKey: "list-orders",
+        },
+        {
+          type: "publish",
+          destinationKey: "orders",
+          serviceKey: "orders",
+          endpointKey: "list-orders",
+          routingKey: "orders.created",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "orders",
+          serviceKey: "orders",
+          consumerGroup: " ",
+          bindingKey: "orders.*",
+        },
+        {
+          type: "subscribe",
+          destinationKey: "events",
+          serviceKey: "orders",
+          consumerGroup: "workers",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const messages = result.error.issues.map(({ message }) => message);
+    expect(messages).toContain("RabbitMQ publish connections require a routing key");
+    expect(messages).toContain("Kafka publish connections do not use routing keys");
+    expect(messages).toContain("Kafka subscriptions require a consumer group");
+    expect(messages).toContain("Kafka subscriptions do not use binding keys");
+    expect(messages).toContain("RabbitMQ subscriptions do not use consumer groups");
+    expect(messages).toContain("RabbitMQ subscriptions require a binding key");
+  });
 });
