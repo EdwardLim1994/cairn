@@ -86,4 +86,45 @@ describe("graph input validation", () => {
     expect(finiteNumber("2.5", "x", 0)).toBe(2.5);
     expect(() => finiteNumber("NaN", "x", 0)).toThrow("x must be a finite number");
   });
+
+  it("validates relative health-check URLs and header rows", () => {
+    const valid = serviceInput({
+      name: "Orders",
+      framework: "Spring Boot",
+      baseUrl: "http://localhost:8081",
+      healthCheckUrl: "/actuator/health",
+      healthCheckCustomHeaders: [{ name: "X-Probe", value: "ready" }],
+      endpoints: [],
+    });
+    expect(valid.healthCheckUrl).toBe("/actuator/health");
+    expect(valid.healthCheckCustomHeaders).toEqual([{ name: "X-Probe", value: "ready" }]);
+
+    expect(() =>
+      serviceInput({
+        name: "Orders",
+        framework: "Spring Boot",
+        baseUrl: "http://localhost:8081",
+        healthCheckUrl: "//example.com/health",
+        endpoints: [],
+      }),
+    ).toThrow("Health-check URL must be an HTTP(S) URL or begin with /");
+    expect(() =>
+      serviceInput({
+        name: "Orders",
+        framework: "Spring Boot",
+        baseUrl: "http://localhost:8081",
+        healthCheckCustomHeaders: "invalid",
+        endpoints: [],
+      }),
+    ).toThrow("Health-check headers must be an array");
+    expect(() =>
+      serviceInput({
+        name: "Orders",
+        framework: "Spring Boot",
+        baseUrl: "http://localhost:8081",
+        healthCheckCustomHeaders: [{ name: "bad header", value: "ready" }],
+        endpoints: [],
+      }),
+    ).toThrow("Custom header");
+  });
 });
