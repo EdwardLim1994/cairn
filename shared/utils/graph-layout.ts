@@ -156,16 +156,12 @@ function placeNodes(
         y = placeQueue(id, rank, y, destinations, positions);
         continue;
       }
-      y = placeService(
-        id,
-        service,
-        rank,
-        y,
+      y = placeService(id, service, rank, y, {
         mockByService,
         subscriptionsByService,
         destinations,
         positions,
-      );
+      });
     }
   }
   return positions;
@@ -192,11 +188,14 @@ function placeService(
   service: GraphService,
   rank: number,
   y: number,
-  mockByService: Map<string, GraphMockApi[]>,
-  subscriptionsByService: Map<string, number>,
-  destinations: GraphDestination[],
-  positions: Map<string, { x: number; y: number }>,
+  context: {
+    mockByService: Map<string, GraphMockApi[]>;
+    subscriptionsByService: Map<string, number>;
+    destinations: GraphDestination[];
+    positions: Map<string, { x: number; y: number }>;
+  },
 ) {
+  const { mockByService, subscriptionsByService, destinations, positions } = context;
   const apis = mockByService.get(id) ?? [];
   const serviceHeight =
     serviceBaseHeight +

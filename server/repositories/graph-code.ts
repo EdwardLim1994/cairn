@@ -20,6 +20,22 @@ type ServiceRow = typeof services.$inferSelect;
 type EndpointRow = typeof serviceEndpoints.$inferSelect;
 type DestinationRow = typeof messageDestinations.$inferSelect;
 type DestinationDefinition = NonNullable<GraphCodeManifest["destinations"]>[number];
+type PositionInput = {
+  nodeType: "service" | "message_destination" | "message_queue";
+  entityId: string;
+  x: number;
+  y: number;
+};
+type LayoutService = Parameters<typeof arrangeGraph>[0][number];
+type LayoutDestination = NonNullable<Parameters<typeof arrangeGraph>[3]>[number];
+type LayoutConnection = NonNullable<Parameters<typeof arrangeGraph>[4]>;
+type PositionRow = typeof graphNodePositions.$inferSelect;
+type PersistedMessageConnection = {
+  type: "publish" | "subscribe";
+  destinationId: string;
+  endpointId: string | null;
+  serviceId: string | null;
+};
 
 async function upsertServices(
   tx: Transaction,
@@ -110,7 +126,7 @@ async function upsertServices(
       );
     await tx.delete(services).where(inArray(services.id, removedServiceIds));
   }
-  return { nextServiceIds, nextEndpointIds, existingByKey };
+  return { nextServiceIds, nextEndpointIds };
 }
 
 async function upsertDestinations(
@@ -173,7 +189,146 @@ async function upsertDestinations(
         ),
       );
   }
-  return { nextDestinationIds, nextQueueIds, existingByKey };
+  return { nextDestinationIds, nextQueueIds };
+}
+
+async function validateBrokerVariables(
+  tx: Transaction,
+  projectId: string,
+  definitions: DestinationDefinition[],
+) {
+  const names = [
+    ...new Set(
+      definitions.flatMap(({ connection }) =>
+        connection.passwordVariable ? [connection.passwordVariable] : [],
+      ),
+    ),
+  ];
+  if (!names.length) return;
+  const variables = await tx
+    .select({ name: environmentVariables.name })
+    .from(environmentVariables)
+    .where(
+      and(eq(environmentVariables.projectId, projectId), inArray(environmentVariables.name, names)),
+    );
+  if (variables.length !== names.length)
+    throw new GraphCodeConstraintError(
+      "Message broker connection references an unknown project variable",
+    );
+}
+
+function buildInitialPositions(
+  services: LayoutService[],
+  edges: { sourceServiceId: string; targetEndpointId: string }[],
+  destinations: LayoutDestination[],
+  connections: LayoutConnection,
+  queueIds: Map<string, string>,
+  add: (type: PositionInput["nodeType"], id: string, point: { x: number; y: number }) => void,
+) {
+  const layout = arrangeGraph(services, edges, [], destinations, connections);
+  for (const service of services) {
+    const point = layout.get(service.id);
+    if (point) add("service", service.id, point);
+  }
+  for (const queueId of new Set(queueIds.values())) {
+    const point = layout.get(messageQueueNodeId(queueId));
+    if (point) add("message_queue", queueId, point);
+  }
+}
+
+function buildAppendedPositions(
+  definitions: GraphCodeManifest["services"],
+  oldServices: ServiceRow[],
+  oldDestinations: DestinationRow[],
+  oldPositions: PositionRow[],
+  serviceIds: Map<string, string>,
+  queueIds: Map<string, string>,
+  add: (type: PositionInput["nodeType"], id: string, point: { x: number; y: number }) => void,
+) {
+  const positionByEntity = new Map(
+    oldPositions.map((position) => [`${position.nodeType}:${position.entityId}`, position]),
+  );
+  const existingByKey = new Map(oldServices.map((service) => [service.codeKey, service]));
+  const x = Math.max(0, ...oldPositions.map((position) => position.positionX)) + 720;
+  let y = 0;
+  for (const service of definitions) {
+    const serviceId = serviceIds.get(service.key)!;
+    const existing = existingByKey.get(service.key);
+    const saved = existing && positionByEntity.get(`service:${existing.id}`);
+    if (saved) add("service", serviceId, { x: saved.positionX, y: saved.positionY });
+    else {
+      add("service", serviceId, { x, y });
+      y += Math.max(320, 218 + service.endpoints.length * 47);
+    }
+  }
+  const oldQueuePositions = new Map<string, { x: number; y: number }>();
+  for (const destination of oldDestinations) {
+    if (oldQueuePositions.has(destination.queueId)) continue;
+    const saved = positionByEntity.get(`message_queue:${destination.queueId}`);
+    const legacy = positionByEntity.get(`message_destination:${destination.id}`);
+    if (saved || legacy)
+      oldQueuePositions.set(destination.queueId, {
+        x: (saved ?? legacy)!.positionX,
+        y: (saved ?? legacy)!.positionY,
+      });
+  }
+  for (const [index, queueId] of [...new Set(queueIds.values())].entries()) {
+    const saved = oldQueuePositions.get(queueId);
+    add("message_queue", queueId, saved ?? { x, y: y + index * 320 });
+  }
+}
+
+function buildGraphPositions(
+  definitions: GraphCodeManifest["services"],
+  services: LayoutService[],
+  edges: { sourceServiceId: string; targetEndpointId: string }[],
+  destinations: LayoutDestination[],
+  connections: LayoutConnection,
+  oldServices: ServiceRow[],
+  oldDestinations: DestinationRow[],
+  oldPositions: PositionRow[],
+  serviceIds: Map<string, string>,
+  queueIds: Map<string, string>,
+) {
+  const positions: PositionInput[] = [];
+  const add = (
+    nodeType: PositionInput["nodeType"],
+    entityId: string,
+    point: { x: number; y: number },
+  ) => positions.push({ nodeType, entityId, ...point });
+  if (oldServices.length === 0 && oldDestinations.length === 0)
+    buildInitialPositions(services, edges, destinations, connections, queueIds, add);
+  else
+    buildAppendedPositions(
+      definitions,
+      oldServices,
+      oldDestinations,
+      oldPositions,
+      serviceIds,
+      queueIds,
+      add,
+    );
+  return positions;
+}
+
+function toLayoutConnections(connections: PersistedMessageConnection[]): LayoutConnection {
+  const result: LayoutConnection = [];
+  for (const connection of connections) {
+    if (connection.type === "publish" && (connection.endpointId || connection.serviceId))
+      result.push({
+        type: "publish",
+        destinationId: connection.destinationId,
+        ...(connection.endpointId ? { endpointId: connection.endpointId } : {}),
+        ...(connection.serviceId ? { serviceId: connection.serviceId } : {}),
+      });
+    else if (connection.type === "subscribe" && connection.serviceId)
+      result.push({
+        type: "subscribe",
+        destinationId: connection.destinationId,
+        serviceId: connection.serviceId,
+      });
+  }
+  return result;
 }
 
 export class GraphCodeConstraintError extends Error {}
@@ -186,28 +341,7 @@ export async function applyGraphCode(
   await db.transaction(async (tx) => {
     const destinations = manifest.version === 2 ? (manifest.destinations ?? []) : [];
     const messageDefinitions = manifest.version === 2 ? (manifest.messageConnections ?? []) : [];
-    const variableNames = [
-      ...new Set(
-        destinations.flatMap(({ connection }) =>
-          connection.passwordVariable ? [connection.passwordVariable] : [],
-        ),
-      ),
-    ];
-    if (variableNames.length) {
-      const variables = await tx
-        .select({ name: environmentVariables.name })
-        .from(environmentVariables)
-        .where(
-          and(
-            eq(environmentVariables.projectId, projectId),
-            inArray(environmentVariables.name, variableNames),
-          ),
-        );
-      if (variables.length !== variableNames.length)
-        throw new GraphCodeConstraintError(
-          "Message broker connection references an unknown project variable",
-        );
-    }
+    await validateBrokerVariables(tx, projectId, destinations);
 
     const [oldServices, oldEndpoints, oldDestinations, oldPositions] = await Promise.all([
       tx.select().from(services).where(eq(services.projectId, projectId)),
@@ -219,7 +353,7 @@ export async function applyGraphCode(
     await tx.delete(serviceEdges).where(eq(serviceEdges.projectId, projectId));
     await tx.delete(messageConnections).where(eq(messageConnections.projectId, projectId));
 
-    const { nextServiceIds, nextEndpointIds, existingByKey } = await upsertServices(
+    const { nextServiceIds, nextEndpointIds } = await upsertServices(
       tx,
       projectId,
       manifest.services,
@@ -265,28 +399,10 @@ export async function applyGraphCode(
       routingKey: connection.type === "publish" ? (connection.routingKey ?? null) : null,
       bindingKey: connection.type === "subscribe" ? (connection.bindingKey ?? null) : null,
     }));
-    const layoutConnections: NonNullable<Parameters<typeof arrangeGraph>[4]> = [];
-    for (const connection of nextMessageConnections) {
-      if (connection.type === "publish" && (connection.endpointId || connection.serviceId))
-        layoutConnections.push({
-          type: "publish",
-          destinationId: connection.destinationId,
-          ...(connection.endpointId ? { endpointId: connection.endpointId } : {}),
-          ...(connection.serviceId ? { serviceId: connection.serviceId } : {}),
-        });
-      else if (connection.type === "subscribe" && connection.serviceId)
-        layoutConnections.push({
-          type: "subscribe",
-          destinationId: connection.destinationId,
-          serviceId: connection.serviceId,
-        });
-    }
+    const layoutConnections = toLayoutConnections(nextMessageConnections);
     if (nextMessageConnections.length)
       await tx.insert(messageConnections).values(nextMessageConnections);
 
-    const positionByEntity = new Map(
-      oldPositions.map((position) => [`${position.nodeType}:${position.entityId}`, position]),
-    );
     const nextServices = manifest.services.map((service) => ({
       id: nextServiceIds.get(service.key)!,
       name: service.name,
@@ -300,56 +416,18 @@ export async function applyGraphCode(
       queueId: nextQueueIds.get(destination.queueKey ?? "legacy-queue")!,
       queueName: destination.queueName ?? "Message Queue",
     }));
-    const nextPositions: {
-      nodeType: "service" | "message_destination" | "message_queue";
-      entityId: string;
-      x: number;
-      y: number;
-    }[] = [];
-    const setPosition = (
-      nodeType: "service" | "message_destination" | "message_queue",
-      entityId: string,
-      position: { x: number; y: number },
-    ) => nextPositions.push({ nodeType, entityId, ...position });
-    if (oldServices.length === 0 && oldDestinations.length === 0) {
-      const layout = arrangeGraph(nextServices, nextEdges, [], nextDestinations, layoutConnections);
-      for (const service of nextServices) {
-        const position = layout.get(service.id);
-        if (position) setPosition("service", service.id, position);
-      }
-      for (const queueId of new Set(nextQueueIds.values())) {
-        const position = layout.get(messageQueueNodeId(queueId));
-        if (position) setPosition("message_queue", queueId, position);
-      }
-    } else {
-      const x = Math.max(0, ...oldPositions.map((position) => position.positionX)) + 720;
-      let y = 0;
-      for (const service of manifest.services) {
-        const serviceId = nextServiceIds.get(service.key)!;
-        const existing = existingByKey.get(service.key);
-        const saved = existing && positionByEntity.get(`service:${existing.id}`);
-        if (saved) setPosition("service", serviceId, { x: saved.positionX, y: saved.positionY });
-        else {
-          setPosition("service", serviceId, { x, y });
-          y += Math.max(320, 218 + service.endpoints.length * 47);
-        }
-      }
-      const oldQueuePositions = new Map<string, { x: number; y: number }>();
-      for (const destination of oldDestinations) {
-        if (oldQueuePositions.has(destination.queueId)) continue;
-        const saved = positionByEntity.get(`message_queue:${destination.queueId}`);
-        const legacy = positionByEntity.get(`message_destination:${destination.id}`);
-        if (saved || legacy)
-          oldQueuePositions.set(destination.queueId, {
-            x: (saved ?? legacy)!.positionX,
-            y: (saved ?? legacy)!.positionY,
-          });
-      }
-      for (const [queueIndex, queueId] of [...new Set(nextQueueIds.values())].entries()) {
-        const saved = oldQueuePositions.get(queueId);
-        setPosition("message_queue", queueId, saved ?? { x, y: y + queueIndex * 320 });
-      }
-    }
+    const nextPositions = buildGraphPositions(
+      manifest.services,
+      nextServices,
+      nextEdges,
+      nextDestinations,
+      layoutConnections,
+      oldServices,
+      oldDestinations,
+      oldPositions,
+      nextServiceIds,
+      nextQueueIds,
+    );
     await Promise.all(
       nextPositions.map(({ nodeType, entityId, x, y }) =>
         tx

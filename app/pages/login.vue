@@ -39,7 +39,7 @@ async function signIn() {
             name="username"
             v-model="username"
             aria-label="Username"
-            autocomplete="username"
+            autocomplete="on"
             required
           />
         </label>

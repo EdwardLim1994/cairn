@@ -268,6 +268,20 @@ function createFetchOptions(
   };
 }
 
+function applyAuthorization(
+  headers: Headers,
+  authorization: string | readonly (readonly [string, string])[],
+) {
+  if (typeof authorization === "string") headers.set("Authorization", authorization);
+  else for (const [name, value] of authorization) headers.set(name, value);
+}
+
+function isGraphqlBody(body: unknown) {
+  return (
+    typeof body === "object" && body !== null && "query" in body && typeof body.query === "string"
+  );
+}
+
 export function createRunMockApiUseCase(dependencies: RunDependencies) {
   return async (id: string): Promise<MockApiRunResponse> => {
     const { projectId, target, apiType, variables } = await getReadyRunTarget(dependencies, id);
@@ -350,15 +364,8 @@ export function createRunMockApiUseCase(dependencies: RunDependencies) {
         apiType === "HTTP"
           ? await authorizationHeader(target, projectId, variables, dependencies.fetch, timeoutMs)
           : [];
-      if (typeof authorization === "string") headers.set("Authorization", authorization);
-      else for (const [name, value] of authorization) headers.set(name, value);
-      if (
-        apiType === "HTTP" &&
-        requestBody !== null &&
-        typeof requestBody === "object" &&
-        "query" in requestBody &&
-        typeof requestBody.query === "string"
-      )
+      applyAuthorization(headers, authorization);
+      if (apiType === "HTTP" && isGraphqlBody(requestBody))
         headers.set("content-type", "application/json");
       headers.set("traceparent", `00-${traceId}-${spanId}-01`);
       timeout = setTimeout(() => controller.abort(), timeoutMs);

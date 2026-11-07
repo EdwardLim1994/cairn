@@ -50,10 +50,22 @@ function stripProtoComments(source: string) {
   return result;
 }
 
-export async function parseGrpcProto(source: string) {
+function validateProtoSource(source: string) {
   if (!source.trim()) throw new Error("Proto file is empty");
   if (Buffer.byteLength(source, "utf8") > 1024 * 1024)
     throw new Error("Proto file must be 1 MB or smaller");
+}
+
+function loadGrpcMethods(file: string) {
+  const definition = loadSync(file, { keepCase: true, longs: String, enums: String });
+  const result = parseMethods(definition);
+  if (!result.methods.length && !result.streamingMethods.length)
+    throw new Error("Proto file contains no service methods");
+  return result;
+}
+
+export async function parseGrpcProto(source: string) {
+  validateProtoSource(source);
 
   const directory = await mkdtemp(join(tmpdir(), "cairn-proto-"));
   const file = join(directory, "service.proto");
@@ -66,10 +78,7 @@ export async function parseGrpcProto(source: string) {
     const unresolvedImports = importedFiles;
     if (unresolvedImports.length) return { methods: [], streamingMethods: [], unresolvedImports };
 
-    const definition = loadSync(file, { keepCase: true, longs: String, enums: String });
-    const { methods, streamingMethods } = parseMethods(definition);
-    if (!methods.length && !streamingMethods.length)
-      throw new Error("Proto file contains no service methods");
+    const { methods, streamingMethods } = loadGrpcMethods(file);
     return { methods, streamingMethods, unresolvedImports: [] };
   } finally {
     await rm(directory, { recursive: true, force: true });

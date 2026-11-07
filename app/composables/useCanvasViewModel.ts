@@ -285,7 +285,7 @@ export function useCanvasViewModel(options: {
     destinationId: string,
   ) {
     const source = sourceFromHandle(connection.source, connection.sourceHandle);
-    if (!source || source.serviceId !== connection.source) return undefined;
+    if (source?.serviceId !== connection.source) return undefined;
     const destination = options.graphStore.messageDestinations.find(
       (item) => item.id === destinationId && (item.queueId ?? "legacy-queue") === queueId,
     );
