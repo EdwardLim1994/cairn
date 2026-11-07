@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-11-07
+goal: Help users identify slow downstream service calls from trace data.
