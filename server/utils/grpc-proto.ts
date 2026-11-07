@@ -26,28 +26,29 @@ function parseMethods(definition: ReturnType<typeof loadSync>) {
   return { methods, streamingMethods };
 }
 
-function stripProtoComments(source: string) {
+function removeBlockComments(source: string) {
   let result = "";
-  let blockComment = false;
-  for (let index = 0; index < source.length; index++) {
-    if (blockComment) {
-      if (source[index] === "*" && source[index + 1] === "/") {
-        blockComment = false;
-        index++;
-      }
-      continue;
-    }
-    if (source[index] === "/" && source[index + 1] === "*") {
-      blockComment = true;
-      index++;
-      continue;
-    }
-    if (source[index] === "/" && source[index + 1] === "/") {
-      while (index < source.length && source[index] !== "\n") index++;
-    }
-    result += source[index] ?? "";
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf("/*", cursor);
+    if (start < 0) return result + source.slice(cursor);
+    const end = source.indexOf("*/", start + 2);
+    if (end < 0) return result + source.slice(cursor);
+    result += source.slice(cursor, start);
+    cursor = end + 2;
   }
   return result;
+}
+
+function stripProtoComments(source: string) {
+  const withoutBlocks = removeBlockComments(source);
+  return withoutBlocks
+    .split("\n")
+    .map((line) => {
+      const start = line.indexOf("//");
+      return start < 0 ? line : line.slice(0, start);
+    })
+    .join("\n");
 }
 
 function validateProtoSource(source: string) {

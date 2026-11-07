@@ -278,18 +278,32 @@ function buildAppendedPositions(
   }
 }
 
-function buildGraphPositions(
-  definitions: GraphCodeManifest["services"],
-  services: LayoutService[],
-  edges: { sourceServiceId: string; targetEndpointId: string }[],
-  destinations: LayoutDestination[],
-  connections: LayoutConnection,
-  oldServices: ServiceRow[],
-  oldDestinations: DestinationRow[],
-  oldPositions: PositionRow[],
-  serviceIds: Map<string, string>,
-  queueIds: Map<string, string>,
-) {
+type GraphPositionContext = {
+  definitions: GraphCodeManifest["services"];
+  services: LayoutService[];
+  edges: { sourceServiceId: string; targetEndpointId: string }[];
+  destinations: LayoutDestination[];
+  connections: LayoutConnection;
+  oldServices: ServiceRow[];
+  oldDestinations: DestinationRow[];
+  oldPositions: PositionRow[];
+  serviceIds: Map<string, string>;
+  queueIds: Map<string, string>;
+};
+
+function buildGraphPositions(context: GraphPositionContext) {
+  const {
+    definitions,
+    services,
+    edges,
+    destinations,
+    connections,
+    oldServices,
+    oldDestinations,
+    oldPositions,
+    serviceIds,
+    queueIds,
+  } = context;
   const positions: PositionInput[] = [];
   const add = (
     nodeType: PositionInput["nodeType"],
@@ -416,18 +430,18 @@ export async function applyGraphCode(
       queueId: nextQueueIds.get(destination.queueKey ?? "legacy-queue")!,
       queueName: destination.queueName ?? "Message Queue",
     }));
-    const nextPositions = buildGraphPositions(
-      manifest.services,
-      nextServices,
-      nextEdges,
-      nextDestinations,
-      layoutConnections,
+    const nextPositions = buildGraphPositions({
+      definitions: manifest.services,
+      services: nextServices,
+      edges: nextEdges,
+      destinations: nextDestinations,
+      connections: layoutConnections,
       oldServices,
       oldDestinations,
       oldPositions,
-      nextServiceIds,
-      nextQueueIds,
-    );
+      serviceIds: nextServiceIds,
+      queueIds: nextQueueIds,
+    });
     await Promise.all(
       nextPositions.map(({ nodeType, entityId, x, y }) =>
         tx
