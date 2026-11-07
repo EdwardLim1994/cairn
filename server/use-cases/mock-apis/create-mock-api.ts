@@ -8,7 +8,9 @@ export function createCreateMockApiUseCase(dependencies: {
   findMockApiEndpoint: (
     projectId: string,
     endpointId: string,
-  ) => Promise<{ id: string; url: string | null; serviceApiType: "REST" | "GRPC" } | undefined>;
+  ) => Promise<
+    { id: string; url: string | null; serviceApiType: "REST" | "GRPC" | "WEBSOCKET" } | undefined
+  >;
   createMockApi: (id: string, projectId: string, input: MockApiInput) => Promise<void>;
   newId?: () => string;
 }) {

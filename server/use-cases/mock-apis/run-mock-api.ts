@@ -13,7 +13,7 @@ import { getProtoFile } from "../../utils/proto-storage";
 import { status as grpcStatusCodes } from "@grpc/grpc-js";
 
 type ExecutionTarget = {
-  apiType?: "HTTP" | "GRPC";
+  apiType?: "HTTP" | "GRPC" | "WEBSOCKET";
   mockApiId: string;
   endpointId: string | null;
   targetEndpointId: string | null;
@@ -385,6 +385,8 @@ async function getReadyRunTarget(dependencies: RunDependencies, id: string) {
   if (!target) throw new MockApiNotFoundError("Mock API not found");
   if (!target.active) throw new MockApiNotReadyError("Mock API is inactive");
   const apiType = target.apiType ?? "HTTP";
+  if (apiType === "WEBSOCKET")
+    throw new MockApiNotReadyError("WebSocket mock APIs must be connected and triggered");
   const variables = new Map(
     (await dependencies.getVariables(projectId)).map(({ name, value }) => [name, value]),
   );

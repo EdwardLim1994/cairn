@@ -103,6 +103,21 @@ describe("mock API run use case", () => {
     });
   });
 
+  it("rejects WebSocket APIs from the unary run endpoint", async () => {
+    const websocketTarget = {
+      ...target,
+      apiType: "WEBSOCKET" as const,
+      endpointUrl: "ws://localhost/events",
+      serviceApiType: "WEBSOCKET" as const,
+    };
+    const { deps, run } = setup({ getTarget: vi.fn().mockResolvedValue(websocketTarget) });
+
+    await expect(run("mock-1")).rejects.toThrow(
+      "WebSocket mock APIs must be connected and triggered",
+    );
+    expect(deps.getVariables).not.toHaveBeenCalled();
+  });
+
   it("records canonical gRPC status names on failed calls", async () => {
     const grpcTarget = {
       ...target,
