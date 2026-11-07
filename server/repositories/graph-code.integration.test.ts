@@ -416,4 +416,26 @@ integration("graph code repository with MySQL", () => {
     const rows = await db!.select().from(services).where(eq(services.projectId, projectId));
     expect(rows.map(({ codeKey }) => codeKey)).toEqual(["existing"]);
   });
+
+  it("rejects broker credentials that reference an unknown project variable", async () => {
+    await expect(
+      applyGraphCode(
+        projectId,
+        {
+          version: 2,
+          services: [],
+          destinations: [
+            {
+              key: "orders-topic",
+              broker: "kafka",
+              name: "Orders",
+              connection: { brokers: "kafka:9092", passwordVariable: "MISSING_PASSWORD" },
+            },
+          ],
+          messageConnections: [],
+        },
+        db!,
+      ),
+    ).rejects.toThrow("unknown project variable");
+  });
 });
