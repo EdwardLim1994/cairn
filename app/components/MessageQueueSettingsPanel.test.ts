@@ -31,11 +31,17 @@ const uiStubs = {
     },
   }),
   SettingsAccordionCard: defineComponent({
-    props: { title: String, subtitle: String },
-    emits: ["toggle", "delete"],
-    setup(props, { slots }) {
+    props: { title: String, subtitle: String, open: Boolean },
+    emits: ["toggle", "delete", "expand", "collapse"],
+    setup(props, { emit, slots }) {
       return () =>
-        h("article", [h("strong", props.title), h("span", props.subtitle), slots.default?.()]);
+        h("article", { "data-open": props.open }, [
+          h("strong", props.title),
+          h("span", props.subtitle),
+          h("button", { "data-action": "expand", onClick: () => emit("expand") }),
+          h("button", { "data-action": "collapse", onClick: () => emit("collapse") }),
+          slots.default?.(),
+        ]);
     },
   }),
   UAccordion: defineComponent({
@@ -65,7 +71,10 @@ describe("MessageQueueSettingsPanel", () => {
           },
         ],
       },
-      global: { components: uiStubs },
+      global: {
+        components: uiStubs,
+        stubs: { SettingsAccordionCard: uiStubs.SettingsAccordionCard },
+      },
     });
 
     expect(wrapper.text()).toContain("Orders");
@@ -97,5 +106,39 @@ describe("MessageQueueSettingsPanel", () => {
       ?.trigger("click");
     expect(wrapper.text()).toContain("Topic 1");
     expect(wrapper.find('[aria-label="Topic 1 name"]').exists()).toBe(true);
+  });
+
+  it("expands and collapses a TLS RabbitMQ topic card", async () => {
+    const wrapper = mount(MessageQueueSettingsPanel, {
+      props: {
+        open: true,
+        destinations: [
+          {
+            id: "orders-topic",
+            projectId: "project-1",
+            codeKey: "orders",
+            broker: "rabbitmq",
+            name: "Orders",
+            connection: { host: "localhost", port: 5671, tls: true, virtualHost: "/" },
+            x: 200,
+            y: 100,
+            health: true,
+          },
+        ],
+      },
+      global: {
+        components: uiStubs,
+        stubs: { SettingsAccordionCard: uiStubs.SettingsAccordionCard },
+      },
+    });
+
+    expect(
+      (wrapper.get('[aria-label="Message queue URL"]').element as HTMLInputElement).value,
+    ).toBe("amqps://localhost:5671/");
+    const card = wrapper.get("article");
+    await card.get('[data-action="expand"]').trigger("click");
+    expect(card.attributes("data-open")).toBe("true");
+    await card.get('[data-action="collapse"]').trigger("click");
+    expect(card.attributes("data-open")).toBe("false");
   });
 });
