@@ -62,6 +62,25 @@ describe("WebSocket mock API streams", () => {
     expect(options.syncNodes).toHaveBeenCalledTimes(5);
   });
 
+  it("creates a native EventSource when no factory is injected", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "EventSource",
+      class extends FakeEventSource {
+        constructor(url: string) {
+          super();
+          urls.push(url);
+        }
+      },
+    );
+    const { controller } = setup({ createEventSource: undefined });
+
+    await controller.connectWebSocket("api-1");
+
+    expect(urls).toEqual(["/api/mock-apis/api-1/events"]);
+    controller.dispose();
+  });
+
   it("clears the unread mark when opening and closing the response panel", async () => {
     const { controller, streams, options } = setup();
     await controller.connectWebSocket("api-1");
@@ -73,6 +92,17 @@ describe("WebSocket mock API streams", () => {
     controller.toggleResponsePanel("api-1");
     expect(controller.responsePanelOpenId.value).toBeNull();
     expect(options.syncNodes).toHaveBeenCalled();
+  });
+
+  it("keeps the unread mark clear when a message arrives in an open panel", async () => {
+    const { controller, streams } = setup();
+    await controller.connectWebSocket("api-1");
+    controller.toggleResponsePanel("api-1");
+
+    streams[0]!.emit("message", { id: 1, data: "visible", receivedAt: "now" });
+
+    expect(controller.websocketMessages.value["api-1"]).toHaveLength(1);
+    expect(controller.websocketUnread.value["api-1"]).toBe(false);
   });
 
   it("disconnects on a remote state event and closes the event stream", async () => {
@@ -113,20 +143,30 @@ describe("WebSocket mock API streams", () => {
 
   it("reports connect, disconnect, and trigger failures with fallback messages", async () => {
     const { controller, onError } = setup({
-      connect: vi.fn().mockRejectedValue("no connection"),
-      disconnect: vi.fn().mockRejectedValue(new Error("close failed")),
-      trigger: vi.fn().mockRejectedValue("send failed"),
+      connect: vi.fn().mockRejectedValue(new Error("connect failed")),
+      disconnect: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("close failed"))
+        .mockRejectedValueOnce("no disconnect"),
+      trigger: vi
+        .fn()
+        .mockRejectedValueOnce("send failed")
+        .mockRejectedValueOnce(new Error("trigger failed")),
     });
 
     await controller.connectWebSocket("api-1");
     await controller.disconnectWebSocket("api-1");
+    await controller.disconnectWebSocket("api-1");
+    await controller.triggerWebSocket("api-1");
     await controller.triggerWebSocket("api-1");
 
     expect(controller.websocketStates.value["api-1"]).toBe("disconnected");
     expect(onError.mock.calls).toEqual([
-      ["Could not connect WebSocket"],
+      ["connect failed"],
       ["close failed"],
+      ["Could not disconnect WebSocket"],
       ["Could not send WebSocket message"],
+      ["trigger failed"],
     ]);
   });
 
