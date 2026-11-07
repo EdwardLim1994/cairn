@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, ref, watch, watchEffect } from "vue";
+import { nextTick, ref, watch, watchEffect } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import HeaderRowsEditor from "./HeaderRowsEditor.vue";
+import RequestJsonEditor from "./RequestJsonEditor.vue";
 import type {
   AuthorizationTemplateDraft,
   EnvironmentVariable,
@@ -9,8 +10,6 @@ import type {
   MockApiDraft,
 } from "../models/mock-api";
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
-
-const RequestJsonEditor = defineAsyncComponent(() => import("./RequestJsonEditor.vue"));
 
 const mockDraft = defineModel<MockApiDraft[]>("mockDraft", { required: true });
 const environmentVariables = defineModel<EnvironmentVariable[]>("environmentVariables", {

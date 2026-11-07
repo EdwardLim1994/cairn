@@ -36,10 +36,6 @@ function formControlStub(tag: "input" | "textarea" | "select") {
 }
 
 const settingsUiStubs = {
-  RequestJsonEditor: defineComponent({
-    name: "RequestJsonEditor",
-    template: '<textarea aria-label="Request body" />',
-  }),
   USlideover: defineComponent({
     name: "USlideover",
     props: { open: Boolean, side: String, close: [Boolean, Object], content: Object, ui: Object },
