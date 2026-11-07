@@ -26,6 +26,30 @@ function parseMethods(definition: ReturnType<typeof loadSync>) {
   return { methods, streamingMethods };
 }
 
+function stripProtoComments(source: string) {
+  let result = "";
+  let blockComment = false;
+  for (let index = 0; index < source.length; index++) {
+    if (blockComment) {
+      if (source[index] === "*" && source[index + 1] === "/") {
+        blockComment = false;
+        index++;
+      }
+      continue;
+    }
+    if (source[index] === "/" && source[index + 1] === "*") {
+      blockComment = true;
+      index++;
+      continue;
+    }
+    if (source[index] === "/" && source[index + 1] === "/") {
+      while (index < source.length && source[index] !== "\n") index++;
+    }
+    result += source[index] ?? "";
+  }
+  return result;
+}
+
 export async function parseGrpcProto(source: string) {
   if (!source.trim()) throw new Error("Proto file is empty");
   if (Buffer.byteLength(source, "utf8") > 1024 * 1024)
@@ -35,7 +59,7 @@ export async function parseGrpcProto(source: string) {
   const file = join(directory, "service.proto");
   try {
     await writeFile(file, source, "utf8");
-    const importSource = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const importSource = stripProtoComments(source);
     const importedFiles = [
       ...importSource.matchAll(/\bimport\s+(?:(?:public|weak)\s+)?["']([^"']+)["']\s*;/g),
     ].map(([, path]) => path);

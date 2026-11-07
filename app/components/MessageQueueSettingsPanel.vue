@@ -38,9 +38,12 @@ function connectionUrl(destination: Destination) {
   return `${protocol}://${destination.connection.host}:${destination.connection.port}${destination.connection.virtualHost}`;
 }
 
-function toggleTopic(id: string, expanded: boolean) {
-  if (expanded) expandedTopicId.value = id;
-  else if (expandedTopicId.value === id) expandedTopicId.value = null;
+function expandTopic(id: string) {
+  expandedTopicId.value = id;
+}
+
+function collapseTopic(id: string) {
+  if (expandedTopicId.value === id) expandedTopicId.value = null;
 }
 
 watch(
@@ -185,7 +188,8 @@ function handleOpenChange(value: boolean) {
         :subtitle="topic.codeKey"
         :delete-label="`Remove ${topic.name || `Topic ${index + 1}`}`"
         :open="expandedTopicId === topic.id"
-        @toggle="toggleTopic(topic.id, $event)"
+        @expand="expandTopic(topic.id)"
+        @collapse="collapseTopic(topic.id)"
         @delete="topics.splice(index, 1)"
       >
         <div class="flex flex-col gap-1">

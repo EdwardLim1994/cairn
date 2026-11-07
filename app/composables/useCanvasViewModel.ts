@@ -479,33 +479,51 @@ export function useCanvasViewModel(options: {
     edges: GraphStore["serviceEdges"],
     messages: GraphStore["messageConnections"],
   ) {
-    if (targetType === "endpoint") {
-      const targetServiceId = options.graphViewModel.endpointTarget(targetId ?? "");
-      if (!targetId || !targetServiceId || sourceServiceId === targetServiceId) return false;
-      edges.push({
-        id: crypto.randomUUID(),
-        sourceServiceId,
-        sourceEndpointId: subscription ? null : sourceId,
-        ...(subscription ? { sourceSubscriptionId: subscription.id } : {}),
-        targetEndpointId: targetId,
-      });
-      return true;
-    }
-    if (targetType === "destination") {
-      const destination = options.graphStore.messageDestinations.find(({ id }) => id === targetId);
-      if (!destination) return false;
-      const routingKey = destination.broker === "rabbitmq" ? "events" : undefined;
-      messages.push({
-        id: crypto.randomUUID(),
-        type: "publish",
-        destinationId: destination.id,
-        serviceId: sourceServiceId,
-        ...(subscription ? { subscriptionId: subscription.id } : { endpointId: sourceId }),
-        ...(routingKey ? { routingKey } : {}),
-      });
-      return true;
-    }
+    if (targetType === "endpoint")
+      return addEndpointTarget(sourceId, subscription, sourceServiceId, targetId, edges);
+    if (targetType === "destination")
+      return addDestinationTarget(sourceId, subscription, sourceServiceId, targetId, messages);
     return false;
+  }
+
+  function addEndpointTarget(
+    sourceId: string,
+    subscription: GraphStore["messageConnections"][number] | undefined,
+    sourceServiceId: string,
+    targetId: string | undefined,
+    edges: GraphStore["serviceEdges"],
+  ) {
+    const targetServiceId = options.graphViewModel.endpointTarget(targetId ?? "");
+    if (!targetId || !targetServiceId || sourceServiceId === targetServiceId) return false;
+    edges.push({
+      id: crypto.randomUUID(),
+      sourceServiceId,
+      sourceEndpointId: subscription ? null : sourceId,
+      ...(subscription ? { sourceSubscriptionId: subscription.id } : {}),
+      targetEndpointId: targetId,
+    });
+    return true;
+  }
+
+  function addDestinationTarget(
+    sourceId: string,
+    subscription: GraphStore["messageConnections"][number] | undefined,
+    sourceServiceId: string,
+    targetId: string | undefined,
+    messages: GraphStore["messageConnections"],
+  ) {
+    const destination = options.graphStore.messageDestinations.find(({ id }) => id === targetId);
+    if (!destination) return false;
+    const routingKey = destination.broker === "rabbitmq" ? "events" : undefined;
+    messages.push({
+      id: crypto.randomUUID(),
+      type: "publish",
+      destinationId: destination.id,
+      serviceId: sourceServiceId,
+      ...(subscription ? { subscriptionId: subscription.id } : { endpointId: sourceId }),
+      ...(routingKey ? { routingKey } : {}),
+    });
+    return true;
   }
 
   async function setOutboundCall(

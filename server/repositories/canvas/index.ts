@@ -24,6 +24,10 @@ import { CanvasConstraintError } from "./errors";
 /** Canvas-specific persistence; multi-table writes stay within this domain module. */
 type Database = ReturnType<typeof getDb>;
 
+function assertCanvasConstraint(valid: boolean, message: string) {
+  if (!valid) throw new CanvasConstraintError(message);
+}
+
 export async function getCanvas(
   projectId: string,
   db: Database = getDb(),
@@ -163,13 +167,15 @@ export async function saveCanvas(
               ),
             )
         : [];
-      if (existingDestinationIds.size !== ownedDestinationIds.length)
-        throw new CanvasConstraintError("Message destination belongs to another project");
+      assertCanvasConstraint(
+        existingDestinationIds.size === ownedDestinationIds.length,
+        "Message destination belongs to another project",
+      );
       const destinationIdSet = new Set(destinationIds);
-      if (connections.some(({ destinationId }) => !destinationIdSet.has(destinationId)))
-        throw new CanvasConstraintError(
-          "Message connection references a destination outside this canvas",
-        );
+      assertCanvasConstraint(
+        !connections.some(({ destinationId }) => !destinationIdSet.has(destinationId)),
+        "Message connection references a destination outside this canvas",
+      );
       const endpointIds = [
         ...new Set(
           connections.flatMap((connection) =>
@@ -215,22 +221,18 @@ export async function saveCanvas(
               )
           : [],
       ]);
-      if (
-        ownedMessageEndpoints.length !== endpointIds.length ||
-        ownedConsumerServices.length !== messageServiceIds.length
-      )
-        throw new CanvasConstraintError(
-          "Message connection references a service or endpoint outside this project",
-        );
-      if (
-        publishSubscriptionRefs.some(
+      assertCanvasConstraint(
+        ownedMessageEndpoints.length === endpointIds.length &&
+          ownedConsumerServices.length === messageServiceIds.length,
+        "Message connection references a service or endpoint outside this project",
+      );
+      assertCanvasConstraint(
+        !publishSubscriptionRefs.some(
           ({ id, serviceId }) =>
             !subscriptionOwners.has(id) || subscriptionOwners.get(id) !== serviceId,
-        )
-      )
-        throw new CanvasConstraintError(
-          "A message publish must reference a subscription owned by its source service",
-        );
+        ),
+        "A message publish must reference a subscription owned by its source service",
+      );
       const variableNames = [
         ...new Set(
           destinations.flatMap(({ connection }) =>
@@ -248,10 +250,10 @@ export async function saveCanvas(
               inArray(environmentVariables.name, variableNames),
             ),
           );
-        if (knownVariables.length !== variableNames.length)
-          throw new CanvasConstraintError(
-            "Message broker connection references an unknown project variable",
-          );
+        assertCanvasConstraint(
+          knownVariables.length === variableNames.length,
+          "Message broker connection references an unknown project variable",
+        );
       }
       return { existingDestinationIds, destinationIdSet };
     })();
@@ -368,8 +370,10 @@ export async function saveCanvas(
         .select({ id: services.id })
         .from(services)
         .where(and(eq(services.projectId, projectId), inArray(services.id, serviceIds)));
-      if (owned.length !== new Set(serviceIds).size)
-        throw new CanvasConstraintError("Canvas contains an unknown or duplicate service");
+      assertCanvasConstraint(
+        owned.length === new Set(serviceIds).size,
+        "Canvas contains an unknown or duplicate service",
+      );
       await Promise.all(
         canvas.services.map((position) =>
           tx
@@ -393,8 +397,10 @@ export async function saveCanvas(
         .select({ id: mockApis.id })
         .from(mockApis)
         .where(and(eq(mockApis.projectId, projectId), inArray(mockApis.id, mockApiIds)));
-      if (owned.length !== new Set(mockApiIds).size)
-        throw new CanvasConstraintError("Canvas contains an unknown or duplicate mock API");
+      assertCanvasConstraint(
+        owned.length === new Set(mockApiIds).size,
+        "Canvas contains an unknown or duplicate mock API",
+      );
       await Promise.all(
         mockApiPositions.map((position) =>
           tx
@@ -454,19 +460,17 @@ export async function saveCanvas(
               )
           : [],
       ]);
-      if (
-        ownedServices.length !== sourceIds.length ||
-        ownedEndpoints.length !== endpointIds.length ||
-        ownedSubscriptions.length !== subscriptionIds.length
-      )
-        throw new CanvasConstraintError(
-          "Connection references a service or endpoint outside this project",
-        );
+      assertCanvasConstraint(
+        ownedServices.length === sourceIds.length &&
+          ownedEndpoints.length === endpointIds.length &&
+          ownedSubscriptions.length === subscriptionIds.length,
+        "Connection references a service or endpoint outside this project",
+      );
       const endpointOwners = new Map(
         ownedEndpoints.map((endpoint) => [endpoint.id, endpoint.serviceId]),
       );
-      if (
-        canvas.edges.some(
+      assertCanvasConstraint(
+        !canvas.edges.some(
           (edge) =>
             endpointOwners.get(edge.targetEndpointId) === edge.sourceServiceId ||
             (edge.sourceEndpointId &&
@@ -476,11 +480,9 @@ export async function saveCanvas(
                 ({ id, serviceId }) =>
                   id === edge.sourceSubscriptionId && serviceId === edge.sourceServiceId,
               )),
-        )
-      )
-        throw new CanvasConstraintError(
-          "A service cannot connect to its own endpoint or use another service's endpoint as source",
-        );
+        ),
+        "A service cannot connect to its own endpoint or use another service's endpoint as source",
+      );
     }
     await tx
       .update(projects)

@@ -96,7 +96,7 @@ const severityFilterItems = computed(() => [
         type="button"
         class="flex w-16 cursor-row-resize touch-none items-center justify-center rounded-full outline-none hover:bg-[var(--panel2)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
         aria-label="Resize logs panel"
-        aria-description="Use the up and down arrow keys to adjust height."
+        title="Use the up and down arrow keys to adjust height"
         aria-controls="logs-panel"
         @pointerdown.prevent="emit('resize', $event)"
         @keydown.up.prevent="emit('adjustHeight', 24)"

@@ -15,6 +15,166 @@ import {
 } from "../db/schema";
 
 type Database = ReturnType<typeof getDb>;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type ServiceRow = typeof services.$inferSelect;
+type EndpointRow = typeof serviceEndpoints.$inferSelect;
+type DestinationRow = typeof messageDestinations.$inferSelect;
+type DestinationDefinition = NonNullable<GraphCodeManifest["destinations"]>[number];
+
+async function upsertServices(
+  tx: Transaction,
+  projectId: string,
+  definitions: GraphCodeManifest["services"],
+  oldServices: ServiceRow[],
+  oldEndpoints: EndpointRow[],
+) {
+  const existingByKey = new Map(oldServices.map((service) => [service.codeKey, service]));
+  const endpointsByService = new Map<string, EndpointRow[]>();
+  for (const endpoint of oldEndpoints)
+    endpointsByService.set(endpoint.serviceId, [
+      ...(endpointsByService.get(endpoint.serviceId) ?? []),
+      endpoint,
+    ]);
+  const nextServiceIds = new Map<string, string>();
+  const nextEndpointIds = new Map<string, string>();
+  await Promise.all(
+    definitions.map(async (service) => {
+      const existing = existingByKey.get(service.key);
+      const serviceId = existing?.id ?? randomUUID();
+      nextServiceIds.set(service.key, serviceId);
+      const serviceValues = {
+        projectId,
+        codeKey: service.key,
+        name: service.name,
+        apiType: service.apiType,
+        framework: service.framework,
+        baseUrl: service.baseUrl,
+        grpcTls: service.grpcTls,
+        protoStorageKey: service.apiType === "GRPC" ? (existing?.protoStorageKey ?? null) : null,
+        healthCheckUrl: service.healthCheck?.url ?? null,
+        healthCheckHeaderTemplateId: null,
+        healthCheckCustomHeaders: service.healthCheck?.headers ?? [],
+        active: existing?.active ?? true,
+      };
+      if (existing) await tx.update(services).set(serviceValues).where(eq(services.id, serviceId));
+      else await tx.insert(services).values({ id: serviceId, ...serviceValues });
+
+      const existingEndpoints = endpointsByService.get(serviceId) ?? [];
+      const endpointsByKey = new Map(
+        existingEndpoints.map((endpoint) => [endpoint.codeKey, endpoint]),
+      );
+      const retainedIds = new Set<string>();
+      await Promise.all(
+        service.endpoints.map(async (endpoint) => {
+          const existingEndpoint = endpointsByKey.get(endpoint.key);
+          const endpointId = existingEndpoint?.id ?? randomUUID();
+          retainedIds.add(endpointId);
+          nextEndpointIds.set(`${service.key}\0${endpoint.key}`, endpointId);
+          const endpointValues = {
+            projectId,
+            serviceId,
+            codeKey: endpoint.key,
+            name: endpoint.name,
+            method: endpoint.method ?? null,
+            url: endpoint.url ?? null,
+            rpcMethod: endpoint.rpcMethod ?? null,
+          };
+          if (existingEndpoint)
+            await tx
+              .update(serviceEndpoints)
+              .set(endpointValues)
+              .where(eq(serviceEndpoints.id, endpointId));
+          else await tx.insert(serviceEndpoints).values({ id: endpointId, ...endpointValues });
+        }),
+      );
+      const removedEndpoints = existingEndpoints
+        .filter((endpoint) => !retainedIds.has(endpoint.id))
+        .map((endpoint) => endpoint.id);
+      if (removedEndpoints.length)
+        await tx.delete(serviceEndpoints).where(inArray(serviceEndpoints.id, removedEndpoints));
+    }),
+  );
+  const retainedServiceIds = new Set(nextServiceIds.values());
+  const removedServiceIds = oldServices
+    .filter((service) => !retainedServiceIds.has(service.id))
+    .map((service) => service.id);
+  if (removedServiceIds.length) {
+    await tx
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "service"),
+          inArray(graphNodePositions.entityId, removedServiceIds),
+        ),
+      );
+    await tx.delete(services).where(inArray(services.id, removedServiceIds));
+  }
+  return { nextServiceIds, nextEndpointIds, existingByKey };
+}
+
+async function upsertDestinations(
+  tx: Transaction,
+  projectId: string,
+  definitions: DestinationDefinition[],
+  oldDestinations: DestinationRow[],
+) {
+  const existingByKey = new Map(oldDestinations.map((item) => [item.codeKey, item]));
+  const nextDestinationIds = new Map<string, string>();
+  const nextQueueIds = new Map<string, string>();
+  for (const destination of definitions) {
+    const queueKey = destination.queueKey ?? "legacy-queue";
+    if (nextQueueIds.has(queueKey)) continue;
+    nextQueueIds.set(queueKey, existingByKey.get(destination.key)?.queueId ?? randomUUID());
+  }
+  await Promise.all(
+    definitions.map(async (destination) => {
+      const existing = existingByKey.get(destination.key);
+      const id = existing?.id ?? randomUUID();
+      nextDestinationIds.set(destination.key, id);
+      const queueId = nextQueueIds.get(destination.queueKey ?? "legacy-queue")!;
+      const values = {
+        projectId,
+        queueId,
+        queueName: destination.queueName ?? "Message Queue",
+        codeKey: destination.key,
+        broker: destination.broker,
+        name: destination.name,
+        connection: destination.connection as Record<string, string | boolean | undefined>,
+      };
+      if (existing)
+        await tx
+          .update(messageDestinations)
+          .set(values)
+          .where(and(eq(messageDestinations.id, id), eq(messageDestinations.projectId, projectId)));
+      else await tx.insert(messageDestinations).values({ id, ...values });
+    }),
+  );
+  const retainedIds = new Set(nextDestinationIds.values());
+  const removedIds = oldDestinations
+    .filter((destination) => !retainedIds.has(destination.id))
+    .map((destination) => destination.id);
+  if (removedIds.length) {
+    await tx
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "message_destination"),
+          inArray(graphNodePositions.entityId, removedIds),
+        ),
+      );
+    await tx
+      .delete(messageDestinations)
+      .where(
+        and(
+          eq(messageDestinations.projectId, projectId),
+          inArray(messageDestinations.id, removedIds),
+        ),
+      );
+  }
+  return { nextDestinationIds, nextQueueIds, existingByKey };
+}
 
 export class GraphCodeConstraintError extends Error {}
 
@@ -55,101 +215,17 @@ export async function applyGraphCode(
       tx.select().from(messageDestinations).where(eq(messageDestinations.projectId, projectId)),
       tx.select().from(graphNodePositions).where(eq(graphNodePositions.projectId, projectId)),
     ]);
-    const existingByKey = new Map(oldServices.map((service) => [service.codeKey, service]));
-    const existingDestinationsByKey = new Map(
-      oldDestinations.map((destination) => [destination.codeKey, destination]),
-    );
-    const endpointsByService = new Map<string, typeof oldEndpoints>();
-    for (const endpoint of oldEndpoints)
-      endpointsByService.set(endpoint.serviceId, [
-        ...(endpointsByService.get(endpoint.serviceId) ?? []),
-        endpoint,
-      ]);
 
     await tx.delete(serviceEdges).where(eq(serviceEdges.projectId, projectId));
     await tx.delete(messageConnections).where(eq(messageConnections.projectId, projectId));
 
-    const { nextServiceIds, nextEndpointIds } = await (async () => {
-      const nextServiceIds = new Map<string, string>();
-      const nextEndpointIds = new Map<string, string>();
-      await Promise.all(
-        manifest.services.map(async (service) => {
-          const existing = existingByKey.get(service.key);
-          const serviceId = existing?.id ?? randomUUID();
-          nextServiceIds.set(service.key, serviceId);
-          const serviceValues = {
-            projectId,
-            codeKey: service.key,
-            name: service.name,
-            apiType: service.apiType,
-            framework: service.framework,
-            baseUrl: service.baseUrl,
-            grpcTls: service.grpcTls,
-            protoStorageKey:
-              service.apiType === "GRPC" ? (existing?.protoStorageKey ?? null) : null,
-            healthCheckUrl: service.healthCheck?.url ?? null,
-            healthCheckHeaderTemplateId: null,
-            healthCheckCustomHeaders: service.healthCheck?.headers ?? [],
-            active: existing?.active ?? true,
-          };
-          if (existing)
-            await tx.update(services).set(serviceValues).where(eq(services.id, serviceId));
-          else await tx.insert(services).values({ id: serviceId, ...serviceValues });
-
-          const existingEndpoints = endpointsByService.get(serviceId) ?? [];
-          const endpointsByKey = new Map(
-            existingEndpoints.map((endpoint) => [endpoint.codeKey, endpoint]),
-          );
-          const retainedIds = new Set<string>();
-          await Promise.all(
-            service.endpoints.map(async (endpoint) => {
-              const existingEndpoint = endpointsByKey.get(endpoint.key);
-              const endpointId = existingEndpoint?.id ?? randomUUID();
-              retainedIds.add(endpointId);
-              nextEndpointIds.set(`${service.key}\0${endpoint.key}`, endpointId);
-              const endpointValues = {
-                projectId,
-                serviceId,
-                codeKey: endpoint.key,
-                name: endpoint.name,
-                method: endpoint.method ?? null,
-                url: endpoint.url ?? null,
-                rpcMethod: endpoint.rpcMethod ?? null,
-              };
-              if (existingEndpoint)
-                await tx
-                  .update(serviceEndpoints)
-                  .set(endpointValues)
-                  .where(eq(serviceEndpoints.id, endpointId));
-              else await tx.insert(serviceEndpoints).values({ id: endpointId, ...endpointValues });
-            }),
-          );
-          const removedEndpoints = existingEndpoints
-            .filter((endpoint) => !retainedIds.has(endpoint.id))
-            .map((endpoint) => endpoint.id);
-          if (removedEndpoints.length)
-            await tx.delete(serviceEndpoints).where(inArray(serviceEndpoints.id, removedEndpoints));
-        }),
-      );
-
-      const retainedServiceIds = new Set(nextServiceIds.values());
-      const removedServiceIds = oldServices
-        .filter((service) => !retainedServiceIds.has(service.id))
-        .map((service) => service.id);
-      if (removedServiceIds.length) {
-        await tx
-          .delete(graphNodePositions)
-          .where(
-            and(
-              eq(graphNodePositions.projectId, projectId),
-              eq(graphNodePositions.nodeType, "service"),
-              inArray(graphNodePositions.entityId, removedServiceIds),
-            ),
-          );
-        await tx.delete(services).where(inArray(services.id, removedServiceIds));
-      }
-      return { nextServiceIds, nextEndpointIds };
-    })();
+    const { nextServiceIds, nextEndpointIds, existingByKey } = await upsertServices(
+      tx,
+      projectId,
+      manifest.services,
+      oldServices,
+      oldEndpoints,
+    );
 
     const nextEdges = manifest.services.flatMap((service) =>
       service.endpoints.flatMap((endpoint) =>
@@ -166,66 +242,12 @@ export async function applyGraphCode(
     );
     if (nextEdges.length) await tx.insert(serviceEdges).values(nextEdges);
 
-    const { nextDestinationIds, nextQueueIds } = await (async () => {
-      const nextDestinationIds = new Map<string, string>();
-      const nextQueueIds = new Map<string, string>();
-      for (const destination of destinations) {
-        const queueKey = destination.queueKey ?? "legacy-queue";
-        if (nextQueueIds.has(queueKey)) continue;
-        const existing = existingDestinationsByKey.get(destination.key);
-        nextQueueIds.set(queueKey, existing?.queueId ?? randomUUID());
-      }
-      await Promise.all(
-        destinations.map(async (destination) => {
-          const existing = existingDestinationsByKey.get(destination.key);
-          const id = existing?.id ?? randomUUID();
-          nextDestinationIds.set(destination.key, id);
-          const queueKey = destination.queueKey ?? "legacy-queue";
-          const queueId = nextQueueIds.get(queueKey)!;
-          const values = {
-            projectId,
-            queueId,
-            queueName: destination.queueName ?? "Message Queue",
-            codeKey: destination.key,
-            broker: destination.broker,
-            name: destination.name,
-            connection: destination.connection as Record<string, string | boolean | undefined>,
-          };
-          if (existing)
-            await tx
-              .update(messageDestinations)
-              .set(values)
-              .where(
-                and(eq(messageDestinations.id, id), eq(messageDestinations.projectId, projectId)),
-              );
-          else await tx.insert(messageDestinations).values({ id, ...values });
-        }),
-      );
-      const retainedDestinationIds = new Set(nextDestinationIds.values());
-      const removedDestinationIds = oldDestinations
-        .filter((destination) => !retainedDestinationIds.has(destination.id))
-        .map((destination) => destination.id);
-      if (removedDestinationIds.length) {
-        await tx
-          .delete(graphNodePositions)
-          .where(
-            and(
-              eq(graphNodePositions.projectId, projectId),
-              eq(graphNodePositions.nodeType, "message_destination"),
-              inArray(graphNodePositions.entityId, removedDestinationIds),
-            ),
-          );
-        await tx
-          .delete(messageDestinations)
-          .where(
-            and(
-              eq(messageDestinations.projectId, projectId),
-              inArray(messageDestinations.id, removedDestinationIds),
-            ),
-          );
-      }
-      return { nextDestinationIds, nextQueueIds };
-    })();
+    const { nextDestinationIds, nextQueueIds } = await upsertDestinations(
+      tx,
+      projectId,
+      destinations,
+      oldDestinations,
+    );
     const nextMessageConnections = messageDefinitions.map((connection) => ({
       id: randomUUID(),
       projectId,
