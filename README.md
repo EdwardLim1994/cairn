@@ -4,7 +4,7 @@
 [![Integration tests](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml)
 [![SonarCloud Scan](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml)
 
-A Nuxt single page app for editing a microservice graph, triggering registered REST and unary gRPC calls, managing raw WebSocket sessions, and viewing correlated traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+A Nuxt single page app for editing a microservice graph, triggering registered REST, GraphQL, and unary gRPC mock APIs, managing raw WebSocket sessions, and inspecting correlated OpenTelemetry traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
 
 GitHub Actions reports unit/component tests and MySQL-backed integration tests in separate workflows, so their README badges show independent status. The unit workflow also checks formatting, lint, and types. The SonarCloud workflow runs unit and component tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
@@ -68,6 +68,16 @@ OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 
 Use your actual `PROJECT_ID` in `OTEL_RESOURCE_ATTRIBUTES`. Service SDKs should propagate W3C trace context so their spans share the trace ID created by a mock API run. The app only overlays observed spans; configured graph edges do not stand in for telemetry.
 
+### Trace-driven graph behavior
+
+Cairn animates service connections and highlights the corresponding source and target endpoint dots when telemetry shows a call during the active mock API run. Other service endpoint dots are dimmed. All graph connections use square paths by default. Observed outbound connection labels sum the durations of matching client spans, including repeated calls and retries; hover a label to inspect the individual calls. When the necessary client-span telemetry is missing, the label indicates that timing is unavailable.
+
+After a mock API run finishes, Cairn opens the response panel beside its trigger node and centers and zooms the graph on that panel. Only one response panel is open at a time. The panel shows the result, trace ID when available, and total trace duration from the earliest span start to the latest span end. When no trace spans are available, Cairn shows the duration as unavailable.
+
+## Services and health checks
+
+Cairn supports Spring Boot, .NET, and custom (`Other`) service frameworks. Spring Boot and .NET use their framework health-check defaults. For `Other`, provide a health-check URL; Cairn calls it with `GET`. Custom health-check headers and shared header templates are available for endpoints that require authentication. WebSocket mock APIs also need a health-check URL because Cairn cannot infer one from a WebSocket endpoint.
+
 ## Message destinations
 
 Register REST or gRPC services and their endpoints; GraphQL subgraphs and routers can be registered as HTTP services with their `/graphql` endpoint. Connect endpoint calls in the graph, then add Kafka topic or RabbitMQ topic exchange nodes from the context menu. Connect a service endpoint or an event-producing service to a destination, then connect the destination to each consuming service. Kafka consumer groups and RabbitMQ routing and binding keys label those declared connections. `graphql-java-microservices.graph.json` provides a ready-to-import graph for the GraphQL Java stack, including its gRPC services, subgraphs, Apollo Router, Kafka flows, and the notification push WebSocket mock API.
@@ -80,7 +90,7 @@ The Collector ingestion routes are `POST /v1/traces` and `POST /v1/logs`. Both r
 
 Register a service with the WebSocket framework option and add an endpoint using its complete `ws://` or `wss://` address. Create a WebSocket mock API, select that endpoint, and enter the exact text message to send. Custom headers, shared header templates, and supported authorization templates are applied to the connection handshake.
 
-Use Connect on the graph trigger node to open the Cairn server's outbound connection. Trigger sends the saved text message after the connection is established. Disconnect asks for confirmation before closing it. Cairn accepts one active mock API session per registered endpoint; different endpoint IDs can stay connected concurrently. An unexpected remote close disables Trigger and requires an explicit reconnect. The response panel to the left of the trigger node shows incoming text messages only, including messages received while the panel is hidden.
+Use Connect on the graph trigger node to open the Cairn server's outbound connection. Trigger sends the saved text message after the connection is established. Disconnect asks for confirmation before closing it. Cairn accepts one active mock API session per registered endpoint; different endpoint IDs can stay connected concurrently. An unexpected remote close disables Trigger and requires an explicit reconnect. The response panel to the left of the trigger node shows incoming text messages only, including messages received while the panel is hidden. Triggering a WebSocket API sends the message but does not close the session; disconnect explicitly when finished.
 
 Live sessions and their bounded message buffers are held in process memory. They end when Cairn restarts, and endpoint exclusivity is enforced only within one Cairn process. Run a single app instance when using WebSocket mock APIs; multi-instance session coordination is not implemented.
 
@@ -113,6 +123,7 @@ This excludes the MySQL integration tests, which run separately through `vp run 
 - `GET/POST /api/environment-variables`, `PUT/DELETE /api/environment-variables/:id`
 - `GET/POST /api/access-tokens`, `DELETE /api/access-tokens/:id`
 - `POST /api/mock-apis/:id/runs`, `GET /api/runs/:id`, `GET /api/runs/:id/flow`
+- `POST /api/mock-apis/:id/connect`, `POST /api/mock-apis/:id/disconnect`, `POST /api/mock-apis/:id/trigger`, `GET /api/mock-apis/:id/events` (WebSocket session control and incoming-message stream)
 - `GET /api/logs`
 - `POST /v1/traces`, `POST /v1/logs`
 
@@ -128,4 +139,4 @@ The **Shareable authorization templates** section supports **Bearer token**, **B
 
 Bearer, Basic, and OAuth send an `Authorization` header; API key sends the configured key as a request header. A raw header template or custom header with the same name, ignoring case, makes that API not ready until the conflict is removed. Authorization secrets are masked while editing and are stored with project settings in MySQL; this does not encrypt them or restrict access from trusted Cairn operators. Postman collection authorization is not imported and remains reported as an unsupported feature.
 
-REST and gRPC mock payloads use a JSON-aware CodeMirror editor with formatting, syntax diagnostics, placeholder highlighting, and shared-variable autocomplete. GraphQL requests use a GraphQL-aware editor. Chained API calls remain future work.
+REST and gRPC mock payloads use a JSON-aware CodeMirror editor with formatting, syntax diagnostics, placeholder highlighting, and shared-variable autocomplete. GraphQL requests use a GraphQL-aware editor. SSE mock APIs and GraphQL subscriptions are not supported; raw WebSocket mock APIs are a separate API type. Chained API calls remain future work.

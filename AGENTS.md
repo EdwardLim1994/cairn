@@ -32,7 +32,9 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Cairn project context
 
-Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, connecting them in a Vue Flow graph, triggering mock REST calls, and inspecting correlated OpenTelemetry traces and logs. The server uses Drizzle ORM with MySQL. Prefer Tailwind CSS v4 utilities in component templates for visual properties such as layout, spacing, typography, sizing, borders, and states, keeping those choices next to the elements they affect. Keep shared theme tokens, global resets, and custom or third-party integration styles in `app/app.vue` where utility classes are not a good fit. Use app-specific BEM classes (`app__element`, `app__element--modifier`) only when needed for semantic or state hooks, custom selectors, pseudo-elements, or integrations; leave third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
+Cairn is a Nuxt 4 single-page app backed by Nitro server routes, Drizzle ORM, and MySQL. Users register Spring Boot, .NET, or custom services, connect service endpoints and message destinations in a Vue Flow graph, and run REST, GraphQL, unary gRPC, or raw WebSocket mock APIs. Cairn correlates OpenTelemetry traces and logs to a run; graph highlighting and call timing must come from observed telemetry, not configured edges alone. The graph, mock APIs, shared variables, templates, access tokens, and telemetry are scoped to `PROJECT_ID`.
+
+Prefer Tailwind CSS v4 utilities in component templates for visual properties such as layout, spacing, typography, sizing, borders, and states, keeping those choices next to the elements they affect. Keep shared theme tokens, global resets, and custom or third-party integration styles in `app/app.vue` where utility classes are not a good fit. Use app-specific BEM classes (`app__element`, `app__element--modifier`) only when needed for semantic or state hooks, custom selectors, pseudo-elements, or integrations; leave third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
 
 ### UI components
 
@@ -40,18 +42,32 @@ Cairn is a Nuxt 4 single-page app for registering microservices and endpoints, c
 - Keep thin Cairn wrappers when they connect a Nuxt UI component to app-specific state or events. Do not wrap Nuxt UI only to rename its API.
 - Keep Vue Flow canvas/nodes and the CodeMirror request editor as Cairn-specific components; their behavior is domain-specific and should not be replaced with generic UI controls.
 - Nuxt UI is registered through `@nuxt/ui` in `nuxt.config.ts`, with its Tailwind styles imported in `app/app.vue`. Component tests that mount panels outside Nuxt should stub the Nuxt UI controls and verify the panel's emitted intents and model updates.
+- Graph connections use square step paths by default. Keep observed timing labels, endpoint-dot highlighting, and response-panel focus in sync with the telemetry and graph view models.
 
 ### Mock APIs and shared variables
 
 - Mock API entries target registered service endpoints. Endpoint route templates may contain `{name}`, `{name:constraint}`, or `:name` parameters; mock API path values are URL-encoded before outbound calls.
 - Postman collection import accepts requests that match a registered REST endpoint by full URL and method. Mismatches are skipped and reported individually.
+- Supported mock API types are REST, GraphQL, unary gRPC, and raw WebSocket. GraphQL subscriptions and SSE APIs are future work; do not imply that WebSocket support covers them.
+- WebSocket mock APIs send saved text messages. Connect opens the session, Trigger sends a message only while connected, and Disconnect closes it. Only one mock API session may use a registered endpoint at a time, but different endpoints can stay connected concurrently. Incoming text messages are retained in a bounded client-side buffer while the response panel is closed; runtime sessions are in memory and are not coordinated across Cairn replicas.
+- Service health checks use GET. Spring Boot and .NET have framework defaults; `Other` and WebSocket services need an explicit URL. Custom health-check headers can be combined with a shared header template.
 - Environment variables are project-scoped strings. References use `{{name}}` in JSON string values or path parameter values. Do not treat environment values as typed JSON.
+- Shared header templates and authorization templates can be applied to mock APIs and custom health checks. Authorization supports Bearer, Basic, API key, and OAuth 2.0 Client Credentials; Postman authorization import and provider-specific OAuth flows are not supported. Header-name conflicts between authorization and raw custom headers make an API not ready.
+- The Mock APIs panel imports Postman REST collection requests only when their full URL and method match registered endpoints. Import warnings should identify skipped requests individually.
 - In the Mock APIs panel, **New variable** adds a blank card in edit mode. The panel's **Save** persists new variables, staged deletions, and mock API changes together. Existing variable cards have Edit/Delete icon actions; **Update** saves a changed name or value immediately and skips the PUT when neither changed.
-- The request body uses CodeMirror 6 with JSON language support. GraphQL syntax support and chained mock calls are future work unless requirements are added.
+- REST and gRPC request payloads use CodeMirror 6 with JSON language support; GraphQL requests use a GraphQL-aware editor. Chained mock calls are future work.
+
+### Telemetry and response panels
+
+- A completed mock API run opens its trigger node's response panel, closes any previously open response panel, and centers and zooms the graph viewport on the newly opened panel. Do not restore the removed global latest-run response panel.
+- REST, GraphQL, and gRPC response panels show status, trace ID when available, and total trace duration derived from earliest span start to latest span end. WebSocket panels show incoming text messages. Duration is unavailable when the trace has no spans.
+- Observed edge timing sums durations from matching outbound OTLP `CLIENT` spans by source/target service pair. Repeated calls and retries contribute each span duration; this sum can exceed wall-clock elapsed time when calls overlap. Missing client-span telemetry is shown as unavailable, not zero. Keep per-call duration details available on the edge label.
+- Animate observed downstream connections and accent their source outbound and target inbound dots; dim unrelated service endpoint dots. Clear these observations when a new run begins and restore them from the selected saved-run history entry when replaying.
+- OTLP ingestion uses Cairn access tokens (`Authorization: Bearer ...`), separate from shared operator login. Multiple unexpired, unrevoked access tokens are valid concurrently. Secrets are shown once at creation; expiry and revocation invalidate the token.
 
 ### Runtime and validation
 
 - Use `vp run db:generate` and `vp run db:migrate` for Drizzle schema changes. Add migration SQL and metadata together; preserve existing data when changing column types.
 - Use `vp run dev`, `vp run build`, `vp check <changed paths>`, and `vp test run <test paths>` for development and focused validation.
 - Docker Compose runs Cairn and MySQL on Cairn's network. `OUTBOUND_HOST_GATEWAY` rewrites container-side `localhost` targets to the host gateway so Cairn can call separately networked service projects through their published reverse proxies.
-- Keep the OpenSpec change artifacts in sync when implementation behavior changes. Validate with `openspec validate service-graph-editor --strict`.
+- Keep the relevant OpenSpec change artifacts in sync when implementation behavior changes. Validate the active change with `openspec validate <change-name> --strict`.
