@@ -7,11 +7,13 @@ The service graph shows which downstream calls occurred, but not how long those 
 ## What Changes
 
 - Show a duration label above each observed downstream service connection after the run's trace collection completes.
-- Use square connection paths for service-to-service graph edges.
+- Use square connection paths for all graph connections by default, including new connection previews.
 - Aggregate durations for multiple outbound calls on the same connection into one edge label, and retain the individual call durations in the run flow for breakdown details.
 - Show timing labels when replaying a saved run.
 - Indicate when timing data is unavailable because the required instrumentation telemetry is missing.
-- Keep total mock API run duration in the trigger node response panel as a separate future task.
+- Keep the latest response in the trigger node's response panel, with status, trace ID, and total trace duration; remove the duplicate global response panel.
+- Highlight endpoint dots on animated connections in the accent color and keep other inbound/outbound dots gray.
+- Automatically open the trigger node's response panel when a mock API run finishes.
 
 ## Capabilities
 

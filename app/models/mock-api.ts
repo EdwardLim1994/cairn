@@ -49,5 +49,6 @@ export type MockApiRunResult = {
   responseBody: string | null;
   error: string | null;
   traceId: string;
+  totalDurationMs?: number | null;
   flow?: { status: string; incomplete: boolean };
 };

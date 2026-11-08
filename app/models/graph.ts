@@ -6,7 +6,11 @@ export type GraphEndpoint = GraphService["endpoints"][number];
 export type GraphServiceEdge = CanvasGetResponse["edges"][number];
 export type GraphMockApi = CanvasGetResponse["mockApis"][number];
 export type GraphViewport = CanvasPutRequest["viewport"];
-export type ObservedServiceEdge = { sourceService: string; targetService: string };
+export type ObservedServiceEdge = {
+  sourceService: string;
+  targetService: string;
+  timing?: { totalDurationMs: number | null; callDurationsMs: number[] };
+};
 export type GraphRunResult = { status: string };
 export type GraphState = {
   nodes: Node[];

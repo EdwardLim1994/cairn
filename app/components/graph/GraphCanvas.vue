@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, nextTick, watch } from "vue";
 import {
   VueFlow,
   useVueFlow,
+  ConnectionLineType,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -15,9 +16,11 @@ import { MiniMap } from "@vue-flow/minimap";
 import MockApiTriggerNode from "./MockApiTriggerNode.vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
 import MessageQueueNode from "./MessageQueueNode.vue";
+import SquareEdge from "./SquareEdge.vue";
 import type { GraphMockApi } from "../../models/graph";
 
 const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean; nodesLocked: boolean }>();
+const edgeTypes = { default: SquareEdge };
 const emit = defineEmits<{
   "update:nodes": [nodes: Node[]];
   "update:edges": [edges: Edge[]];
@@ -46,7 +49,33 @@ const modelEdges = computed({
   get: () => props.edges,
   set: (value: Edge[]) => emit("update:edges", value),
 });
-const { fitView, screenToFlowCoordinate, setViewport, updateNodeInternals } = useVueFlow();
+const { fitView, screenToFlowCoordinate, setCenter, setViewport, updateNodeInternals } =
+  useVueFlow();
+
+async function focusResponsePanel(mockApiId: string) {
+  await nextTick();
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  const responsePanel = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-response-panel]"),
+  ).find((element) => element.dataset.responsePanel === mockApiId);
+  if (!responsePanel) return;
+
+  const panelRect = responsePanel.getBoundingClientRect();
+  const flowTopLeft = screenToFlowCoordinate({ x: panelRect.left, y: panelRect.top });
+  const flowBottomRight = screenToFlowCoordinate({ x: panelRect.right, y: panelRect.bottom });
+  const canvasRect = responsePanel.closest<HTMLElement>(".vue-flow")?.getBoundingClientRect();
+  if (!canvasRect) return;
+
+  const width = flowBottomRight.x - flowTopLeft.x;
+  const height = flowBottomRight.y - flowTopLeft.y;
+  const zoom = Math.min(3, (canvasRect.width - 48) / width, (canvasRect.height - 48) / height);
+  await setCenter(
+    (flowTopLeft.x + flowBottomRight.x) / 2,
+    (flowTopLeft.y + flowBottomRight.y) / 2,
+    { zoom, duration: 350 },
+  );
+}
 
 function handleLayoutSignature(node: Node) {
   const data = node.data as {
@@ -93,13 +122,21 @@ watch(
   { flush: "post" },
 );
 
-defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals });
+defineExpose({
+  fitView,
+  focusResponsePanel,
+  screenToFlowCoordinate,
+  setViewport,
+  updateNodeInternals,
+});
 </script>
 
 <template>
   <VueFlow
     v-model:nodes="modelNodes"
     v-model:edges="modelEdges"
+    :edge-types="edgeTypes"
+    :connection-line-type="ConnectionLineType.Step"
     class="app__graph-flow"
     :select-nodes-on-drag="false"
     :elements-selectable="true"
@@ -107,7 +144,7 @@ defineExpose({ fitView, screenToFlowCoordinate, setViewport, updateNodeInternals
     :snap-to-grid="true"
     :snap-grid="[22, 22]"
     :min-zoom="0.2"
-    :max-zoom="1.8"
+    :max-zoom="3"
     fit-view-on-init
     @connect="emit('connect', $event)"
     @edge-double-click="emit('edgeDoubleClick', $event)"

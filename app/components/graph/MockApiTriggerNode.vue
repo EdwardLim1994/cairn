@@ -20,6 +20,7 @@ export type MockApiTriggerNodeData = {
     responseBody?: string | null;
     error?: string | null;
     traceId?: string;
+    totalDurationMs?: number | null;
   };
   entry: GraphMockApi;
 };
@@ -40,6 +41,13 @@ function prettyResponse(value: string | null | undefined) {
   } catch {
     return value;
   }
+}
+
+function formatDuration(durationMs: number | null | undefined) {
+  if (durationMs == null) return "N/A";
+  if (durationMs < 1_000) return `${Math.round(durationMs)} ms`;
+  const seconds = durationMs / 1_000;
+  return `${Number(seconds.toFixed(seconds < 10 ? 2 : 1))} s`;
 }
 </script>
 
@@ -113,6 +121,7 @@ function prettyResponse(value: string | null | undefined) {
     </button>
     <aside
       v-if="data.responseOpen"
+      :data-response-panel="data.id"
       class="app__surface absolute right-full top-0 z-20 mr-3 max-h-80 w-[320px] overflow-auto rounded-xl p-3 shadow-xl"
     >
       <header class="mb-2 flex items-center justify-between text-xs font-semibold">
@@ -139,9 +148,23 @@ function prettyResponse(value: string | null | undefined) {
         </template>
       </template>
       <template v-else-if="data.latestResponse">
-        <p class="mb-2 text-[10px] text-[var(--muted)]">
-          {{ data.latestResponse.status }} ·
-          {{ data.latestResponse.grpcStatusName ?? data.latestResponse.responseStatus ?? "—" }}
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span
+            class="inline-flex rounded-full border border-current/20 px-2 py-0.5 text-[10px] font-semibold"
+            :class="`app__run-state--${data.latestResponse.status}`"
+          >
+            {{ data.latestResponse.status }} ·
+            {{ data.latestResponse.grpcStatusName ?? data.latestResponse.responseStatus ?? "—" }}
+          </span>
+          <span class="text-[10px] text-[var(--muted)]">
+            Total {{ formatDuration(data.latestResponse.totalDurationMs) }}
+          </span>
+        </div>
+        <p
+          v-if="data.latestResponse.traceId"
+          class="mb-2 break-all text-[10px] text-[var(--muted)]"
+        >
+          Trace ID: {{ data.latestResponse.traceId }}
         </p>
         <p v-if="data.latestResponse.error" class="mb-2 text-xs text-[var(--danger)]">
           {{ data.latestResponse.error }}

@@ -94,7 +94,13 @@ describe("graph store", () => {
     store.setObservations({
       services: ["Orders"],
       errorServices: ["Orders"],
-      edges: [{ sourceService: "Orders", targetService: "Payments" }],
+      edges: [
+        {
+          sourceService: "Orders",
+          targetService: "Payments",
+          timing: { totalDurationMs: 120, callDurationsMs: [120] },
+        },
+      ],
     });
     store.setNodes([
       { id: "service-1", position: { x: 12, y: 34 } },
@@ -106,7 +112,15 @@ describe("graph store", () => {
     expect(store.selectedNodeId).toBe("service-1");
     expect(store.observedServices).toEqual(["Orders"]);
     expect(store.observedErrorServices).toEqual(["Orders"]);
-    expect(store.observedEdges).toEqual([{ sourceService: "Orders", targetService: "Payments" }]);
+    expect(store.observedEdges).toEqual([
+      {
+        sourceService: "Orders",
+        targetService: "Payments",
+        timing: { totalDurationMs: 120, callDurationsMs: [120] },
+      },
+    ]);
+    store.setObservations({ services: [], errorServices: [], edges: [] });
+    expect(store.observedEdges).toEqual([]);
     expect(store.services[0]?.positionX).toBe(12);
     expect(store.services[0]?.positionY).toBe(34);
     store.setSelection(null);

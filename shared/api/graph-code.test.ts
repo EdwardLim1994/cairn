@@ -36,14 +36,12 @@ describe("service graph code schema", () => {
     if (parsed.version !== 2) return;
     const push = parsed.services.find(({ key }) => key === "push-service");
     expect(push?.apiType).toBe("WEBSOCKET");
-    expect(push?.baseUrl).toBe("ws://localhost:51061");
+    expect(push?.baseUrl).toBe("ws://localhost");
     expect(push?.healthCheck).toEqual({
-      url: "http://localhost:51061/actuator/health/readiness",
+      url: "http://localhost/services/push/actuator/health/readiness",
       headers: [],
     });
-    expect(push?.endpoints[0]?.url).toBe(
-      "ws://localhost:51061/ws/notifications?token=test-token-u1",
-    );
+    expect(push?.endpoints[0]?.url).toBe("ws://localhost/ws/notifications?token=test-token-u1");
     expect(parsed.destinations).toContainEqual(
       expect.objectContaining({
         key: "notification-created",

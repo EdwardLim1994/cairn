@@ -2,9 +2,10 @@
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
-import type { Edge, Node } from "@vue-flow/core";
+import { ConnectionLineType, type Edge, type Node } from "@vue-flow/core";
 import type { GraphMockApi } from "../../models/graph";
 import GraphCanvas from "./GraphCanvas.vue";
+import SquareEdge from "./SquareEdge.vue";
 
 const mockApi: GraphMockApi = {
   id: "mock-1",
@@ -30,6 +31,8 @@ const VueFlowStub = defineComponent({
   props: [
     "nodes",
     "edges",
+    "edgeTypes",
+    "connectionLineType",
     "nodesDraggable",
     "snapToGrid",
     "snapGrid",
@@ -93,6 +96,10 @@ describe("GraphCanvas", () => {
     expect(wrapper.get('[data-testid="vue-flow"]').element).toBeTruthy();
     expect(wrapper.get('[data-testid="service-node"]').text()).toBe("Orders");
     expect(wrapper.get('[data-testid="mock-trigger-node"]').element).toBeTruthy();
+    expect(wrapper.getComponent(VueFlowStub).props("edgeTypes")).toEqual({ default: SquareEdge });
+    expect(wrapper.getComponent(VueFlowStub).props("connectionLineType")).toBe(
+      ConnectionLineType.Step,
+    );
   });
 
   it("forwards a trigger intent with the saved mock API to the run handler", async () => {

@@ -118,6 +118,147 @@ describe("run endpoint use cases", () => {
     expect(getRunFlowData).toHaveBeenCalledWith("project-1", "run-1");
   });
 
+  it("aggregates distinct client span durations by service pair, including parallel and failed calls", async () => {
+    const now = 10_000;
+    const run = {
+      id: "run-timing",
+      projectId: "project-1",
+      mockApiId: "mock-1",
+      traceId: "trace-timing",
+      status: "completed" as const,
+      responseStatus: 200,
+      responseHeaders: null,
+      responseBody: null,
+      error: null,
+      startedAt: new Date(now - 5_000),
+      finishedAt: new Date(now - 4_000),
+      lastTelemetryAt: new Date(now - 3_000),
+    };
+    const span = (
+      spanId: string,
+      serviceName: string,
+      parentSpanId: string | null,
+      start: number,
+      end: number,
+      kind: "CLIENT" | "SERVER",
+      statusCode: string = "OK",
+    ) => ({
+      id: spanId.length,
+      projectId: "project-1",
+      traceId: "trace-timing",
+      spanId,
+      parentSpanId,
+      serviceName,
+      operationName: spanId,
+      startTime: new Date(start),
+      endTime: new Date(end),
+      statusCode,
+      attributes: { "span.kind": kind },
+      receivedAt: new Date(end),
+    });
+    const getRunFlowData = vi.fn().mockResolvedValue({
+      run,
+      spans: [
+        span("root", "orders", null, 0, 2_000, "SERVER"),
+        span("client-1", "orders", "root", 100, 400, "CLIENT"),
+        span("server-1", "inventory", "client-1", 110, 390, "SERVER"),
+        span("client-2", "orders", "root", 200, 700, "CLIENT"),
+        span("server-2", "inventory", "client-2", 210, 690, "SERVER"),
+        span("client-failed", "orders", "root", 1_000, 1_150, "CLIENT", "ERROR"),
+        span("server-failed", "inventory", "client-failed", 1_010, 1_140, "SERVER", "ERROR"),
+      ],
+      registeredServices: [
+        { id: "orders", name: "Orders" },
+        { id: "inventory", name: "Inventory" },
+      ],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
+      failedTargetService: undefined,
+    });
+    const flow = await createGetRunFlowUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      getRunFlowData,
+      telemetryQuietMs: () => 100,
+      telemetryMaxWaitMs: () => 5_000,
+      now: () => now,
+    })("run-timing");
+
+    expect(flow.edges).toHaveLength(1);
+    expect(flow.edges[0]?.timing).toEqual({
+      totalDurationMs: 950,
+      callDurationsMs: [300, 500, 150],
+    });
+    expect(flow.errorServices).toEqual(["Orders", "Inventory"]);
+  });
+
+  it("marks observed service pairs unavailable when no client span matches", async () => {
+    const now = 10_000;
+    const getRunFlowData = vi.fn().mockResolvedValue({
+      run: {
+        id: "run-missing-client",
+        projectId: "project-1",
+        mockApiId: "mock-1",
+        traceId: "trace-1",
+        status: "completed",
+        responseStatus: 200,
+        responseHeaders: null,
+        responseBody: null,
+        error: null,
+        startedAt: new Date(now - 1_000),
+        finishedAt: new Date(now - 900),
+        lastTelemetryAt: new Date(now - 800),
+      },
+      spans: [
+        {
+          id: 1,
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "caller",
+          parentSpanId: null,
+          serviceName: "Orders",
+          operationName: "request",
+          startTime: new Date(now - 700),
+          endTime: new Date(now - 600),
+          statusCode: "OK",
+          attributes: { "span.kind": "SERVER" },
+          receivedAt: new Date(now - 500),
+        },
+        {
+          id: 2,
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "downstream",
+          parentSpanId: "caller",
+          serviceName: "Inventory",
+          operationName: "request",
+          startTime: new Date(now - 650),
+          endTime: new Date(now - 620),
+          statusCode: "OK",
+          attributes: { "span.kind": "SERVER" },
+          receivedAt: new Date(now - 500),
+        },
+      ],
+      registeredServices: [
+        { id: "orders", name: "Orders" },
+        { id: "inventory", name: "Inventory" },
+      ],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
+      failedTargetService: undefined,
+    });
+    const flow = await createGetRunFlowUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      getRunFlowData,
+      telemetryQuietMs: () => 100,
+      telemetryMaxWaitMs: () => 5_000,
+      now: () => now,
+    })("run-missing-client");
+
+    expect(flow.edges[0]?.timing).toEqual({ totalDurationMs: null, callDurationsMs: [] });
+  });
+
   it("marks active telemetry as pending and missing runs as not found", async () => {
     const now = 10_000;
     const getRunFlowData = vi.fn().mockResolvedValue({

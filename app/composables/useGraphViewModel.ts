@@ -1,5 +1,10 @@
 import type { Edge, Node } from "@vue-flow/core";
-import type { GraphMockApi, GraphService } from "../models/graph";
+import type {
+  GraphMockApi,
+  GraphService,
+  GraphServiceEdge,
+  ObservedServiceEdge,
+} from "../models/graph";
 import type { useGraphStore } from "../stores/graph";
 import { arrangeGraph, messageQueueNodeId } from "../utils/graph-layout";
 
@@ -17,6 +22,7 @@ type ViewModelOptions = {
       responseBody?: string | null;
       error?: string | null;
       traceId?: string;
+      totalDurationMs?: number | null;
     }
   >;
   websocketState?: (id: string) => "connecting" | "connected" | "disconnected";
@@ -47,6 +53,29 @@ function edgeClass(running: boolean, completed: boolean) {
   if (running) return "app__flow-edge app__flow-edge--running";
   if (completed) return "app__flow-edge app__flow-edge--observed";
   return "";
+}
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1_000) return `${Math.round(durationMs)} ms`;
+  const seconds = durationMs / 1_000;
+  const precision = seconds < 10 ? 2 : 1;
+  const scale = 10 ** precision;
+  return `${Math.round(durationMs / (1_000 / scale)) / scale} s`;
+}
+
+function timingLabel(edge: ObservedServiceEdge) {
+  const totalDurationMs = edge.timing?.totalDurationMs ?? null;
+  const callDurationsMs = edge.timing?.callDurationsMs ?? [];
+  if (totalDurationMs === null) {
+    return {
+      label: "N/A",
+      tooltip: "Timing unavailable: outbound client-span telemetry was not found.",
+    };
+  }
+  return {
+    label: formatDuration(totalDurationMs),
+    tooltip: `Cumulative call time: ${formatDuration(totalDurationMs)}\nCalls (${callDurationsMs.length}): ${callDurationsMs.map(formatDuration).join(", ")}`,
+  };
 }
 
 export function useGraphViewModel({
@@ -85,6 +114,73 @@ export function useGraphViewModel({
 
   function serviceNode(service: GraphService): Node {
     const hasError = store.observedErrorServices.includes(service.name);
+    const isObservedApiEdge = (edge: GraphServiceEdge) => {
+      const targetId = endpointTarget(edge.targetEndpointId);
+      const sourceName = store.services.find((item) => item.id === edge.sourceServiceId)?.name;
+      const targetName = store.services.find((item) => item.id === targetId)?.name;
+      return store.observedEdges.some(
+        (observed) =>
+          observed.sourceService === sourceName && observed.targetService === targetName,
+      );
+    };
+    const outboundCalls = [
+      ...store.serviceEdges
+        .filter((edge) => edge.sourceServiceId === service.id)
+        .map((edge) => ({
+          id: edge.id,
+          kind: "api" as const,
+          sourceEndpointId:
+            edge.sourceEndpointId ??
+            (edge.sourceSubscriptionId ? undefined : service.endpoints[0]?.id),
+          sourceSubscriptionId: edge.sourceSubscriptionId,
+        })),
+      ...store.messageConnections
+        .filter(
+          (connection) =>
+            connection.type === "publish" &&
+            (connection.serviceId === service.id ||
+              ("endpointId" in connection &&
+                service.endpoints.some((endpoint) => endpoint.id === connection.endpointId))),
+        )
+        .map((connection) => ({
+          id: connection.id,
+          kind: "message" as const,
+          sourceEndpointId:
+            ("endpointId" in connection ? connection.endpointId : undefined) ??
+            ("subscriptionId" in connection && connection.subscriptionId
+              ? undefined
+              : service.endpoints[0]?.id),
+          sourceSubscriptionId:
+            "subscriptionId" in connection ? connection.subscriptionId : undefined,
+        })),
+    ];
+    const observedInboundEndpointIds = [
+      ...store.serviceEdges
+        .filter(
+          (edge) => endpointTarget(edge.targetEndpointId) === service.id && isObservedApiEdge(edge),
+        )
+        .map((edge) => edge.targetEndpointId),
+      ...mockApis().flatMap((entry) => {
+        const endpointId = entry.targetEndpointId;
+        if (!entry.id || !endpointId || endpointTarget(endpointId) !== service.id) return [];
+        const status = runResults?.()[entry.id]?.status;
+        const running = runningMockId() === entry.id && status === "running";
+        return status === "completed" || status === "failed" || running ? [endpointId] : [];
+      }),
+    ];
+    const observedOutboundCallIds = outboundCalls.flatMap((call) => {
+      if (call.kind === "message")
+        return store.observedMessageConnectionIds.includes(call.id) ? [call.id] : [];
+      const edge = store.serviceEdges.find((item) => item.id === call.id);
+      return edge && isObservedApiEdge(edge) ? [call.id] : [];
+    });
+    const observedSubscriptionIds = store.messageConnections.flatMap((connection) =>
+      connection.type === "subscribe" &&
+      connection.serviceId === service.id &&
+      store.observedMessageConnectionIds.includes(connection.id)
+        ? [connection.id]
+        : [],
+    );
     return {
       id: service.id,
       type: "service",
@@ -103,37 +199,10 @@ export function useGraphViewModel({
               !connection.endpointId &&
               !connection.subscriptionId,
           ),
-        outboundCalls: [
-          ...store.serviceEdges
-            .filter((edge) => edge.sourceServiceId === service.id)
-            .map((edge) => ({
-              id: edge.id,
-              kind: "api" as const,
-              sourceEndpointId:
-                edge.sourceEndpointId ??
-                (edge.sourceSubscriptionId ? undefined : service.endpoints[0]?.id),
-              sourceSubscriptionId: edge.sourceSubscriptionId,
-            })),
-          ...store.messageConnections
-            .filter(
-              (connection) =>
-                connection.type === "publish" &&
-                (connection.serviceId === service.id ||
-                  ("endpointId" in connection &&
-                    service.endpoints.some((endpoint) => endpoint.id === connection.endpointId))),
-            )
-            .map((connection) => ({
-              id: connection.id,
-              kind: "message" as const,
-              sourceEndpointId:
-                ("endpointId" in connection ? connection.endpointId : undefined) ??
-                ("subscriptionId" in connection && connection.subscriptionId
-                  ? undefined
-                  : service.endpoints[0]?.id),
-              sourceSubscriptionId:
-                "subscriptionId" in connection ? connection.subscriptionId : undefined,
-            })),
-        ],
+        outboundCalls,
+        observedInboundEndpointIds,
+        observedOutboundCallIds,
+        observedSubscriptionIds,
         online: store.serviceHealth[service.id] ?? null,
         endpoints: service.endpoints,
         subscriptions: store.messageConnections.flatMap((connection) => {
@@ -276,9 +345,11 @@ export function useGraphViewModel({
         (service) => service.id === edge.sourceServiceId,
       )?.name;
       const targetName = store.services.find((service) => service.id === target)?.name;
-      const isObserved = store.observedEdges.some(
+      const observedEdge = store.observedEdges.find(
         (item) => item.sourceService === sourceName && item.targetService === targetName,
       );
+      const isObserved = Boolean(observedEdge);
+      const timing = observedEdge ? timingLabel(observedEdge) : undefined;
       return [
         {
           id: edge.id,
@@ -289,9 +360,16 @@ export function useGraphViewModel({
           updatable: canEdit,
           deletable: canEdit,
           type: "default",
+          ...(timing
+            ? {
+                label: timing.label,
+                ariaLabel: `Observed call from ${sourceName} to ${targetName}: ${timing.tooltip}`,
+                domAttributes: { title: timing.tooltip },
+              }
+            : {}),
           class: isObserved ? "app__flow-edge app__flow-edge--observed" : "",
           animated: isObserved,
-        },
+        } as Edge,
       ];
     });
     const mock: Edge[] = mockApis().flatMap((entry) => {
@@ -329,6 +407,7 @@ export function useGraphViewModel({
       const targetEndpointId = store.services.find((service) => service.id === target)?.endpoints[0]
         ?.id;
       if (!source || !target) return [];
+      const timing = timingLabel(edge);
       return [
         {
           id: `observed-${index}`,
@@ -337,9 +416,12 @@ export function useGraphViewModel({
           target,
           targetHandle: targetEndpointId ? endpointHandle(targetEndpointId) : undefined,
           type: "default",
+          label: timing.label,
+          ariaLabel: `Observed call from ${edge.sourceService} to ${edge.targetService}: ${timing.tooltip}`,
+          domAttributes: { title: timing.tooltip },
           class: "app__flow-edge app__flow-edge--observed",
           animated: true,
-        },
+        } as Edge,
       ];
     });
     const messages: Edge[] = store.messageConnections.flatMap((connection) => {

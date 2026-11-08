@@ -8,7 +8,6 @@ import AppToolbar from "../components/AppToolbar.vue";
 import GraphAsCodePanel from "../components/GraphAsCodePanel.vue";
 import OtelAccessTokensDialog from "../components/OtelAccessTokensDialog.vue";
 import AppToastStack from "../components/AppToastStack.vue";
-import LatestRunDrawer from "../components/LatestRunDrawer.vue";
 import MockApiCallHistoryPanel from "../components/MockApiCallHistoryPanel.vue";
 import MessageQueueSettingsPanel from "../components/MessageQueueSettingsPanel.vue";
 import { createApiClient } from "../models/api-client";
@@ -246,10 +245,11 @@ const mockApiRunViewModel = useMockApiRunViewModel({
   logService,
   logSeverity,
   logsOpen,
+  openResponsePanel: websocketStreams.openResponsePanel,
+  focusResponsePanel: (id) => graphCanvas.value?.focusResponsePanel(id),
   saveCanvas,
   loadLogs: observabilityViewModel.loadLogs,
 });
-const latestRunResult = computed(() => Object.values(runResults.value).at(-1));
 type MockApi = MockApiDraft;
 const resetEnvironmentCardEdit = mockApiViewModel.resetEnvironmentCardEdit;
 const dismissImportWarning = mockApiViewModel.dismissImportWarning;
@@ -828,11 +828,6 @@ onUnmounted(() => {
       @delete-authorization-template="deleteAuthorizationTemplate"
     />
 
-    <LatestRunDrawer
-      :result="latestRunResult"
-      :running="Boolean(runningMockId)"
-      @close="mockApiStore.clearRunResults"
-    />
     <MockApiCallHistoryPanel
       v-model:open="historyOpen"
       :entries="historyEntries"

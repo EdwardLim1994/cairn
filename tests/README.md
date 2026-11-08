@@ -10,14 +10,14 @@ Integration tests require a disposable MySQL database. Start it and run the suit
 
 ```sh
 docker compose -p cairn-personal-test -f docker-compose.test.yml up -d --wait mysql-test
-CAIRN_TEST_DATABASE_URL=mysql://cairn_test:cairn_test_only@127.0.0.1:13306/cairn_test bun run test:integration
+CAIRN_TEST_DATABASE_URL=mysql://cairn_test:cairn_test_only@127.0.0.1:13309/cairn_test bun run test:integration
 ```
 
 PowerShell:
 
 ```powershell
 docker compose -p cairn-personal-test -f docker-compose.test.yml up -d --wait mysql-test
-$env:CAIRN_TEST_DATABASE_URL = "mysql://cairn_test:cairn_test_only@127.0.0.1:13306/cairn_test"
+$env:CAIRN_TEST_DATABASE_URL = "mysql://cairn_test:cairn_test_only@127.0.0.1:13309/cairn_test"
 bun run test:integration
 Remove-Item Env:CAIRN_TEST_DATABASE_URL
 ```

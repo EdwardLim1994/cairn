@@ -208,12 +208,44 @@ describe("graph view model", () => {
       targetHandle: "in:endpoint-1",
     });
     expect(edges[0]?.animated).toBe(true);
+    expect(edges[0]).toMatchObject({ type: "default", label: "N/A" });
+    expect(edges[0]?.domAttributes).toMatchObject({
+      title: "Timing unavailable: outbound client-span telemetry was not found.",
+    });
     store.toggleServiceEndpoints("service-1");
     expect(model.buildEdges()[0]).toMatchObject({
       sourceHandle: "outbound-call:edge-1",
       targetHandle: "in:endpoint-1",
       updatable: false,
       deletable: false,
+    });
+  });
+
+  it("labels observed service calls with cumulative duration and per-call tooltip details", () => {
+    const { store, model } = createModel();
+    store.services.push({ ...service, id: "inventory", name: "Inventory", endpoints: [] });
+    store.setObservations({
+      services: ["Orders", "Inventory"],
+      errorServices: [],
+      edges: [
+        {
+          sourceService: "Orders",
+          targetService: "Inventory",
+          timing: { totalDurationMs: 1_275, callDurationsMs: [275, 1_000] },
+        },
+      ],
+    });
+
+    const edge = model.buildEdges().find(({ id }) => id === "observed-0");
+
+    expect(edge).toMatchObject({
+      type: "default",
+      label: "1.28 s",
+      ariaLabel:
+        "Observed call from Orders to Inventory: Cumulative call time: 1.28 s\nCalls (2): 275 ms, 1 s",
+      domAttributes: {
+        title: "Cumulative call time: 1.28 s\nCalls (2): 275 ms, 1 s",
+      },
     });
   });
 

@@ -18,6 +18,13 @@ function spanStatus(code: unknown) {
   return "UNSET";
 }
 
+function spanKind(value: unknown) {
+  const kinds = ["UNSPECIFIED", "INTERNAL", "SERVER", "CLIENT", "PRODUCER", "CONSUMER"];
+  const kind = typeof value === "number" ? kinds[value] : typeof value === "string" ? value : null;
+  const normalized = kind?.trim().toUpperCase();
+  return normalized && kinds.includes(normalized) ? normalized : undefined;
+}
+
 function normalizeResourceSpans(
   resourceSpan: Record<string, unknown>,
   projectId: string,
@@ -29,6 +36,9 @@ function normalizeResourceSpans(
     for (const spanValue of otlpArray(scope.spans, "spans")) {
       const item = otlpObject(spanValue, "Span");
       const status = otlpObject(item.status, "Span status");
+      const attributes = otlpAttributes(item.attributes);
+      const kind = spanKind(item.kind);
+      if (kind) attributes["span.kind"] = kind;
       records.push({
         projectId,
         traceId: validHex(item.traceId, 32, "Trace id"),
@@ -39,7 +49,7 @@ function normalizeResourceSpans(
         startTime: otlpTimestamp(item.startTimeUnixNano, "Span start time"),
         endTime: otlpTimestamp(item.endTimeUnixNano, "Span end time"),
         statusCode: spanStatus(status.code),
-        attributes: otlpAttributes(item.attributes),
+        attributes,
       });
     }
   }

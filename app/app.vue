@@ -25,8 +25,12 @@
   --danger-soft: #fbe4e1;
   --warning: #855b00;
   --warning-soft: #fff0c2;
+  --success: #047857;
+  --success-soft: #daf3e8;
   --shadow: 0 8px 28px rgba(20, 24, 28, 0.12), 0 1px 2px rgba(20, 24, 28, 0.08);
   --edge: #8a9097;
+  --timing-label-bg: #fff;
+  --timing-label-text: #1a1c1e;
   --get-fg: #1d4ed8;
   --get-bg: #e3ebfd;
   --post-fg: #047857;
@@ -69,8 +73,12 @@ body {
   --danger-soft: #43211f;
   --warning: #f2c66d;
   --warning-soft: #413518;
+  --success: #5ee0a9;
+  --success-soft: #123528;
   --shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
   --edge: #5c646c;
+  --timing-label-bg: #1a1d20;
+  --timing-label-text: #fff;
   --get-fg: #8ab4ff;
   --get-bg: #1c2a47;
   --post-fg: #5ee0a9;
@@ -151,14 +159,19 @@ body {
 .vue-flow__edge.app__flow-edge--observed .vue-flow__edge-path,
 .vue-flow__edge.app__flow-edge--running .vue-flow__edge-path {
   stroke: var(--accent);
+  stroke-width: 3.5;
 }
 .vue-flow__edge.app__flow-edge--message.app__flow-edge--observed .vue-flow__edge-path {
   stroke: var(--message-edge);
 }
 
 .vue-flow__edge-text {
-  fill: var(--muted);
+  fill: var(--timing-label-text) !important;
   font-size: 10px;
+}
+
+.vue-flow__edge-textbg {
+  fill: var(--timing-label-bg) !important;
 }
 
 .app__graph-node--service {
@@ -240,8 +253,18 @@ body {
   color: var(--danger);
 }
 
+.app__run-state--failed {
+  background: var(--danger-soft);
+}
+
 .app__run-state--completed {
-  color: #047857;
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.app__run-state--running {
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .app__run-spinner {
@@ -274,14 +297,18 @@ body {
   right: -5px;
 }
 .app .app__endpoint-source--connected {
-  background: var(--accent);
+  background: var(--edge);
 }
 .app .app__endpoint-source--message {
-  background: var(--message-edge);
+  background: var(--edge);
 }
 .app .app__endpoint-source--authoring {
   border-color: var(--edge);
   background: var(--panel);
+}
+.app .app__endpoint-handle--observed,
+.app .app__endpoint-source--observed {
+  background: var(--accent);
 }
 .app .app__endpoint-handle--collapsed,
 .app .app__endpoint-source--collapsed {

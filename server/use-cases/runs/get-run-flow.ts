@@ -30,19 +30,36 @@ function spanEdges(spans: RunFlowData["spans"], services: RunFlowData["registere
       targetService: string;
       sourceSpanId: string;
       targetSpanId: string;
+      timing: { totalDurationMs: number | null; callDurationsMs: number[] };
+      clientSpanIds: Set<string>;
     }
   >();
   for (const span of spans) {
     const parent = span.parentSpanId ? bySpanId.get(span.parentSpanId) : undefined;
     if (!parent || parent.serviceName === span.serviceName) continue;
-    edges.set(`${parent.serviceName}\0${span.serviceName}`, {
-      sourceService: normalizeServiceName(parent.serviceName, services),
-      targetService: normalizeServiceName(span.serviceName, services),
-      sourceSpanId: parent.spanId,
-      targetSpanId: span.spanId,
-    });
+    const sourceService = normalizeServiceName(parent.serviceName, services);
+    const targetService = normalizeServiceName(span.serviceName, services);
+    const key = `${sourceService}\0${targetService}`;
+    let edge = edges.get(key);
+    if (!edge) {
+      edge = {
+        sourceService,
+        targetService,
+        sourceSpanId: parent.spanId,
+        targetSpanId: span.spanId,
+        timing: { totalDurationMs: null, callDurationsMs: [] },
+        clientSpanIds: new Set(),
+      };
+      edges.set(key, edge);
+    }
+    if (parent.attributes["span.kind"] === "CLIENT" && !edge.clientSpanIds.has(parent.spanId)) {
+      edge.clientSpanIds.add(parent.spanId);
+      const durationMs = Math.max(0, parent.endTime.getTime() - parent.startTime.getTime());
+      edge.timing.callDurationsMs.push(durationMs);
+      edge.timing.totalDurationMs = (edge.timing.totalDurationMs ?? 0) + durationMs;
+    }
   }
-  return [...edges.values()];
+  return [...edges.values()].map(({ clientSpanIds: _clientSpanIds, ...edge }) => edge);
 }
 
 function spanErrors(spans: RunFlowData["spans"], services: RunFlowData["registeredServices"]) {

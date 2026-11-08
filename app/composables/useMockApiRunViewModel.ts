@@ -11,6 +11,21 @@ type GraphStore = ReturnType<typeof useGraphStore>;
 type MockStore = ReturnType<typeof useMockApiStore>;
 type GraphViewModel = ReturnType<typeof useGraphViewModel>;
 
+function traceDurationMs(flow: {
+  traceId: string;
+  spans: Array<{ traceId: string; startTime: string; endTime: string }>;
+}) {
+  const traceSpans = flow.spans.filter(({ traceId }) => traceId === flow.traceId);
+  if (!traceSpans.length) return null;
+  const spanStarts = traceSpans.map(({ startTime }) => Date.parse(startTime));
+  const spanEnds = traceSpans.map(({ endTime }) => Date.parse(endTime));
+  const earliestStart = Math.min(...spanStarts);
+  const latestEnd = Math.max(...spanEnds);
+  return Number.isFinite(earliestStart) && Number.isFinite(latestEnd)
+    ? Math.max(0, latestEnd - earliestStart)
+    : null;
+}
+
 export function useMockApiRunViewModel(options: {
   apiClient: ReturnType<typeof createApiClient>;
   graphStore: GraphStore;
@@ -20,6 +35,8 @@ export function useMockApiRunViewModel(options: {
   logService: Ref<string[]>;
   logSeverity: Ref<string[]>;
   logsOpen: Ref<boolean>;
+  openResponsePanel?: (id: string) => void;
+  focusResponsePanel?: (id: string) => Promise<unknown>;
   saveCanvas: () => Promise<void>;
   loadLogs: () => Promise<void>;
   wait?: (milliseconds: number) => Promise<void>;
@@ -92,14 +109,19 @@ export function useMockApiRunViewModel(options: {
   ) {
     options.graphStore.setObservations({
       errorServices: flow.errorServices,
-      edges: flow.edges.map(({ sourceService, targetService }) => ({
+      edges: flow.edges.map(({ sourceService, targetService, timing }) => ({
         sourceService,
         targetService,
+        ...(timing ? { timing } : {}),
       })),
       messageConnectionIds: flow.observedMessageConnectionIds,
       services: tracedServices(flow),
     });
-    options.mockApiStore.setRunResult(entry.id!, { ...result, flow });
+    options.mockApiStore.setRunResult(entry.id!, {
+      ...result,
+      flow,
+      totalDurationMs: traceDurationMs(flow),
+    });
     options.graphViewModel.syncNodes();
     if (result.status === "failed" && flow.errorServices.length)
       options.logService.value = flow.errorServices;
@@ -137,7 +159,9 @@ export function useMockApiRunViewModel(options: {
       await showServiceLogs(targetService);
     } finally {
       options.mockApiStore.setRunningMockId(null);
+      options.openResponsePanel?.(entry.id);
       options.graphViewModel.syncNodes();
+      await options.focusResponsePanel?.(entry.id);
       await options.saveCanvas();
     }
   }
@@ -148,9 +172,10 @@ export function useMockApiRunViewModel(options: {
     if (generation !== replayGeneration) return;
     options.graphStore.setObservations({
       errorServices: flow.errorServices,
-      edges: flow.edges.map(({ sourceService, targetService }) => ({
+      edges: flow.edges.map(({ sourceService, targetService, timing }) => ({
         sourceService,
         targetService,
+        ...(timing ? { timing } : {}),
       })),
       messageConnectionIds: flow.observedMessageConnectionIds,
       services: tracedServices(flow),
@@ -163,6 +188,7 @@ export function useMockApiRunViewModel(options: {
       responseBody: entry.responseBody,
       error: entry.error,
       flow,
+      totalDurationMs: traceDurationMs(flow),
     });
     options.graphViewModel.syncNodes();
     return flow;

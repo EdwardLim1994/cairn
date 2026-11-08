@@ -172,7 +172,7 @@
         "url": "http://localhost/services/user/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51051",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "user-service",
       "name": "User Service",
@@ -198,7 +198,7 @@
         "url": "http://localhost/services/product/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51052",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "product-service",
       "name": "Product Service",
@@ -233,7 +233,7 @@
         "url": "http://localhost/services/pricing/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51053",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "pricing-service",
       "name": "Pricing Service",
@@ -253,7 +253,7 @@
         "url": "http://localhost/services/inventory/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51054",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "inventory-service",
       "name": "Inventory Service",
@@ -273,7 +273,7 @@
         "url": "http://localhost/services/cart/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51055",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "cart-service",
       "name": "Cart Service",
@@ -310,7 +310,7 @@
         "url": "http://localhost/services/order/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51056",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "order-service",
       "name": "Order Service",
@@ -355,7 +355,7 @@
         "url": "http://localhost/services/payment/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51057",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "payment-service",
       "name": "Payment Service",
@@ -375,7 +375,7 @@
         "url": "http://localhost/services/shipping/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51058",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "shipping-service",
       "name": "Shipping Service",
@@ -395,7 +395,7 @@
         "url": "http://localhost/services/notification/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51059",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "notification-service",
       "name": "Notification Service",
@@ -411,19 +411,19 @@
     },
     {
       "apiType": "WEBSOCKET",
-      "baseUrl": "ws://localhost:51061",
+      "baseUrl": "ws://localhost",
       "key": "push-service",
       "name": "Notification Push Service",
       "framework": "Spring Boot",
       "healthCheck": {
-        "url": "http://localhost:51061/actuator/health/readiness",
+        "url": "http://localhost/services/push/actuator/health/readiness",
         "headers": []
       },
       "endpoints": [
         {
           "key": "user-notifications",
           "name": "User notifications WebSocket",
-          "url": "ws://localhost:51061/ws/notifications?token=test-token-u1",
+          "url": "ws://localhost/ws/notifications?token=test-token-u1",
           "outboundConnections": []
         }
       ]
@@ -434,7 +434,7 @@
         "url": "http://localhost/services/review/actuator/health/readiness"
       },
       "apiType": "GRPC",
-      "baseUrl": "localhost:51060",
+      "baseUrl": "localhost:9000",
       "grpcTls": false,
       "key": "review-service",
       "name": "Review Service",
@@ -628,7 +628,7 @@
       "framework": "Other",
       "name": "Apollo Router",
       "apiType": "REST",
-      "baseUrl": "http://localhost:4000",
+      "baseUrl": "http://localhost",
       "key": "apollo-router",
       "endpoints": [
         {

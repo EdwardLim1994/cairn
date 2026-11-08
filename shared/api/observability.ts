@@ -69,6 +69,12 @@ export const runFlowResponseSchema = z.object({
       targetService: z.string(),
       sourceSpanId: z.string(),
       targetSpanId: z.string(),
+      timing: z
+        .object({
+          totalDurationMs: z.number().nonnegative().nullable(),
+          callDurationsMs: z.array(z.number().nonnegative()),
+        })
+        .optional(),
     }),
   ),
   observedMessageConnectionIds: z.array(z.string()).default([]),

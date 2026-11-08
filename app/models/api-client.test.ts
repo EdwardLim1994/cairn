@@ -118,6 +118,43 @@ describe("typed API client", () => {
     });
   });
 
+  it("preserves optional service timing while accepting flows saved before timing was added", async () => {
+    const legacyApi = createApiClient(async () => ({
+      ...flow,
+      edges: [
+        {
+          sourceService: "Orders",
+          targetService: "Inventory",
+          sourceSpanId: "client-span",
+          targetSpanId: "server-span",
+        },
+      ],
+    }));
+    await expect(legacyApi.getRunFlow("run-1")).resolves.toMatchObject({
+      edges: [{ sourceService: "Orders", targetService: "Inventory" }],
+    });
+
+    const timedApi = createApiClient(async () => ({
+      ...flow,
+      edges: [
+        {
+          sourceService: "Orders",
+          targetService: "Inventory",
+          sourceSpanId: "client-span",
+          targetSpanId: "server-span",
+          timing: { totalDurationMs: 275, callDurationsMs: [100, 175] },
+        },
+      ],
+    }));
+    await expect(timedApi.getRunFlow("run-1")).resolves.toMatchObject({
+      edges: [
+        {
+          timing: { totalDurationMs: 275, callDurationsMs: [100, 175] },
+        },
+      ],
+    });
+  });
+
   it("rejects malformed requests and invalid server responses", async () => {
     const client = createApiClient(async () => ({ saved: false }));
     await expect(

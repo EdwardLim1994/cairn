@@ -13,7 +13,7 @@ The system SHALL show a duration label above each observed downstream service co
 #### Scenario: Show one observed outbound call duration
 
 - **WHEN** a completed run contains a correlated outbound client span for a downstream service connection
-- **THEN** the graph shows that call's elapsed duration above the connection
+- **THEN** the graph shows that call's elapsed duration near the source outbound handle and above the connection
 - **AND** the connection uses a square path
 
 #### Scenario: Do not substitute downstream processing duration
@@ -73,3 +73,56 @@ The system SHALL show connection timing labels only after trace collection for a
 - **WHEN** a user replays a saved mock API call history entry
 - **THEN** the graph shows the timing labels calculated from that saved run's trace
 - **AND** the system does not trigger the mock API again
+
+### Requirement: Graph connections use square paths by default
+
+The system SHALL render configured, mock API, message queue, and observed graph connections with square step paths by default. The in-progress connection preview SHALL use the same square path style.
+
+#### Scenario: Render existing and newly drawn connections as square paths
+
+- **WHEN** the graph displays any connection or the user draws a new connection
+- **THEN** the connection path uses square corners
+
+### Requirement: Trigger response panel shows total run details
+
+The system SHALL show the latest mock API response beside its trigger node and SHALL NOT show a duplicate global latest-run response panel. The response panel SHALL show the run status, trace ID when available, and total trace duration. Success and failure statuses SHALL use their corresponding theme colors.
+
+#### Scenario: Show completed run details
+
+- **WHEN** a mock API run completes and its trace contains spans
+- **THEN** the trigger response panel shows its response status, trace ID, and total duration from the earliest trace span start to the latest trace span end
+- **AND** the success or failure status is colorized to match its outcome
+
+#### Scenario: Open response panel after execution
+
+- **WHEN** a mock API run finishes successfully or with an error
+- **THEN** its trigger node's response panel opens automatically
+- **AND** the graph viewport centers and zooms into the active response panel
+- **AND** the previously open trigger response panel closes
+
+#### Scenario: Trace duration is unavailable
+
+- **WHEN** the run flow contains no spans for its trace
+- **THEN** the trigger response panel shows that total duration is unavailable
+
+#### Scenario: Keep one response panel
+
+- **WHEN** a mock API run finishes
+- **THEN** its response appears beside the trigger node
+- **AND** no global response panel appears below the page header
+
+### Requirement: Observed connections highlight their endpoint dots
+
+The system SHALL color inbound and outbound node handles for animated observed connections with the accent color and SHALL render other connected service handles in gray.
+
+#### Scenario: Highlight handles on observed API calls
+
+- **WHEN** a mock API run causes a service connection to animate
+- **THEN** the source outbound dot and target inbound dot use the accent color
+- **AND** unrelated inbound and outbound dots remain gray
+
+#### Scenario: Highlight handles on observed message connections
+
+- **WHEN** a message connection is observed during a mock API run
+- **THEN** its publisher outbound dot and subscriber inbound dot use the accent color
+- **AND** unrelated message connection dots remain gray

@@ -121,6 +121,7 @@ describe("telemetry endpoint use cases", () => {
                   spanId: "b".repeat(16),
                   parentSpanId: "c".repeat(16),
                   name: "GET /inventory",
+                  kind: 3,
                   startTimeUnixNano: "1000000",
                   endTimeUnixNano: "2000000",
                   status: { code: 2 },
@@ -149,9 +150,43 @@ describe("telemetry endpoint use cases", () => {
           "messaging.system": "kafka",
           "messaging.destination.name": "orders",
           "messaging.operation.type": "publish",
+          "span.kind": "CLIENT",
         },
       }),
     ]);
     expect(events).toEqual(["ensure-project", "insert-spans"]);
+  });
+
+  it("normalizes server span kinds and leaves missing kinds absent", async () => {
+    const insertSpans = vi.fn().mockResolvedValue(undefined);
+    const useCase = createIngestOtlpTracesUseCase({
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      configuredProjectId: () => "project-1",
+      insertSpans,
+    });
+    const span = (spanId: string, kind?: string) => ({
+      traceId: "a".repeat(32),
+      spanId: spanId.repeat(16),
+      name: "request",
+      startTimeUnixNano: "1000000",
+      endTimeUnixNano: "2000000",
+      status: { code: 1 },
+      ...(kind ? { kind } : {}),
+      attributes: [],
+    });
+
+    await useCase({
+      resourceSpans: [
+        {
+          resource: { attributes: [resourceAttribute("service.name", "inventory-service")] },
+          scopeSpans: [{ spans: [span("b", "SERVER"), span("c")] }],
+        },
+      ],
+    });
+
+    expect(insertSpans.mock.calls[0]?.[0]).toMatchObject([
+      { attributes: { "span.kind": "SERVER" } },
+      { attributes: {} },
+    ]);
   });
 });

@@ -137,6 +137,7 @@ describe("mock API run view model", () => {
           targetService: "Inventory",
           sourceSpanId: "span-1",
           targetSpanId: "span-2",
+          timing: { totalDurationMs: 1_000, callDurationsMs: [1_000] },
         },
       ],
       errorServices: status === "failed" ? ["Inventory"] : [],
@@ -197,7 +198,16 @@ describe("mock API run view model", () => {
     expect(context.mockApiStore.runResults["mock-1"]?.status).toBe("completed");
     expect(context.mockApiStore.runningMockId).toBeNull();
     expect(context.graphStore.observedServices).toEqual(["Orders", "Inventory"]);
-    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
+    expect(context.graphStore.observedEdges[0]?.timing).toEqual({
+      totalDurationMs: 1_000,
+      callDurationsMs: [1_000],
+    });
+    const edges = context.graphStore.edges as unknown as {
+      id: string;
+      animated?: boolean;
+      label?: string;
+      domAttributes?: { title?: string };
+    }[];
     expect(edges.some((edge) => edge.id === "observed-0")).toBe(true);
     expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
     const nodes = context.graphStore.nodes as unknown as { id: string; class?: string }[];
@@ -213,7 +223,11 @@ describe("mock API run view model", () => {
     const nodes = context.graphStore.nodes as unknown as { id: string; class?: string }[];
     expect(nodes.find((node) => node.id === "inventory")?.class).toContain("service-error");
     expect(context.graphStore.observedEdges).toEqual([
-      { sourceService: "Orders", targetService: "Inventory" },
+      {
+        sourceService: "Orders",
+        targetService: "Inventory",
+        timing: { totalDurationMs: 1_000, callDurationsMs: [1_000] },
+      },
     ]);
     expect(context.logService.value).toEqual(["Inventory"]);
     expect(context.logSeverity.value).toEqual([]);
@@ -246,10 +260,25 @@ describe("mock API run view model", () => {
     expect(context.apiCalls).toEqual(["/api/runs/run-1/flow"]);
     expect(context.graphStore.observedServices).toEqual(["Orders", "Inventory"]);
     expect(context.graphStore.observedEdges).toEqual([
-      { sourceService: "Orders", targetService: "Inventory" },
+      {
+        sourceService: "Orders",
+        targetService: "Inventory",
+        timing: { totalDurationMs: 1_000, callDurationsMs: [1_000] },
+      },
     ]);
-    const edges = context.graphStore.edges as unknown as { id: string; animated?: boolean }[];
+    const edges = context.graphStore.edges as unknown as {
+      id: string;
+      animated?: boolean;
+      label?: string;
+      domAttributes?: { title?: string };
+    }[];
     expect(edges.find((edge) => edge.id === "observed-0")?.animated).toBe(true);
+    expect(edges.find((edge) => edge.id === "observed-0")).toMatchObject({
+      label: "1 s",
+      domAttributes: {
+        title: "Cumulative call time: 1 s\nCalls (1): 1 s",
+      },
+    });
     const nodes = context.graphStore.nodes as unknown as { id: string; class?: string }[];
     expect(nodes.find((node) => node.id === "inventory")?.class).toContain("service-observed");
     expect(nodes.find((node) => node.id === "inventory")?.class).toContain("service-error");

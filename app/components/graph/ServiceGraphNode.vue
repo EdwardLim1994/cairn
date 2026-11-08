@@ -30,6 +30,9 @@ const props = defineProps<{
       sourceEndpointId?: string | null;
       sourceSubscriptionId?: string | null;
     }>;
+    observedInboundEndpointIds?: string[];
+    observedOutboundCallIds?: string[];
+    observedSubscriptionIds?: string[];
     hasMessagePublisher: boolean;
     endpointsCollapsed: boolean;
     hasError: boolean;
@@ -45,6 +48,18 @@ function endpointOutboundCalls(endpointId: string | undefined) {
 
 function subscriptionOutboundCalls(subscriptionId: string) {
   return data.value.outboundCalls.filter((call) => call.sourceSubscriptionId === subscriptionId);
+}
+
+function isObservedInboundEndpoint(endpointId: string) {
+  return data.value.observedInboundEndpointIds?.includes(endpointId) ?? false;
+}
+
+function isObservedOutboundCall(callId: string) {
+  return data.value.observedOutboundCallIds?.includes(callId) ?? false;
+}
+
+function isObservedSubscription(subscriptionId: string) {
+  return data.value.observedSubscriptionIds?.includes(subscriptionId) ?? false;
 }
 
 function serviceOutboundCalls() {
@@ -80,6 +95,7 @@ const emit = defineEmits<{
           :position="Position.Left"
           :connectable="false"
           class="app__endpoint-handle app__endpoint-handle--collapsed"
+          :class="{ 'app__endpoint-handle--observed': isObservedInboundEndpoint(endpoint.id) }"
         />
         <Handle
           v-if="endpoint.id && !endpointOutboundCalls(endpoint.id).length"
@@ -88,6 +104,9 @@ const emit = defineEmits<{
           :position="Position.Right"
           :connectable="false"
           class="app__endpoint-source app__endpoint-source--collapsed"
+          :class="{
+            'app__endpoint-source--observed': endpoint.id && isObservedOutboundCall(endpoint.id),
+          }"
         />
       </template>
       <Handle
@@ -98,6 +117,7 @@ const emit = defineEmits<{
         :position="Position.Right"
         :connectable="false"
         class="app__endpoint-source app__endpoint-source--collapsed"
+        :class="{ 'app__endpoint-source--observed': isObservedOutboundCall(call.id) }"
       />
     </template>
     <div class="flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3">
@@ -188,6 +208,9 @@ const emit = defineEmits<{
         :position="Position.Left"
         :connectable="!data.endpointsCollapsed"
         class="app__endpoint-handle"
+        :class="{
+          'app__endpoint-handle--observed': endpoint.id && isObservedInboundEndpoint(endpoint.id),
+        }"
       />
       <Handle
         v-if="endpoint.id && !data.endpointsCollapsed && !endpointOutboundCalls(endpoint.id).length"
@@ -206,7 +229,10 @@ const emit = defineEmits<{
         :position="Position.Right"
         :style="callHandleStyle(callIndex, endpointOutboundCalls(endpoint.id).length)"
         class="app__endpoint-source app__endpoint-source--connected"
-        :class="{ 'app__endpoint-source--message': call.kind === 'message' }"
+        :class="{
+          'app__endpoint-source--message': call.kind === 'message',
+          'app__endpoint-source--observed': isObservedOutboundCall(call.id),
+        }"
       />
       <span
         class="rounded px-1 py-0.5 font-mono text-[9px]"
@@ -254,7 +280,10 @@ const emit = defineEmits<{
         :position="Position.Right"
         :style="callHandleStyle(callIndex, serviceOutboundCalls().length)"
         class="app__endpoint-source app__endpoint-source--connected"
-        :class="{ 'app__endpoint-source--message': call.kind === 'message' }"
+        :class="{
+          'app__endpoint-source--message': call.kind === 'message',
+          'app__endpoint-source--observed': isObservedOutboundCall(call.id),
+        }"
       />
     </div>
     <template v-if="data.endpointsCollapsed && data.subscriptions.length">
@@ -269,6 +298,7 @@ const emit = defineEmits<{
           :position="Position.Left"
           :connectable="false"
           class="app__endpoint-handle"
+          :class="{ 'app__endpoint-handle--observed': isObservedSubscription(subscription.id) }"
         />
         <Handle
           v-for="subscription in data.subscriptions.filter(
@@ -280,6 +310,7 @@ const emit = defineEmits<{
           :position="Position.Right"
           :connectable="false"
           class="app__endpoint-source app__endpoint-source--collapsed"
+          :class="{ 'app__endpoint-source--observed': isObservedSubscription(subscription.id) }"
         />
         {{ data.subscriptions.length }} consumers · connections bundled
       </div>
@@ -295,6 +326,7 @@ const emit = defineEmits<{
         type="target"
         :position="Position.Left"
         class="app__endpoint-handle"
+        :class="{ 'app__endpoint-handle--observed': isObservedSubscription(subscription.id) }"
       />
       <Handle
         v-if="!subscriptionOutboundCalls(subscription.id).length"
@@ -302,6 +334,7 @@ const emit = defineEmits<{
         type="source"
         :position="Position.Right"
         class="app__endpoint-source app__endpoint-source--authoring"
+        :class="{ 'app__endpoint-source--observed': isObservedSubscription(subscription.id) }"
       />
       <Handle
         v-for="(call, callIndex) in subscriptionOutboundCalls(subscription.id)"
@@ -311,7 +344,10 @@ const emit = defineEmits<{
         :position="Position.Right"
         :style="callHandleStyle(callIndex, subscriptionOutboundCalls(subscription.id).length)"
         class="app__endpoint-source app__endpoint-source--connected"
-        :class="{ 'app__endpoint-source--message': call.kind === 'message' }"
+        :class="{
+          'app__endpoint-source--message': call.kind === 'message',
+          'app__endpoint-source--observed': isObservedOutboundCall(call.id),
+        }"
       />
       <span class="rounded px-1 py-0.5 text-[9px] text-[var(--muted)]">SUB</span>
       <span class="min-w-0 flex-1 truncate text-[11px]">{{ subscription.destinationName }}</span>

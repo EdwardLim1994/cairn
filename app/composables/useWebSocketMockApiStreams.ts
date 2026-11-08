@@ -94,6 +94,12 @@ export function useWebSocketMockApiStreams(options: {
     options.syncNodes();
   }
 
+  function openResponsePanel(id: string) {
+    responsePanelOpenId.value = id;
+    websocketUnread.value[id] = false;
+    options.syncNodes();
+  }
+
   function dispose() {
     for (const stream of websocketStreams.values()) stream.close();
     websocketStreams.clear();
@@ -108,6 +114,7 @@ export function useWebSocketMockApiStreams(options: {
     disconnectWebSocket,
     triggerWebSocket,
     toggleResponsePanel,
+    openResponsePanel,
     dispose,
   };
 }

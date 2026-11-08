@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import type { Edge, Node } from "@vue-flow/core";
 import type { CanvasGetResponse } from "#shared/api/canvas";
-import type { GraphViewport } from "../models/graph";
+import type { GraphViewport, ObservedServiceEdge } from "../models/graph";
 
 export const useGraphStore = defineStore("graph", () => {
   const nodes = ref<Node[]>([]);
@@ -17,7 +17,7 @@ export const useGraphStore = defineStore("graph", () => {
   const nodesLocked = ref(false);
   const observedErrorServices = ref<string[]>([]);
   const observedServices = ref<string[]>([]);
-  const observedEdges = ref<{ sourceService: string; targetService: string }[]>([]);
+  const observedEdges = ref<ObservedServiceEdge[]>([]);
   const observedMessageConnectionIds = ref<string[]>([]);
   const selectedNodeId = ref<string | null>(null);
   const allNodesCollapsed = computed(() => {
@@ -75,7 +75,7 @@ export const useGraphStore = defineStore("graph", () => {
   function setObservations(value: {
     services: string[];
     errorServices: string[];
-    edges: { sourceService: string; targetService: string }[];
+    edges: ObservedServiceEdge[];
     messageConnectionIds?: string[];
   }) {
     observedServices.value = value.services;

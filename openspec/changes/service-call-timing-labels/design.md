@@ -14,7 +14,6 @@ See `proposal.md` and `specs/service-call-timing/spec.md`. Trace ingestion curre
 
 **Non-Goals:**
 
-- Add the total mock API request duration to the trigger node response panel; that is a separate task.
 - Infer a call duration from a downstream server span when its caller-side client span is missing.
 - Persist aggregate metrics or compare durations across multiple runs.
 - Add automatic label collision avoidance or layout changes.
@@ -35,13 +34,21 @@ Retain the per-call durations with the edge data and expose them in a compact to
 
 ### Render square edges with timing labels
 
-Render service-to-service observed connections with Vue Flow's built-in `step` edge type. Put the cumulative duration above the connection using Vue Flow's edge label rendering and style the label so it remains legible against the canvas. Use an `N/A` label when an observed edge has no usable client-span timing, with a tooltip explaining that instrumentation telemetry was not found. Do not render zero for missing data.
+Render all graph connections with a shared Vue Flow edge component built on `getSmoothStepPath` and `BaseEdge`, using a zero border radius to produce square paths. Set the new-connection preview to Vue Flow's step mode as well. Place an observed timing label near the source outbound handle and just above the path, then style it so it remains legible against the canvas. Use an `N/A` label when an observed edge has no usable client-span timing, with an SVG title tooltip explaining that instrumentation telemetry was not found. Include the cumulative duration and each individual call duration in the tooltip. Do not render zero for missing data.
 
 No collision-avoidance algorithm is included. Labels use a consistent default position above each edge; visual tuning can follow after the first implementation is reviewed in the graph.
 
 ### Follow completed run and replay lifecycle
 
 The frontend already waits for trace collection to become quiet before applying the assembled flow. Add timing data to that flow and apply it with existing observed edge state. When a saved history entry is replayed, use that run's flow and durations without triggering the mock API again. Clear timing labels when observations are cleared for a new run, following the existing graph observation lifecycle.
+
+### Show total run details beside the trigger node
+
+Keep the latest response panel beside its trigger node as the single response view. Automatically open it after a mock API execution completes and fit the viewport around the rendered response panel itself so the result is enlarged and centered. Measure the panel after rendering so its overlay bounds are included in the focus area. Allow graph zoom up to 3x so large viewports can zoom in enough to inspect the panel. Remove the global latest-run drawer to avoid duplicating the response. Derive total trace duration as the wall-clock span from the earliest start to latest end among spans in the run's trace, then display it with the run status and trace ID. Color the status with success or error theme colors. If the flow has no spans, show the duration as unavailable.
+
+### Highlight observed connection handles
+
+Use the same observed API edges, message connection IDs, and triggered mock API target endpoint that drive edge animation to mark their node handles. Give observed inbound and outbound handles the accent color; keep other connected handles gray so activity is easy to follow. Apply the same handle state to expanded and collapsed service nodes.
 
 ## Risks / Trade-offs
 
