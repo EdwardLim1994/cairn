@@ -5,10 +5,10 @@ export { idParamsSchema as otelAccessTokenIdRequestSchema } from "./common";
 export const otelAccessTokenCreateRequestSchema = z
   .object({
     name: z.string().trim().min(1).max(255),
-    expiresAt: isoDateTimeSchema,
+    expiresAt: isoDateTimeSchema.nullable(),
   })
   .superRefine(({ expiresAt }, context) => {
-    if (new Date(expiresAt).getTime() <= Date.now()) {
+    if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
       context.addIssue({
         code: "custom",
         path: ["expiresAt"],
@@ -21,13 +21,13 @@ export const otelAccessTokenCreateResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   token: z.string(),
-  expiresAt: isoDateTimeSchema,
+  expiresAt: isoDateTimeSchema.nullable(),
 });
 export const otelAccessTokenListResponseSchema = z.array(
   z.object({
     id: z.string(),
     name: z.string(),
-    expiresAt: isoDateTimeSchema,
+    expiresAt: isoDateTimeSchema.nullable(),
     createdAt: isoDateTimeSchema,
     expired: z.boolean(),
   }),

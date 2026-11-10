@@ -283,8 +283,14 @@ integration("canvas repositories with MySQL", () => {
       await db!
         .select()
         .from(graphNodePositions)
-        .where(eq(graphNodePositions.nodeType, "message_queue")),
-    ).toHaveLength(1);
+        .where(eq(graphNodePositions.nodeType, "message_destination")),
+    ).toMatchObject([
+      {
+        entityId: "canvas-destination-kafka",
+        positionX: 150,
+        positionY: 250,
+      },
+    ]);
     await saveCanvas(
       projectId,
       {
@@ -304,6 +310,97 @@ integration("canvas repositories with MySQL", () => {
         .from(messageConnections)
         .where(eq(messageConnections.projectId, projectId)),
     ).toEqual([]);
+  });
+
+  it("migrates shared legacy queue positions to distinct destination positions", async () => {
+    await db!.insert(messageDestinations).values([
+      {
+        id: "canvas-dest-a",
+        projectId,
+        queueId: "canvas-shared-queue",
+        queueName: "Events",
+        codeKey: "events-a",
+        broker: "kafka",
+        name: "orders.created",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+      },
+      {
+        id: "canvas-dest-b",
+        projectId,
+        queueId: "canvas-shared-queue",
+        queueName: "Events",
+        codeKey: "events-b",
+        broker: "kafka",
+        name: "payments.created",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+      },
+    ]);
+    await db!.insert(graphNodePositions).values({
+      id: "canvas-legacy-queue-position",
+      projectId,
+      nodeType: "message_queue",
+      entityId: "canvas-shared-queue",
+      positionX: 420,
+      positionY: 240,
+    });
+    await db!.insert(messageConnections).values([
+      {
+        id: "canvas-publish-a",
+        projectId,
+        destinationId: "canvas-dest-a",
+        type: "publish",
+        endpointId: "canvas-source-endpoint",
+      },
+      {
+        id: "canvas-publish-b",
+        projectId,
+        destinationId: "canvas-dest-b",
+        type: "publish",
+        endpointId: "canvas-source-endpoint",
+      },
+    ]);
+
+    const legacyCanvas = await getCanvas(projectId, db!);
+    expect(legacyCanvas.messageDestinations.map(({ id, x, y }) => ({ id, x, y }))).toEqual([
+      { id: "canvas-dest-a", x: 420, y: 240 },
+      { id: "canvas-dest-b", x: 420, y: 433 },
+    ]);
+
+    await saveCanvas(
+      projectId,
+      {
+        nodesLocked: legacyCanvas.nodesLocked,
+        viewport: legacyCanvas.viewport,
+        services: legacyCanvas.services.map(({ id, positionX, positionY }) => ({
+          id,
+          x: positionX,
+          y: positionY,
+        })),
+        edges: legacyCanvas.edges,
+        messageDestinations: legacyCanvas.messageDestinations,
+        messageConnections: legacyCanvas.messageConnections,
+      },
+      db!,
+    );
+
+    const migratedCanvas = await getCanvas(projectId, db!);
+    expect(migratedCanvas.messageDestinations.map(({ id, x, y }) => ({ id, x, y }))).toEqual([
+      { id: "canvas-dest-a", x: 420, y: 240 },
+      { id: "canvas-dest-b", x: 420, y: 433 },
+    ]);
+    expect(migratedCanvas.messageConnections).toHaveLength(2);
+    expect(
+      await db!
+        .select()
+        .from(graphNodePositions)
+        .where(eq(graphNodePositions.nodeType, "message_destination")),
+    ).toHaveLength(2);
+    expect(
+      await db!
+        .select()
+        .from(graphNodePositions)
+        .where(eq(graphNodePositions.nodeType, "message_queue")),
+    ).toHaveLength(0);
   });
 
   it("rejects cross-project message references without partial writes", async () => {

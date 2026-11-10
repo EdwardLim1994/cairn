@@ -3,6 +3,7 @@ import { computed, nextTick, watch } from "vue";
 import {
   VueFlow,
   useVueFlow,
+  Panel,
   ConnectionLineType,
   type Connection,
   type Edge,
@@ -11,7 +12,7 @@ import {
   type Node,
 } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls } from "@vue-flow/controls";
+import { ControlButton, Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
 import MockApiTriggerNode from "./MockApiTriggerNode.vue";
 import ServiceGraphNode from "./ServiceGraphNode.vue";
@@ -19,7 +20,15 @@ import MessageQueueNode from "./MessageQueueNode.vue";
 import SquareEdge from "./SquareEdge.vue";
 import type { GraphMockApi } from "../../models/graph";
 
-const props = defineProps<{ nodes: Node[]; edges: Edge[]; dark: boolean; nodesLocked: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    nodes: Node[];
+    edges: Edge[];
+    dark: boolean;
+    allNodesCollapsed?: boolean;
+  }>(),
+  { allNodesCollapsed: false },
+);
 const edgeTypes = { default: SquareEdge };
 const emit = defineEmits<{
   "update:nodes": [nodes: Node[]];
@@ -32,7 +41,12 @@ const emit = defineEmits<{
   paneContextMenu: [event: MouseEvent];
   moveEnd: [viewport: { x: number; y: number; zoom: number }];
   nodeDragStop: [];
+  autoArrange: [];
+  toggleAll: [];
   toggleServiceEndpoints: [serviceId: string];
+  editService: [serviceId: string];
+  editMessageQueue: [queueId: string];
+  editMockApi: [mockApiId: string];
   openServiceEndpoint: [endpointId: string | undefined];
   runMockApi: [entry: GraphMockApi];
   connectWebSocket: [id: string];
@@ -62,14 +76,24 @@ async function focusResponsePanel(mockApiId: string) {
   if (!responsePanel) return;
 
   const panelRect = responsePanel.getBoundingClientRect();
-  const flowTopLeft = screenToFlowCoordinate({ x: panelRect.left, y: panelRect.top });
-  const flowBottomRight = screenToFlowCoordinate({ x: panelRect.right, y: panelRect.bottom });
+  const triggerNode = responsePanel.closest<HTMLElement>(".vue-flow__node");
+  const triggerRect = triggerNode?.getBoundingClientRect();
+  const bounds = triggerRect
+    ? {
+        left: Math.min(panelRect.left, triggerRect.left),
+        top: Math.min(panelRect.top, triggerRect.top),
+        right: Math.max(panelRect.right, triggerRect.right),
+        bottom: Math.max(panelRect.bottom, triggerRect.bottom),
+      }
+    : panelRect;
+  const flowTopLeft = screenToFlowCoordinate({ x: bounds.left, y: bounds.top });
+  const flowBottomRight = screenToFlowCoordinate({ x: bounds.right, y: bounds.bottom });
   const canvasRect = responsePanel.closest<HTMLElement>(".vue-flow")?.getBoundingClientRect();
-  if (!canvasRect) return;
+  if (!canvasRect || !flowTopLeft || !flowBottomRight) return;
 
   const width = flowBottomRight.x - flowTopLeft.x;
   const height = flowBottomRight.y - flowTopLeft.y;
-  const zoom = Math.min(3, (canvasRect.width - 48) / width, (canvasRect.height - 48) / height);
+  const zoom = Math.min(1.15, (canvasRect.width - 128) / width, (canvasRect.height - 128) / height);
   await setCenter(
     (flowTopLeft.x + flowBottomRight.x) / 2,
     (flowTopLeft.y + flowBottomRight.y) / 2,
@@ -101,6 +125,8 @@ function handleLayoutSignature(node: Node) {
         item.kind,
         item.sourceEndpointId,
         item.sourceSubscriptionId,
+        item.targetServiceId,
+        item.targetEndpointLabel,
       ]),
       data.hasMessagePublisher,
       data.endpointsCollapsed,
@@ -140,7 +166,6 @@ defineExpose({
     class="app__graph-flow"
     :select-nodes-on-drag="false"
     :elements-selectable="true"
-    :nodes-draggable="!nodesLocked"
     :snap-to-grid="true"
     :snap-grid="[22, 22]"
     :min-zoom="0.2"
@@ -164,17 +189,55 @@ defineExpose({
       :mask-color="dark ? 'rgba(0, 0, 0, 0.58)' : 'rgba(240, 240, 240, 0.6)'"
       :mask-stroke-color="dark ? '#2dd4bf' : '#0f766e'"
     />
-    <Controls />
+    <Controls position="bottom-left">
+      <div class="mt-1 flex flex-col border-t border-[var(--border)] pt-1">
+        <ControlButton
+          aria-label="Auto arrange"
+          title="Auto arrange"
+          @click.stop="emit('autoArrange')"
+        >
+          <UIcon name="i-lucide-layout-grid" class="size-4" aria-hidden="true" />
+        </ControlButton>
+        <ControlButton
+          :aria-label="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
+          :title="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
+          @click.stop="emit('toggleAll')"
+        >
+          <UIcon
+            :name="allNodesCollapsed ? 'i-lucide-expand' : 'i-lucide-minimize-2'"
+            class="size-4"
+            aria-hidden="true"
+          />
+        </ControlButton>
+      </div>
+    </Controls>
+    <Panel position="bottom-left" class="app__graph-legend-panel">
+      <div class="app__graph-legend" aria-label="Graph legend">
+        <span><i class="app__legend-line" aria-hidden="true" />Call</span>
+        <span
+          ><i class="app__legend-line app__legend-line--message" aria-hidden="true" />Message</span
+        >
+        <span
+          ><i
+            class="app__legend-line app__legend-line--observed"
+            aria-hidden="true"
+          />Observed</span
+        >
+        <span><i class="app__legend-dot" aria-hidden="true" />Endpoint in trace</span>
+      </div>
+    </Panel>
     <template #node-service="{ data }">
       <ServiceGraphNode
         :data="data"
         @toggle-endpoints="emit('toggleServiceEndpoints', $event)"
+        @edit="emit('editService', $event)"
         @open-endpoint="emit('openServiceEndpoint', $event)"
       />
     </template>
     <template #node-mockApiTrigger="{ data }">
       <MockApiTriggerNode
         :data="data"
+        @edit="emit('editMockApi', $event)"
         @trigger="
           data.entry.apiType === 'WEBSOCKET'
             ? emit('triggerWebSocket', $event)
@@ -186,7 +249,7 @@ defineExpose({
       />
     </template>
     <template #node-messageQueue="{ data }">
-      <MessageQueueNode :data="data" />
+      <MessageQueueNode :data="data" @edit="emit('editMessageQueue', $event)" />
     </template>
   </VueFlow>
 </template>

@@ -93,14 +93,13 @@ export const useGraphStore = defineStore("graph", () => {
         service.positionX = node.position.x;
         service.positionY = node.position.y;
       }
-      if (node.id === "message-queue" || node.id.startsWith("message-queue:")) {
-        const queueId =
-          node.id === "message-queue" ? "legacy-queue" : node.id.slice("message-queue:".length);
-        for (const destination of messageDestinations.value)
-          if ((destination.queueId ?? "legacy-queue") === queueId) {
-            destination.x = node.position.x;
-            destination.y = node.position.y;
-          }
+      if (node.id.startsWith("message-queue:")) {
+        const destinationId = node.id.slice("message-queue:".length);
+        const destination = messageDestinations.value.find(({ id }) => id === destinationId);
+        if (destination) {
+          destination.x = node.position.x;
+          destination.y = node.position.y;
+        }
       }
     }
   }

@@ -5,14 +5,14 @@ export function createListOtelAccessTokensUseCase(deps: {
   ensureProject: () => Promise<string>;
   list: (
     projectId: string,
-  ) => Promise<Array<{ id: string; name: string; expiresAt: Date; createdAt: Date }>>;
+  ) => Promise<Array<{ id: string; name: string; expiresAt: Date | null; createdAt: Date }>>;
 }) {
   return async () => {
     const projectId = await deps.ensureProject();
     return (await deps.list(projectId)).map(({ id, name, expiresAt, createdAt }) => ({
       id,
       name,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt?.toISOString() ?? null,
       createdAt: createdAt.toISOString(),
       expired: !isAccessTokenValid(expiresAt),
     }));
@@ -26,19 +26,19 @@ export function createOtelAccessTokenUseCase(deps: {
     projectId: string;
     name: string;
     digest: string;
-    expiresAt: Date;
+    expiresAt: Date | null;
   }) => Promise<void>;
 }) {
   return async (input: OtelAccessTokenCreateInput) => {
     const projectId = await deps.ensureProject();
     const generated = generateAccessToken();
-    const expiresAt = new Date(input.expiresAt);
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
     await deps.create({ ...generated, projectId, name: input.name, expiresAt });
     return {
       id: generated.id,
       name: input.name,
       token: generated.token,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt?.toISOString() ?? null,
     };
   };
 }

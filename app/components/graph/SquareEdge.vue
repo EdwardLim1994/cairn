@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { BaseEdge, getSmoothStepPath } from "@vue-flow/core";
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from "@vue-flow/core";
+
+type EdgeTiming = {
+  title: string;
+  available: boolean;
+  callDurationsMs: number[];
+  unavailableReason?: string;
+};
 
 const props = defineProps<{
   id: string;
@@ -14,8 +21,10 @@ const props = defineProps<{
   markerStart?: string;
   markerEnd?: string;
   interactionWidth?: number;
+  data?: { timing?: EdgeTiming };
 }>();
-const edgePath = computed(() =>
+
+const pathLayout = computed(() =>
   getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
@@ -26,27 +35,68 @@ const edgePath = computed(() =>
     borderRadius: 0,
   }),
 );
-const labelX = computed(() => {
-  const sourceDirection = props.sourcePosition === "right" ? 1 : -1;
-  return props.sourceX + sourceDirection * 32;
-});
-const labelY = computed(() => props.sourceY + (props.sourcePosition === "bottom" ? 32 : -12));
+const durationCount = computed(() => props.data?.timing?.callDurationsMs.length ?? 0);
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1_000) return `${Math.round(durationMs)} ms`;
+  const seconds = durationMs / 1_000;
+  return `${Number(seconds.toFixed(seconds < 10 ? 2 : 1))} s`;
+}
 </script>
 
 <template>
   <BaseEdge
     :id="id"
-    :path="edgePath[0]"
-    :label="label"
-    :label-x="labelX"
-    :label-y="labelY"
-    :label-style="{ fill: 'var(--text)', fontSize: '10px' }"
-    :label-show-bg="true"
-    :label-bg-style="{ fill: 'var(--panel)', fillOpacity: 0.95 }"
-    :label-bg-padding="[4, 2]"
-    :label-bg-border-radius="4"
+    :path="pathLayout[0]"
     :marker-start="markerStart"
     :marker-end="markerEnd"
     :interaction-width="interactionWidth"
   />
+  <EdgeLabelRenderer v-if="label">
+    <div
+      class="app__edge-label-wrap nodrag nopan"
+      :style="{ left: `${pathLayout[1]}px`, top: `${pathLayout[2]}px` }"
+    >
+      <button
+        type="button"
+        class="app__edge-label"
+        :class="{ 'app__edge-label--unavailable': !data?.timing?.available }"
+        :aria-label="`${data?.timing?.title ?? 'Observed service call'}: ${label}`"
+        :title="data?.timing?.title"
+      >
+        <UIcon
+          v-if="!data?.timing?.available"
+          name="i-lucide-triangle-alert"
+          class="size-3"
+          aria-hidden="true"
+        />
+        {{ label }}
+        <span v-if="data?.timing?.available && durationCount > 1" class="app__edge-label-count">
+          ×{{ durationCount }}
+        </span>
+      </button>
+      <div class="app__edge-label-popover" role="tooltip">
+        <div class="app__edge-label-popover-title">
+          {{ data?.timing?.available ? data.timing.title : "Timing unavailable" }}
+        </div>
+        <template v-if="data?.timing?.available">
+          <div
+            v-for="(duration, index) in data.timing.callDurationsMs"
+            :key="index"
+            class="app__edge-label-popover-row"
+          >
+            <span>Call {{ index + 1 }}</span>
+            <span class="font-mono">{{ formatDuration(duration) }}</span>
+          </div>
+          <div class="app__edge-label-popover-row">
+            <span>Sum of observed calls</span>
+            <span class="font-mono">{{ label }}</span>
+          </div>
+        </template>
+        <p v-else class="app__edge-label-note">
+          {{ data?.timing?.unavailableReason ?? "No usable client-span duration was found." }}
+        </p>
+      </div>
+    </div>
+  </EdgeLabelRenderer>
 </template>

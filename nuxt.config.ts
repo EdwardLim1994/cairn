@@ -4,6 +4,11 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
+  runtimeConfig: {
+    public: {
+      projectId: process.env.PROJECT_ID ?? "",
+    },
+  },
   modules: ["@pinia/nuxt", "@nuxt/ui"],
   vite: {
     build: { chunkSizeWarningLimit: 700 },

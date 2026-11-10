@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createApiClient, type ApiTransportOptions } from "../models/api-client";
 import { useGraphStore } from "../stores/graph";
 import { useMockApiStore } from "../stores/mockApis";
@@ -72,7 +72,10 @@ const canvas = {
 describe("canvas view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function setup(transportOverride?: (url: string, options: ApiTransportOptions) => unknown) {
+  function setup(
+    transportOverride?: (url: string, options: ApiTransportOptions) => unknown,
+    onServiceHealthCompleted = vi.fn(),
+  ) {
     const requests: Array<{ url: string; options: ApiTransportOptions }> = [];
     const apiClient = createApiClient(async (url, options) => {
       requests.push({ url, options });
@@ -115,6 +118,7 @@ describe("canvas view model", () => {
       graphCanvas: ref(canvasElement),
       loading,
       errorMessage,
+      onServiceHealthCompleted,
       promptConnectionValue: (_message, defaultValue) => defaultValue,
     });
     return {
@@ -127,6 +131,7 @@ describe("canvas view model", () => {
       canvasElement,
       loading,
       errorMessage,
+      onServiceHealthCompleted,
     };
   }
 
@@ -141,8 +146,27 @@ describe("canvas view model", () => {
     expect(context.mockApiStore.mockApis).toEqual([mockApi]);
     expect(context.graphStore.nodesLocked).toBe(false);
     expect(context.graphStore.serviceHealth).toEqual({ "service-1": true });
+    expect(context.onServiceHealthCompleted).toHaveBeenCalledWith(
+      ["service-1"],
+      expect.any(String),
+    );
     expect(context.canvasElement.setViewportCalls).toEqual([canvas.viewport]);
     expect(context.loading.value).toBe(false);
+  });
+
+  it("records completion time when a health check fails", async () => {
+    const onServiceHealthCompleted = vi.fn();
+    const context = setup((url) => {
+      if (url === "/api/services/health") throw new Error("offline");
+      if (url === "/api/mock-apis") return [];
+      return canvas;
+    }, onServiceHealthCompleted);
+    context.graphStore.applyCanvas(canvas);
+
+    await context.model.loadServiceHealth();
+
+    expect(onServiceHealthCompleted).toHaveBeenCalledWith(["service-1"], expect.any(String));
+    expect(Number.isNaN(Date.parse(onServiceHealthCompleted.mock.calls[0]![1]))).toBe(false);
   });
 
   it("preserves health on failure and reports canvas loading errors", async () => {
@@ -181,7 +205,7 @@ describe("canvas view model", () => {
     expect(context.graphStore.messageDestinations[0]?.health).toBe(false);
     expect(context.graphStore.nodes).toContainEqual(
       expect.objectContaining({
-        id: "message-queue",
+        id: "message-queue:kafka-1",
         data: expect.objectContaining({ online: false }),
       }),
     );
@@ -219,24 +243,6 @@ describe("canvas view model", () => {
       mockApiPositions: [{ id: "mock-1", x: -326, y: 49 }],
     });
     expect(context.canvasElement.fitViewCalls).toEqual([{ padding: 0.2, duration: 300 }]);
-  });
-
-  it("persists lock toggles and restores prior state when saving fails", async () => {
-    const context = setup();
-    context.graphStore.applyCanvas(canvas);
-    await context.model.toggleNodesLocked();
-    expect(context.graphStore.nodesLocked).toBe(true);
-    expect(context.requests.at(-1)?.options.body).toMatchObject({ nodesLocked: true });
-
-    const failing = setup((url, options) => {
-      if (url === "/api/canvas" && options.method === "PUT") throw new Error("offline");
-      if (url === "/api/canvas") return canvas;
-      return [];
-    });
-    failing.graphStore.applyCanvas(canvas);
-    await failing.model.toggleNodesLocked();
-    expect(failing.graphStore.nodesLocked).toBe(false);
-    expect(failing.errorMessage.value).toBe("offline");
   });
 
   it("ignores non-service graph connections because targets are selected in the panel", async () => {
@@ -348,7 +354,7 @@ describe("canvas view model", () => {
     );
     await context.model.onConnect({
       source: "service-1",
-      target: "message-queue",
+      target: "message-queue:rabbit",
       sourceHandle: "consumer-out:subscription-1",
       targetHandle: "publish-in:rabbit",
     });
@@ -363,19 +369,19 @@ describe("canvas view model", () => {
       expect.objectContaining({
         source: "service-1",
         sourceHandle: `outbound-call:${context.graphStore.messageConnections.find((item) => item.type === "publish" && item.subscriptionId === "subscription-1")?.id}`,
-        target: "message-queue",
+        target: "message-queue:rabbit",
         targetHandle: "publish-in:rabbit",
       }),
     );
 
     await context.model.onConnect({
       source: "service-1",
-      target: "message-queue",
+      target: "message-queue:rabbit",
       sourceHandle: "out:endpoint-1",
       targetHandle: "publish-in:rabbit",
     });
     await context.model.onConnect({
-      source: "message-queue",
+      source: "message-queue:rabbit",
       target: "service-2",
       sourceHandle: "subscribe-out:rabbit",
       targetHandle: "subscriber-in:new-subscription",
@@ -400,13 +406,13 @@ describe("canvas view model", () => {
     expect(context.graphViewModel.buildEdges()).toContainEqual(
       expect.objectContaining({
         source: "service-1",
-        target: "message-queue",
+        target: "message-queue:rabbit",
         targetHandle: "publish-in:rabbit",
       }),
     );
     expect(context.graphViewModel.buildEdges()).toContainEqual(
       expect.objectContaining({
-        source: "message-queue",
+        source: "message-queue:rabbit",
         sourceHandle: "subscribe-out:rabbit",
         target: "service-2",
       }),

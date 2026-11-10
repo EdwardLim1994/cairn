@@ -21,6 +21,8 @@ const data = {
   name: "Orders",
   apiType: "REST" as const,
   framework: "Spring Boot",
+  inboundCount: 2,
+  outboundCount: 3,
   online: true,
   endpoints: [{ id: "endpoint-1", name: "List orders", method: "GET", rpcMethod: null }],
   subscriptions: [],
@@ -31,15 +33,21 @@ const data = {
 };
 
 describe("ServiceGraphNode", () => {
-  it("renders service status and its endpoint", () => {
+  it("renders the compact mockup header and its endpoint", () => {
     const wrapper = mount(ServiceGraphNode, {
       props: { data },
-      global: { stubs: { Handle: true } },
+      global: { stubs: { Handle: true, UIcon: true } },
     });
 
     expect(wrapper.text()).toContain("Orders");
-    expect(wrapper.text()).toContain("REGISTERED ENDPOINTS");
+    expect(wrapper.text()).toContain("Spring Boot");
+    expect(wrapper.text()).toContain("Online");
+    expect(wrapper.text()).toContain("INBOUND CALLS");
+    expect(wrapper.text()).toContain("OUTBOUND CALLS");
     expect(wrapper.text()).toContain("List orders");
+    expect(wrapper.get("header").classes()).toContain("h-14");
+    expect(wrapper.get('[aria-label="Edit Orders"]').text()).toContain("Edit");
+    expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get('[aria-label="Service online"]').element.tagName).toBe("OUTPUT");
   });
 
@@ -49,6 +57,21 @@ describe("ServiceGraphNode", () => {
       global: { stubs: { Handle: true } },
     });
     expect(wrapper.get('[aria-label="Other framework"]').text()).toBe("Or");
+    expect(wrapper.get('[aria-label="Service framework"]').text()).toBe("Other");
+  });
+
+  it("shows connection counts in the compact header and keeps endpoint dots on it when collapsed", () => {
+    const wrapper = mount(ServiceGraphNode, {
+      props: { data: { ...data, endpointsCollapsed: true } },
+      global: { stubs: { Handle: HandleStub, UIcon: true } },
+    });
+
+    expect(wrapper.text()).toContain("2 in");
+    expect(wrapper.text()).toContain("3 out");
+    expect(wrapper.get('[data-handle="in:endpoint-1"]').classes()).toContain(
+      "app__service-handle--collapsed",
+    );
+    expect(wrapper.find('[aria-label="Show service endpoints"]').exists()).toBe(true);
   });
 
   it("emits endpoint and collapse actions", async () => {
@@ -62,6 +85,17 @@ describe("ServiceGraphNode", () => {
 
     expect(wrapper.emitted("openEndpoint")).toEqual([["endpoint-1"]]);
     expect(wrapper.emitted("toggleEndpoints")).toEqual([["service-1"]]);
+  });
+
+  it("emits the service identity from its edit action", async () => {
+    const wrapper = mount(ServiceGraphNode, {
+      props: { data },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+
+    await wrapper.get('[aria-label="Edit Orders"]').trigger("click");
+
+    expect(wrapper.emitted("edit")).toEqual([["service-1"]]);
   });
 
   it("shows the service error indicator when the graph reports a failure", () => {
@@ -92,16 +126,29 @@ describe("ServiceGraphNode", () => {
 
     expect(wrapper.text()).toContain("Orders");
     expect(wrapper.text()).toContain("order-workers");
+    expect(wrapper.text()).toContain("INBOUND CALLS");
+    expect(wrapper.text()).toContain("OUTBOUND CALLS");
     expect(wrapper.find('[data-handle="subscriber-in:subscription-1"]').exists()).toBe(true);
     expect(wrapper.find('[data-handle="consumer-out:subscription-1"]').exists()).toBe(true);
   });
 
-  it("gives API calls and message publishes separate outbound dots on their source endpoint", () => {
+  it("renders each API call and publish in its own outbound row", () => {
     const outboundCalls = [
-      { id: "endpoint-call-1", sourceEndpointId: "endpoint-1" },
-      { id: "endpoint-call-2", sourceEndpointId: "endpoint-1" },
-      { id: "publish-call", kind: "message", sourceEndpointId: "endpoint-1" },
-      { id: "consumer-call-1", sourceSubscriptionId: "subscription-1" },
+      {
+        id: "endpoint-call-1",
+        sourceEndpointId: "endpoint-1",
+        label: "inventory-service: Reserve",
+        methodTag: "gRPC",
+      },
+      { id: "endpoint-call-2", sourceEndpointId: "endpoint-1", label: "POST /reserve" },
+      {
+        id: "publish-call",
+        kind: "message",
+        sourceEndpointId: "endpoint-1",
+        label: "orders.created",
+        methodTag: "PUB",
+      },
+      { id: "consumer-call-1", sourceSubscriptionId: "subscription-1", label: "POST /notify" },
     ];
     const wrapper = mount(ServiceGraphNode, {
       props: {
@@ -115,10 +162,11 @@ describe("ServiceGraphNode", () => {
     });
 
     expect(wrapper.findAll('[data-handle^="outbound-call:"]')).toHaveLength(4);
-    const endpointDotPositions = ["endpoint-call-1", "endpoint-call-2", "publish-call"].map((id) =>
-      wrapper.get(`[data-handle="outbound-call:${id}"]`).attributes("style"),
-    );
-    expect(new Set(endpointDotPositions).size).toBe(3);
+    expect(wrapper.findAll("[data-outbound-call]")).toHaveLength(4);
+    expect(wrapper.text()).toContain("inventory-service: Reserve");
+    expect(wrapper.text()).toContain("orders.created");
+    for (const id of ["endpoint-call-1", "endpoint-call-2", "publish-call", "consumer-call-1"])
+      expect(wrapper.find(`[data-outbound-call="${id}"]`).exists()).toBe(true);
     expect(wrapper.get('[data-handle="outbound-call:publish-call"]').classes()).toContain(
       "app__endpoint-source--message",
     );
@@ -156,7 +204,7 @@ describe("ServiceGraphNode", () => {
     ).toBe(false);
   });
 
-  it("bundles consumer rows when the service endpoints are collapsed", () => {
+  it("bundles inbound and outbound handles in the header when collapsed", () => {
     const wrapper = mount(ServiceGraphNode, {
       props: {
         data: {
@@ -171,7 +219,9 @@ describe("ServiceGraphNode", () => {
       global: { stubs: { Handle: HandleStub } },
     });
 
-    expect(wrapper.text()).toContain("2 consumers · connections bundled");
+    expect(wrapper.text()).toContain("2 in");
+    expect(wrapper.text()).not.toContain("INBOUND CALLS");
+    expect(wrapper.text()).not.toContain("OUTBOUND CALLS");
     expect(wrapper.text()).not.toContain("orders-workers");
     expect(wrapper.text()).not.toContain("invoice-workers");
     expect(wrapper.findAll('[data-handle^="subscriber-in:"]')).toHaveLength(2);
@@ -220,7 +270,7 @@ describe("ServiceGraphNode", () => {
 
     expect(
       wrapper.findAll("[data-handle]").map((handle) => handle.attributes("data-handle")),
-    ).toEqual(["in:endpoint-1", "out:endpoint-1", "in:endpoint-2", "out:endpoint-2"]);
+    ).toEqual(["in:endpoint-1", "in:endpoint-2", "out:endpoint-1", "out:endpoint-2"]);
     expect(wrapper.findAll('[data-connectable="false"]')).toHaveLength(4);
   });
 });

@@ -100,8 +100,8 @@ function componentRanks(
   return { componentByNode, ranks };
 }
 
-export function messageQueueNodeId(queueId?: string) {
-  return !queueId || queueId === "legacy-queue" ? "message-queue" : `message-queue:${queueId}`;
+export function messageQueueNodeId(destinationId?: string) {
+  return destinationId ? `message-queue:${destinationId}` : "message-queue";
 }
 
 function createNodeRanks(
@@ -112,9 +112,7 @@ function createNodeRanks(
   const endpointOwners = new Map(
     services.flatMap((service) => service.endpoints.map((endpoint) => [endpoint.id, service.id])),
   );
-  const destinationNodeIds = [
-    ...new Set(destinations.map((destination) => messageQueueNodeId(destination.queueId))),
-  ];
+  const destinationNodeIds = destinations.map((destination) => messageQueueNodeId(destination.id));
   const nodeIds = [...services.map(({ id }) => id), ...destinationNodeIds];
   const adjacency = new Map(nodeIds.map((id) => [id, new Set<string>()]));
   for (const edge of edges) {
@@ -122,7 +120,11 @@ function createNodeRanks(
     if (target && target !== edge.sourceServiceId) adjacency.get(edge.sourceServiceId)?.add(target);
   }
   const serviceById = new Map(services.map((service) => [service.id, service]));
-  const nodeName = (id: string) => serviceById.get(id)?.name ?? "Message Queue";
+  const destinationsByNode = new Map(
+    destinations.map((destination) => [messageQueueNodeId(destination.id), destination]),
+  );
+  const nodeName = (id: string) =>
+    serviceById.get(id)?.name ?? destinationsByNode.get(id)?.name ?? "Message Queue";
   const serviceKey = (id: string) => `${nodeName(id)}\0${id}`;
   const components = connectedComponents(nodeIds, adjacency, serviceKey);
   const { componentByNode, ranks } = componentRanks(components, adjacency, serviceKey);
@@ -174,13 +176,14 @@ function placeQueue(
   destinations: GraphDestination[],
   positions: Map<string, { x: number; y: number }>,
 ) {
-  const queueId = id === "message-queue" ? "legacy-queue" : id.slice("message-queue:".length);
-  const topicCount = destinations.filter(
-    (destination) =>
-      destination.queueId === queueId || (!destination.queueId && queueId === "legacy-queue"),
-  ).length;
+  const destinationId = id.slice("message-queue:".length);
   positions.set(id, { x: rank * layerWidth, y });
-  return y + messageQueueBaseHeight + topicCount * queueRowHeight + rowGap;
+  return (
+    y +
+    messageQueueBaseHeight +
+    (destinations.some(({ id }) => id === destinationId) ? queueRowHeight : 0) +
+    rowGap
+  );
 }
 
 function placeService(

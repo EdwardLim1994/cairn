@@ -6,6 +6,20 @@ import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history"
 import MockApiCallHistoryPanel from "./MockApiCallHistoryPanel.vue";
 
 const components = {
+  USlideover: defineComponent({
+    props: { content: Object, ui: Object },
+    setup(props, { slots }) {
+      return () =>
+        h("aside", { ...props.content, class: props.ui?.content }, [
+          h("header", [
+            ...(slots.title?.() ?? []),
+            ...(slots.description?.() ?? []),
+            ...(slots.actions?.() ?? []),
+          ]),
+          ...(slots.body?.() ?? []),
+        ]);
+    },
+  }),
   UButton: defineComponent({
     inheritAttrs: false,
     props: { type: String },
@@ -49,7 +63,7 @@ describe("MockApiCallHistoryPanel", () => {
     expect(wrapper.text()).toContain("completed");
     const replayButton = wrapper
       .findAll("button")
-      .find((button) => button.text().includes("Replay saved trace"));
+      .find((button) => button.text().includes("Replay"));
     await replayButton!.trigger("click");
     expect(wrapper.emitted("replayEntry")).toEqual([[entry]]);
     expect(wrapper.find("time").attributes("datetime")).toBe(entry.triggeredAt);
@@ -63,7 +77,7 @@ describe("MockApiCallHistoryPanel", () => {
       .find((button) => button.text().includes("Remove from history"));
     await removeButton!.trigger("click");
     expect(wrapper.emitted("removeEntry")).toEqual([["history-1"]]);
-    await wrapper.get('[aria-label="Close call history"]').trigger("click");
+    await wrapper.get('[aria-label="Close panel"]').trigger("click");
     expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 
@@ -89,12 +103,12 @@ describe("MockApiCallHistoryPanel", () => {
     expect(wrapper.emitted("clearHistory")).toEqual([[]]);
   });
 
-  it("hides most of the panel during replay and restores it on stop", async () => {
+  it("keeps the shared drawer layout during replay and can stop replay", async () => {
     const wrapper = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [entry], loading: false, replaying: true },
       global: { components },
     });
-    expect(wrapper.get("aside").classes()).toContain("translate-x-[80%]");
+    expect(wrapper.get("aside").classes()).not.toContain("translate-x-[80%]");
     await wrapper.get('[aria-label="Stop replay and restore history"]').trigger("click");
     expect(wrapper.emitted("stopReplay")).toEqual([[]]);
   });

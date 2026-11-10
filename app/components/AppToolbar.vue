@@ -1,16 +1,26 @@
 <script setup lang="ts">
-defineProps<{
-  allNodesCollapsed: boolean;
-  dark: boolean;
-  nodesLocked: boolean;
-  authEnabled?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    dark: boolean;
+    logsOpen: boolean;
+    projectId?: string;
+    manageNodesOpen?: boolean;
+    mockApisOpen?: boolean;
+    historyOpen?: boolean;
+    graphCodeOpen?: boolean;
+  }>(),
+  {
+    manageNodesOpen: false,
+    mockApisOpen: false,
+    historyOpen: false,
+    graphCodeOpen: false,
+  },
+);
 const emit = defineEmits<{
-  toggleAll: [];
-  autoArrange: [];
-  toggleNodesLocked: [];
   toggleTheme: [];
   openMockApis: [];
+  openManageNodes: [];
+  openLogs: [];
   openGraphAsCode: [];
   openAccessTokens: [];
   openHistory: [];
@@ -20,129 +30,141 @@ const emit = defineEmits<{
 
 <template>
   <header
-    class="app__surface absolute left-4 right-4 top-3.5 z-30 flex h-[62px] items-center gap-3 rounded-2xl px-3.5 max-[720px]:left-2 max-[720px]:right-2 max-[720px]:top-2 max-[720px]:h-[54px] max-[720px]:px-[9px]"
+    class="app__surface absolute left-3 right-3 top-3 z-30 flex h-14 items-center gap-3 rounded-xl px-3 max-[720px]:left-2 max-[720px]:right-2 max-[720px]:top-2 max-[720px]:h-12 max-[720px]:gap-2 max-[720px]:px-2"
   >
-    <div
-      class="grid size-[34px] place-items-center rounded-lg bg-[var(--accent)] font-mono text-xs font-semibold text-[var(--accent-ink)]"
+    <div class="app__toolbar-brand flex min-w-0 shrink-0 items-center gap-2.5">
+      <svg
+        class="size-6 shrink-0 text-[var(--accent)]"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <ellipse cx="12" cy="19" rx="8.5" ry="3.2" opacity=".55" />
+        <ellipse cx="12.5" cy="12.5" rx="5.8" ry="2.7" opacity=".75" />
+        <ellipse cx="11.5" cy="6.5" rx="3.4" ry="2.1" />
+      </svg>
+      <strong class="text-[15px] leading-none">Cairn</strong>
+      <span
+        v-if="projectId"
+        class="flex max-w-48 items-center gap-1.5 truncate rounded-md bg-[var(--panel2)] px-2 py-1 text-xs text-[var(--muted)]"
+        :title="projectId"
+        aria-label="Project ID"
+      >
+        <span class="shrink-0">Project</span>
+        <span class="truncate font-mono">{{ projectId }}</span>
+      </span>
+    </div>
+    <nav
+      class="ml-auto flex min-w-0 items-center max-[720px]:overflow-x-auto"
+      aria-label="Workspace"
     >
-      SG
-    </div>
-    <div class="flex flex-col leading-[1.1]">
-      <strong class="text-sm">Cairn</strong
-      ><span class="mt-1 text-[9px] tracking-widest text-[var(--muted)] max-[720px]:hidden"
-        >DATA FLOW OBSERVABILITY</span
-      >
-    </div>
-    <div class="ml-auto flex items-center gap-2 max-[720px]:gap-[5px]">
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
-        aria-label="Graph as code"
-        title="Graph as code"
-        @click.stop="emit('openGraphAsCode')"
-      >
-        <UIcon name="i-lucide-braces" class="size-3.5" aria-hidden="true" />
-        Graph as code
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
-        aria-label="Auto arrange"
-        title="Auto arrange"
-        @click.stop="emit('autoArrange')"
-      >
-        <UIcon name="i-lucide-layout-grid" class="size-3.5" aria-hidden="true" />
-        Auto arrange
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
-        :aria-label="nodesLocked ? 'Unlock node positions' : 'Lock node positions'"
-        :title="nodesLocked ? 'Unlock node positions' : 'Lock node positions'"
-        @click.stop="emit('toggleNodesLocked')"
-      >
-        <UIcon
-          :name="nodesLocked ? 'i-lucide-lock' : 'i-lucide-unlock'"
-          class="size-4"
-          aria-hidden="true"
-        />
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
-        aria-label="Mock APIs"
-        title="Mock APIs"
-        @click.stop="emit('openMockApis')"
-      >
-        <UIcon name="i-lucide-play" class="size-3.5" aria-hidden="true" />
-        Mock APIs
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
-        aria-label="Mock API call history"
-        title="Mock API call history"
-        @click.stop="emit('openHistory')"
-      >
-        <UIcon name="i-lucide-history" class="size-4" aria-hidden="true" />
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
-        aria-label="Manage access tokens"
-        title="Manage access tokens"
-        @click.stop="emit('openAccessTokens')"
-      >
-        <UIcon name="i-lucide-key-round" class="size-4" aria-hidden="true" />
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
-        :aria-label="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
-        :title="allNodesCollapsed ? 'Expand all nodes' : 'Collapse all nodes'"
-        @click.stop="emit('toggleAll')"
-      >
-        <UIcon
-          :name="allNodesCollapsed ? 'i-lucide-expand' : 'i-lucide-minimize-2'"
-          class="size-4"
-          aria-hidden="true"
-        />
-      </UButton>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] p-0 leading-none hover:bg-[var(--panel2)]"
-        :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
-        @click.stop="emit('toggleTheme')"
-      >
-        <UIcon :name="dark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-4" aria-hidden="true" />
-      </UButton>
-      <UButton
-        v-if="authEnabled"
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="inline-flex h-[34px] items-center rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11px] font-medium leading-none hover:bg-[var(--panel2)]"
-        aria-label="Sign out"
-        @click.stop="emit('signOut')"
-      >
-        Sign out
-      </UButton>
-    </div>
+      <div class="app__toolbar-group" role="group" aria-label="Nodes">
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-pressed="manageNodesOpen"
+          aria-label="Manage nodes"
+          title="Manage nodes"
+          @click.stop="emit('openManageNodes')"
+        >
+          <UIcon name="i-lucide-network" class="size-4" aria-hidden="true" />
+        </UButton>
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-pressed="mockApisOpen"
+          aria-label="Mock APIs"
+          title="Mock APIs"
+          @click.stop="emit('openMockApis')"
+        >
+          <UIcon name="i-lucide-play" class="size-4" aria-hidden="true" />
+        </UButton>
+      </div>
+      <div class="app__toolbar-group" role="group" aria-label="Observe">
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-pressed="historyOpen"
+          aria-label="Run history"
+          title="Run history"
+          @click.stop="emit('openHistory')"
+        >
+          <UIcon name="i-lucide-history" class="size-4" aria-hidden="true" />
+        </UButton>
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-pressed="logsOpen"
+          aria-label="Logs"
+          title="Logs"
+          @click.stop="emit('openLogs')"
+        >
+          <UIcon name="i-lucide-list" class="size-4" aria-hidden="true" />
+        </UButton>
+      </div>
+      <div class="app__toolbar-group" role="group" aria-label="Code">
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-pressed="graphCodeOpen"
+          aria-label="Graph as code"
+          title="Graph as code"
+          @click.stop="emit('openGraphAsCode')"
+        >
+          <UIcon name="i-lucide-braces" class="size-4" aria-hidden="true" />
+        </UButton>
+      </div>
+      <div class="app__toolbar-group" role="group" aria-label="Settings">
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          aria-label="Manage access tokens"
+          title="Access tokens"
+          @click.stop="emit('openAccessTokens')"
+        >
+          <UIcon name="i-lucide-key-round" class="size-4" aria-hidden="true" />
+        </UButton>
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button"
+          :aria-label="dark ? 'Use light theme' : 'Use dark theme'"
+          :title="dark ? 'Use light theme' : 'Use dark theme'"
+          @click.stop="emit('toggleTheme')"
+        >
+          <UIcon
+            :name="dark ? 'i-lucide-sun' : 'i-lucide-moon'"
+            class="size-4"
+            aria-hidden="true"
+          />
+        </UButton>
+      </div>
+      <div class="app__toolbar-group app__toolbar-group--account" role="group" aria-label="Account">
+        <UButton
+          type="button"
+          color="neutral"
+          variant="ghost"
+          class="app__toolbar-button app__toolbar-button--account"
+          aria-label="Sign out"
+          title="Sign out"
+          @click.stop="emit('signOut')"
+        >
+          <UIcon name="i-lucide-log-out" class="size-4" aria-hidden="true" />
+        </UButton>
+      </div>
+    </nav>
   </header>
 </template>

@@ -72,19 +72,21 @@ describe("arrangeGraph", () => {
     expect(orders.y).not.toBe(payments.y);
   });
 
-  it("reserves the queue node's topic-dependent height during auto arrange", () => {
+  it("spaces individual destination nodes during auto arrange", () => {
     const positions = arrangeGraph(
       [...services, { id: "zulu", name: "Zulu", endpoints: [{ id: "zulu-endpoint" }] }] as never,
       [],
       [],
       [
-        { id: "orders", name: "Orders" },
-        { id: "payments", name: "Payments" },
-        { id: "shipments", name: "Shipments" },
+        { id: "orders", name: "Orders", queueId: "shared" },
+        { id: "payments", name: "Payments", queueId: "shared" },
+        { id: "shipments", name: "Shipments", queueId: "shared" },
       ],
     );
-    const queue = positions.get("message-queue")!;
-    const queueHeight = 58 + 3 * 47;
-    expect(positions.get("zulu")!.y).toBeGreaterThanOrEqual(queue.y + queueHeight + 88);
+    const orders = positions.get("message-queue:orders")!;
+    const payments = positions.get("message-queue:payments")!;
+    const shipments = positions.get("message-queue:shipments")!;
+    expect(payments.y - orders.y).toBe(193);
+    expect(shipments.y - payments.y).toBe(193);
   });
 });

@@ -41,6 +41,7 @@ export function useCanvasViewModel(options: {
   graphCanvas: Ref<GraphCanvas | null>;
   loading: Ref<boolean>;
   errorMessage: Ref<string>;
+  onServiceHealthCompleted?: (serviceIds: string[], checkedAt: string) => void;
   promptConnectionValue?: (message: string, defaultValue: string) => string | null;
   onError?: (message: string) => void;
 }) {
@@ -91,6 +92,11 @@ export function useCanvasViewModel(options: {
       syncNodes();
     } catch {
       // Keep the last known health state visible.
+    } finally {
+      options.onServiceHealthCompleted?.(
+        options.graphStore.services.map(({ id }) => id),
+        new Date().toISOString(),
+      );
     }
   }
 
@@ -151,12 +157,6 @@ export function useCanvasViewModel(options: {
 
   async function saveCanvas() {
     return await persistCanvas();
-  }
-
-  async function toggleNodesLocked() {
-    const previous = options.graphStore.nodesLocked;
-    options.graphStore.setNodesLocked(!previous);
-    if (!(await persistCanvas())) options.graphStore.setNodesLocked(previous);
   }
 
   async function autoArrange() {
@@ -287,7 +287,7 @@ export function useCanvasViewModel(options: {
     const source = sourceFromHandle(connection.source, connection.sourceHandle);
     if (source?.serviceId !== connection.source) return undefined;
     const destination = options.graphStore.messageDestinations.find(
-      (item) => item.id === destinationId && (item.queueId ?? "legacy-queue") === queueId,
+      (item) => item.id === destinationId,
     );
     if (!destination) return undefined;
     let routingKey: string | undefined;
@@ -313,7 +313,7 @@ export function useCanvasViewModel(options: {
     if (!options.graphStore.services.some((service) => service.id === connection.target))
       return undefined;
     const destination = options.graphStore.messageDestinations.find(
-      (item) => item.id === destinationId && (item.queueId ?? "legacy-queue") === queueId,
+      (item) => item.id === destinationId,
     );
     if (!destination) return undefined;
     const isKafka = destination.broker === "kafka";
@@ -608,7 +608,6 @@ export function useCanvasViewModel(options: {
     loadMessageDestinationHealth,
     canvasPayload,
     saveCanvas,
-    toggleNodesLocked,
     autoArrange,
     onMoveEnd,
     onConnect,

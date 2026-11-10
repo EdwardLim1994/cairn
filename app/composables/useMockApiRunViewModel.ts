@@ -1,5 +1,6 @@
 import type { Ref } from "vue";
 import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
+import type { RunFlowResponse } from "#shared/api/observability";
 import type { createApiClient } from "../models/api-client";
 import type { GraphService } from "../models/graph";
 import type { MockApiDraft } from "../models/mock-api";
@@ -41,6 +42,12 @@ export function useMockApiRunViewModel(options: {
   loadLogs: () => Promise<void>;
   wait?: (milliseconds: number) => Promise<void>;
   now?: () => number;
+  onFlowCollected?: (details: {
+    flow: RunFlowResponse;
+    apiName: string;
+    status: "completed" | "failed";
+    totalDurationMs: number | null;
+  }) => void;
 }) {
   const wait =
     options.wait ??
@@ -123,6 +130,14 @@ export function useMockApiRunViewModel(options: {
       totalDurationMs: traceDurationMs(flow),
     });
     options.graphViewModel.syncNodes();
+    if (flow.status === "complete" && !flow.incomplete && flow.spans.length > 0) {
+      options.onFlowCollected?.({
+        flow,
+        apiName: entry.name,
+        status: result.status,
+        totalDurationMs: traceDurationMs(flow),
+      });
+    }
     if (result.status === "failed" && flow.errorServices.length)
       options.logService.value = flow.errorServices;
   }
@@ -191,6 +206,16 @@ export function useMockApiRunViewModel(options: {
       totalDurationMs: traceDurationMs(flow),
     });
     options.graphViewModel.syncNodes();
+    if (flow.status === "complete" && !flow.incomplete && flow.spans.length > 0) {
+      options.onFlowCollected?.({
+        flow,
+        apiName:
+          options.mockApiStore.mockApis.find(({ id }) => id === entry.mockApiId)?.name ??
+          "Mock API",
+        status: entry.status === "failed" ? "failed" : "completed",
+        totalDurationMs: traceDurationMs(flow),
+      });
+    }
     return flow;
   }
 

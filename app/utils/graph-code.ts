@@ -1,5 +1,6 @@
 import type { CanvasGetResponse } from "#shared/api/canvas";
 import type { GraphCodeManifest } from "#shared/api/graph-code";
+import { stringify } from "yaml";
 
 type Service = CanvasGetResponse["services"][number];
 type Edge = CanvasGetResponse["edges"][number];
@@ -107,7 +108,7 @@ export function serializeGraphCode(
     ];
   });
   if (!destinations.length && !websocketMockApis.length)
-    return JSON.stringify({ version: 1, services: serviceDefinitions }, null, 2);
+    return stringify({ version: 1, services: serviceDefinitions }, { indent: 2 });
   const destinationById = new Map(destinations.map((destination) => [destination.id, destination]));
   const definitions = destinations.map(
     ({ codeKey, queueId, queueName, broker, name, connection }) => ({
@@ -128,7 +129,7 @@ export function serializeGraphCode(
     );
     return definition ? [definition] : [];
   });
-  return JSON.stringify(
+  return stringify(
     {
       version: 2,
       services: serviceDefinitions,
@@ -136,7 +137,6 @@ export function serializeGraphCode(
       messageConnections: connections,
       ...(websocketMockApis.length ? { mockApis: websocketMockApis } : {}),
     },
-    null,
-    2,
+    { indent: 2 },
   );
 }

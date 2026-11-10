@@ -350,12 +350,16 @@ describe("graph view model", () => {
           outboundCalls: { id: string; kind?: string; sourceEndpointId?: string }[];
         }
       ).outboundCalls,
-    ).toContainEqual({
-      id: "publish-1",
-      kind: "message",
-      sourceEndpointId: "endpoint-1",
-      sourceSubscriptionId: undefined,
-    });
+    ).toContainEqual(
+      expect.objectContaining({
+        id: "publish-1",
+        kind: "message",
+        methodTag: "PUB",
+        label: "Orders",
+        sourceEndpointId: "endpoint-1",
+        sourceSubscriptionId: undefined,
+      }),
+    );
     expect(model.buildEdges().find((edge) => edge.id === "message-publish-1")).toMatchObject({
       source: "service-1",
       sourceHandle: "outbound-call:publish-1",
@@ -393,12 +397,16 @@ describe("graph view model", () => {
           outboundCalls: { id: string; kind?: string; sourceEndpointId?: string }[];
         }
       ).outboundCalls,
-    ).toContainEqual({
-      id: "review-publish",
-      kind: "message",
-      sourceEndpointId: "endpoint-1",
-      sourceSubscriptionId: undefined,
-    });
+    ).toContainEqual(
+      expect.objectContaining({
+        id: "review-publish",
+        kind: "message",
+        methodTag: "PUB",
+        label: "Review added",
+        sourceEndpointId: "endpoint-1",
+        sourceSubscriptionId: undefined,
+      }),
+    );
     expect(model.buildEdges().find((edge) => edge.id === "message-review-publish")).toMatchObject({
       source: "service-1",
       sourceHandle: "outbound-call:review-publish",
@@ -411,7 +419,7 @@ describe("graph view model", () => {
     store.setMessageDestinations([
       {
         id: "orders-topic",
-        queueId: "queue-orders",
+        queueId: "shared-broker",
         projectId: "project-1",
         codeKey: "orders",
         broker: "kafka",
@@ -422,7 +430,7 @@ describe("graph view model", () => {
       },
       {
         id: "payments-topic",
-        queueId: "queue-payments",
+        queueId: "shared-broker",
         projectId: "project-1",
         codeKey: "payments",
         broker: "rabbitmq",
@@ -451,18 +459,25 @@ describe("graph view model", () => {
 
     const nodes = model.syncNodes();
     expect(nodes.filter((node) => node.type === "messageQueue").map(({ id }) => id)).toEqual([
-      "message-queue:queue-orders",
-      "message-queue:queue-payments",
+      "message-queue:orders-topic",
+      "message-queue:payments-topic",
+    ]);
+    const queueNodes = nodes.filter((node) => node.type === "messageQueue") as unknown as {
+      data: { destinations: { id: string }[] };
+    }[];
+    expect(queueNodes.map(({ data }) => data.destinations.map(({ id }) => id))).toEqual([
+      ["orders-topic"],
+      ["payments-topic"],
     ]);
     expect(model.buildEdges()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: "message-publish-orders",
-          target: "message-queue:queue-orders",
+          target: "message-queue:orders-topic",
         }),
         expect.objectContaining({
           id: "message-consume-payments",
-          source: "message-queue:queue-payments",
+          source: "message-queue:payments-topic",
         }),
       ]),
     );
@@ -585,7 +600,7 @@ describe("graph view model", () => {
     const publish = renderedEdges.find((edge) => edge.id === "message-publish-link");
     const subscribe = renderedEdges.find((edge) => edge.id === "message-subscribe-link");
     const renderedNodes = store.nodes as unknown as { id: string; class?: string }[];
-    const destination = renderedNodes.find((node) => node.id === "message-queue");
+    const destination = renderedNodes.find((node) => node.id === "message-queue:destination-1");
     const consumer = (store.nodes as unknown as { id: string; data: unknown }[]).find(
       (node) => node.id === "service-2",
     ) as {
@@ -602,7 +617,7 @@ describe("graph view model", () => {
     expect(destination?.class).toContain("app__flow-node--service-observed");
     const queueCollapsed = () =>
       (store.nodes as unknown as { id: string; data: { topicsCollapsed: boolean } }[]).find(
-        (node) => node.id === "message-queue",
+        (node) => node.id === "message-queue:destination-1",
       )?.data.topicsCollapsed;
     store.setAllNodesCollapsed(true);
     model.syncNodes();

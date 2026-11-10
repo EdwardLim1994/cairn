@@ -87,7 +87,7 @@ describe("graph interaction view model", () => {
     expect(contextMenu.value).toEqual({ x: 30, y: 40, flowX: 160, flowY: 120 });
   });
 
-  it("selects services and routes message queue clicks to settings", () => {
+  it("selects graph nodes without opening settings from body clicks", () => {
     const store = useGraphStore();
     store.services = [service];
     const syncNodes = vi.fn();
@@ -107,12 +107,12 @@ describe("graph interaction view model", () => {
     expect(store.selectedNodeId).toBe("service-1");
     expect(syncNodes).toHaveBeenCalledOnce();
     expect(fitView).toHaveBeenCalledWith({ nodes: ["service-1"], padding: 0.45, duration: 300 });
-    expect(editService).toHaveBeenCalledWith("service-1");
+    expect(editService).not.toHaveBeenCalled();
     model.onNodeClick("mock-api-mock-1");
     model.onNodeClick("message-queue");
-    expect(syncNodes).toHaveBeenCalledOnce();
+    expect(syncNodes).toHaveBeenCalledTimes(3);
     expect(fitView).toHaveBeenCalledOnce();
-    expect(editService).toHaveBeenCalledOnce();
-    expect(editMessageQueue).toHaveBeenCalledOnce();
+    expect(editService).not.toHaveBeenCalled();
+    expect(editMessageQueue).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { parse } from "yaml";
 import { serializeGraphCode } from "./graph-code";
 
 describe("serializeGraphCode", () => {
@@ -46,7 +47,7 @@ describe("serializeGraphCode", () => {
       },
     ] as never;
 
-    expect(JSON.parse(serializeGraphCode(services, [], [], [], mockApis))).toMatchObject({
+    expect(parse(serializeGraphCode(services, [], [], [], mockApis))).toMatchObject({
       version: 2,
       destinations: [],
       messageConnections: [],
@@ -130,7 +131,7 @@ describe("serializeGraphCode", () => {
       },
     ]);
 
-    expect(JSON.parse(code)).toEqual({
+    expect(parse(code)).toEqual({
       version: 1,
       services: [
         {
@@ -225,7 +226,7 @@ describe("serializeGraphCode", () => {
         consumerGroup: "orders-v1",
       },
     ] as never);
-    const manifest = JSON.parse(code);
+    const manifest = parse(code);
 
     expect(manifest).toMatchObject({
       version: 2,

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { json } from "@codemirror/lang-json";
+import { yaml } from "@codemirror/lang-yaml";
 import { autocompletion } from "@codemirror/autocomplete";
 import { Codemirror } from "vue-codemirror";
 import { computed, ref, watch } from "vue";
+import { parse } from "yaml";
 import { graphCodeManifestSchema, type GraphCodeManifest } from "#shared/api/graph-code";
 import { graphCodeCompletions } from "../utils/graph-code-editor";
+import WorkspaceDrawer from "./WorkspaceDrawer.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -19,6 +21,7 @@ const draft = ref("");
 const baseline = ref("");
 const importInput = ref<HTMLInputElement | null>(null);
 const error = ref("");
+const copyError = ref("");
 let skipNextDraftWatch = false;
 watch(
   () => props.open,
@@ -30,6 +33,7 @@ watch(
     }
     baseline.value = props.initialCode;
     error.value = "";
+    copyError.value = "";
   },
 );
 watch(
@@ -39,20 +43,21 @@ watch(
       skipNextDraftWatch = false;
       return;
     }
+    copyError.value = "";
     validate();
   },
   { flush: "sync" },
 );
 
-const extensions = [json(), autocompletion({ override: [graphCodeCompletions] })];
+const extensions = [yaml(), autocompletion({ override: [graphCodeCompletions] })];
 
 function validate() {
   error.value = "";
   let value: unknown;
   try {
-    value = JSON.parse(draft.value);
+    value = parse(draft.value);
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "Invalid JSON";
+    error.value = cause instanceof Error ? cause.message : "Invalid YAML";
     return undefined;
   }
   const result = graphCodeManifestSchema.safeParse(value);
@@ -91,31 +96,56 @@ function apply() {
 }
 
 const errors = computed(() => error.value.split("\n").filter(Boolean));
+const manifestSummary = computed(() => {
+  const manifest = validate();
+  if (!manifest) return "Invalid graph YAML";
+  const topicCount = manifest.version === 2 ? manifest.destinations.length : 0;
+  const mockApiCount = manifest.version === 2 ? (manifest.mockApis?.length ?? 0) : 0;
+  return `cairn.graph.yaml · ${manifest.services.length} services · ${topicCount} topics · ${mockApiCount} mock APIs`;
+});
+
+async function copyCode() {
+  try {
+    await navigator.clipboard.writeText(draft.value);
+    copyError.value = "";
+  } catch {
+    copyError.value = "Could not copy graph YAML to the clipboard";
+  }
+}
+
+function downloadCode() {
+  const blobUrl = URL.createObjectURL(new Blob([draft.value], { type: "application/yaml" }));
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = "cairn.graph.yaml";
+  anchor.click();
+  URL.revokeObjectURL(blobUrl);
+}
 </script>
 
 <template>
-  <USlideover
-    :open="open"
-    side="right"
-    :portal="false"
-    :close="false"
-    :ui="{
-      overlay:
-        'fixed inset-0 z-[70] flex h-full w-full max-h-none max-w-none justify-end m-0 border-0 bg-[rgba(20,24,28,0.4)] p-0 text-inherit',
-      content:
-        'z-[71] flex h-full w-[min(680px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
-      header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
-      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
-      footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
-    }"
-    @update:open="(value: boolean) => !value && discard()"
-  >
+  <WorkspaceDrawer :open="open" @update:open="(value: boolean) => !value && discard()">
     <template #title>Graph as code</template>
-    <template #description>Edit and apply a versioned service graph manifest</template>
+    <template #description>{{ manifestSummary }}</template>
     <template #body>
+      <div class="flex items-center gap-2">
+        <span
+          class="rounded-full px-2 py-1 text-[10px] font-semibold"
+          :class="
+            errors.length
+              ? 'bg-[var(--danger-soft)] text-[var(--danger)]'
+              : 'bg-[var(--success-soft)] text-[var(--success)]'
+          "
+        >
+          {{ errors.length ? "Invalid" : "Valid" }}
+        </span>
+        <p class="text-xs text-[var(--muted)]">
+          In sync with the canvas. Edits here replace the graph when applied.
+        </p>
+      </div>
       <div class="flex items-center justify-between gap-3">
         <p class="text-xs text-[var(--muted)]">
-          JSON contains services, endpoints, and outbound calls.
+          YAML contains services, endpoints, and outbound calls. Existing JSON files are supported.
         </p>
         <UButton type="button" color="neutral" variant="outline" @click="importInput?.click()">
           Import
@@ -124,8 +154,8 @@ const errors = computed(() => error.value.split("\n").filter(Boolean));
           ref="importInput"
           class="hidden"
           type="file"
-          accept="application/json,.json"
-          aria-label="Import graph JSON"
+          accept="application/yaml,.yaml,.yml,application/json,.json"
+          aria-label="Import graph YAML or JSON"
           @change="importFile"
         />
       </div>
@@ -134,7 +164,7 @@ const errors = computed(() => error.value.split("\n").filter(Boolean));
         :extensions="extensions"
         :tab-size="2"
         class="min-h-0 flex-1 overflow-auto rounded-lg border border-[var(--border)] text-xs"
-        aria-label="Service graph JSON"
+        aria-label="Service graph YAML"
       />
       <div
         v-if="errors.length"
@@ -143,12 +173,18 @@ const errors = computed(() => error.value.split("\n").filter(Boolean));
       >
         <p v-for="message in errors" :key="message">{{ message }}</p>
       </div>
+      <p v-if="copyError" class="text-xs text-[var(--danger)]" role="status">
+        {{ copyError }}
+      </p>
     </template>
     <template #footer>
-      <UButton type="button" color="neutral" variant="outline" @click="discard">Discard</UButton>
       <UButton type="button" :disabled="applying" @click="apply">
-        {{ applying ? "Applying..." : "Apply" }}
+        {{ applying ? "Applying..." : "Apply changes" }}
       </UButton>
+      <UButton type="button" color="neutral" variant="outline" @click="copyCode">Copy</UButton>
+      <UButton type="button" color="neutral" variant="ghost" @click="downloadCode"
+        >Download .yaml</UButton
+      >
     </template>
-  </USlideover>
+  </WorkspaceDrawer>
 </template>

@@ -33,7 +33,6 @@ const VueFlowStub = defineComponent({
     "edges",
     "edgeTypes",
     "connectionLineType",
-    "nodesDraggable",
     "snapToGrid",
     "snapGrid",
     "selectNodesOnDrag",
@@ -80,7 +79,7 @@ const MockTriggerNodeStub = defineComponent({
 describe("GraphCanvas", () => {
   it("renders service and mock API trigger node slots with Vue Flow", () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: true, nodesLocked: false },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: true },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -104,7 +103,7 @@ describe("GraphCanvas", () => {
 
   it("forwards a trigger intent with the saved mock API to the run handler", async () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false, nodesLocked: true },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -124,7 +123,7 @@ describe("GraphCanvas", () => {
 
   it("forwards Vue Flow connection, selection, viewport, and drag events", async () => {
     const wrapper = mount(GraphCanvas, {
-      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false, nodesLocked: true },
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false },
       global: {
         stubs: {
           VueFlow: VueFlowStub,
@@ -146,7 +145,6 @@ describe("GraphCanvas", () => {
     expect(wrapper.emitted("connect")).toEqual([[{ source: "service-1", target: "service-2" }]]);
     expect(wrapper.emitted("edgeDoubleClick")).toEqual([[{ edge: { id: "edge-1" } }]]);
     expect(wrapper.emitted("nodeClick")).toEqual([[{ node: { id: "service-1" } }]]);
-    expect(wrapper.getComponent(VueFlowStub).props("nodesDraggable")).toBe(false);
     expect(wrapper.getComponent(VueFlowStub).props("snapToGrid")).toBe(true);
     expect(wrapper.getComponent(VueFlowStub).props("snapGrid")).toEqual([22, 22]);
     expect(wrapper.emitted("moveEnd")).toEqual([[{ x: 8, y: 9, zoom: 1.5 }]]);

@@ -1,32 +1,24 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import type { CanvasGetResponse } from "#shared/api/canvas";
-import SettingsAccordionCard from "./SettingsAccordionCard.vue";
+import WorkspaceDrawer from "./WorkspaceDrawer.vue";
 
 type Destination = CanvasGetResponse["messageDestinations"][number];
-type TopicDraft = { id: string; codeKey: string; name: string; x: number; y: number };
-
-const props = withDefaults(
-  defineProps<{
-    queueId?: string;
-    position?: { x: number; y: number };
-    destinations: Destination[];
-  }>(),
-  {
-    queueId: "legacy-queue",
-    position: () => ({ x: 160, y: 120 }),
-  },
-);
+const props = defineProps<{
+  destination: Destination | null;
+  position: { x: number; y: number };
+  projectId: string;
+}>();
 const open = defineModel<boolean>("open", { required: true });
 const emit = defineEmits<{
-  save: [queueId: string, destinations: Destination[]];
-  remove: [queueId: string];
+  save: [destination: Destination];
+  remove: [destinationId: string];
 }>();
+
 const broker = ref<"kafka" | "rabbitmq">("kafka");
-const queueName = ref("Message Queue");
+const name = ref("");
+const codeKey = ref("");
 const url = ref("localhost:9092");
-const topics = ref<TopicDraft[]>([]);
-const expandedTopicId = ref<string | null>(null);
 const brokerOptions = [
   { label: "Kafka", value: "kafka" },
   { label: "RabbitMQ", value: "rabbitmq" },
@@ -38,98 +30,76 @@ function connectionUrl(destination: Destination) {
   return `${protocol}://${destination.connection.host}:${destination.connection.port}${destination.connection.virtualHost}`;
 }
 
-function expandTopic(id: string) {
-  expandedTopicId.value = id;
-}
-
-function collapseTopic(id: string) {
-  if (expandedTopicId.value === id) expandedTopicId.value = null;
-}
-
 watch(
-  () => [open.value, props.destinations] as const,
-  ([isOpen, destinations]) => {
+  () => [open.value, props.destination] as const,
+  ([isOpen, destination]) => {
     if (!isOpen) return;
-    const first = destinations[0];
-    queueName.value = first?.queueName ?? "Message Queue";
-    broker.value = first?.broker ?? "kafka";
-    url.value = first ? connectionUrl(first) : "localhost:9092";
-    topics.value = destinations.map(({ id, codeKey, name, x, y }) => ({ id, codeKey, name, x, y }));
-    expandedTopicId.value = null;
+    broker.value = destination?.broker ?? "kafka";
+    name.value = destination?.name ?? "";
+    codeKey.value = destination?.codeKey ?? "";
+    url.value = destination ? connectionUrl(destination) : "localhost:9092";
   },
   { immediate: true },
 );
-
-function addTopic() {
-  const id = crypto.randomUUID();
-  topics.value.push({
-    id,
-    codeKey: "",
-    name: "",
-    x: props.destinations[0]?.x ?? props.position.x,
-    y: props.destinations[0]?.y ?? props.position.y,
-  });
-  expandedTopicId.value = id;
-}
+watch(broker, (value, previous) => {
+  if (value === previous) return;
+  if (props.destination?.broker === value) {
+    url.value = connectionUrl(props.destination);
+    return;
+  }
+  url.value = value === "kafka" ? "localhost:9092" : "amqp://localhost:5672/";
+});
 
 function save() {
-  const previous = new Map(props.destinations.map((destination) => [destination.id, destination]));
-  const destinations = topics.value.map((topic): Destination => {
-    const old = previous.get(topic.id);
-    if (broker.value === "kafka") {
-      const connection =
-        old?.broker === "kafka" ? old.connection : { securityProtocol: "PLAINTEXT" as const };
-      return {
-        ...topic,
-        broker: "kafka",
-        connection: { ...connection, brokers: url.value },
-        ...(old
-          ? { projectId: old.projectId, health: old.health }
-          : { projectId: props.destinations[0]?.projectId ?? "local", health: null }),
-      };
-    }
-    const address = /^(?:amqps?:\/\/)?(?:[^/@]+@)?\[?([^\]/:]+|::1)\]?(?::(\d+))?(\/.*)?$/.exec(
-      url.value,
-    );
-    const connection =
-      old?.broker === "rabbitmq" ? old.connection : { port: 5672, virtualHost: "/", tls: false };
-    return {
-      ...topic,
-      broker: "rabbitmq",
-      connection: {
-        ...connection,
-        host: address?.[1] ?? url.value,
-        port: Number(address?.[2] ?? connection.port),
-        virtualHost: address?.[3] ?? connection.virtualHost,
-        tls: url.value.startsWith("amqps://"),
-      },
-      ...(old
-        ? { projectId: old.projectId, health: old.health }
-        : { projectId: props.destinations[0]?.projectId ?? "local", health: null }),
-    };
+  const id = props.destination?.id ?? crypto.randomUUID();
+  const common = {
+    id,
+    queueId: id,
+    queueName: props.destination?.queueName ?? "Message Queue",
+    codeKey: codeKey.value.trim(),
+    name: name.value.trim(),
+    x: props.destination?.x ?? props.position.x,
+    y: props.destination?.y ?? props.position.y,
+    projectId: props.destination?.projectId || props.projectId || "local",
+    health: props.destination?.health ?? null,
+  };
+
+  if (broker.value === "kafka") {
+    const previous = props.destination?.broker === "kafka" ? props.destination.connection : {};
+    emit("save", {
+      ...common,
+      broker: "kafka",
+      connection: { ...previous, brokers: url.value.trim() },
+    });
+    return;
+  }
+
+  const parsed = /^(amqps?):\/\/([^/:]+)(?::(\d+))?(\/.*)?$/.exec(url.value.trim());
+  const previous =
+    props.destination?.broker === "rabbitmq"
+      ? props.destination.connection
+      : { port: 5672, virtualHost: "/", tls: false };
+  emit("save", {
+    ...common,
+    broker: "rabbitmq",
+    connection: {
+      ...previous,
+      host: parsed?.[2] ?? url.value.trim(),
+      port: parsed?.[3] ? Number(parsed[3]) : previous.port,
+      virtualHost: parsed?.[4] ?? previous.virtualHost,
+      tls: parsed?.[1] === "amqps" || (!parsed && previous.tls),
+    },
   });
-  emit(
-    "save",
-    props.queueId,
-    destinations.map((destination) => ({
-      ...destination,
-      queueId: props.queueId,
-      queueName: queueName.value,
-    })),
-  );
 }
 
-function handleOpenChange(value: boolean) {
-  if (!value) open.value = false;
+function close() {
+  open.value = false;
 }
 </script>
 
 <template>
-  <USlideover
+  <WorkspaceDrawer
     :open="open"
-    side="right"
-    :portal="false"
-    :close="false"
     :content="{ 'aria-label': 'Message queue settings' }"
     :ui="{
       overlay:
@@ -140,88 +110,57 @@ function handleOpenChange(value: boolean) {
       body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
       footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
     }"
-    @update:open="handleOpenChange"
+    @update:open="(value: boolean) => !value && close()"
   >
-    <template #title>Message Queue Settings</template>
-    <template #description>Configure the broker and its topics</template>
+    <template #title>{{ destination ? "Message queue settings" : "Add message queue" }}</template>
+    <template #description>Configure one Kafka topic or RabbitMQ exchange</template>
     <template #actions>
       <UButton
-        v-if="props.destinations.length"
+        v-if="destination"
         type="button"
         color="error"
         variant="outline"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--danger)] bg-[var(--panel)] p-0 leading-none text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--danger)] bg-[var(--panel)] p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
         aria-label="Remove message queue"
         title="Remove message queue"
-        @click="emit('remove', props.queueId)"
+        @click="emit('remove', destination.id)"
       >
         <UIcon name="i-lucide-trash" class="size-4" aria-hidden="true" />
       </UButton>
     </template>
     <template #body>
-      <div class="flex flex-col gap-1">
-        <span class="text-[10px] font-medium text-[var(--muted)]">Message queue name</span>
-        <UInput v-model="queueName" aria-label="Message queue name" required />
-      </div>
+      <label class="flex flex-col gap-1">
+        <span class="text-[12px] font-medium text-[var(--muted)]">Topic or exchange name</span>
+        <UInput v-model="name" aria-label="Topic or exchange name" required />
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-[12px] font-medium text-[var(--muted)]">Stable code key</span>
+        <UInput v-model="codeKey" aria-label="Stable code key" required />
+      </label>
       <div class="flex gap-2.5 max-[720px]:flex-col">
-        <div class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Message queue type</span>
-          <USelect v-model="broker" :items="brokerOptions" aria-label="Message queue type" />
-        </div>
-        <div class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">URL</span>
+        <label class="min-w-0 flex flex-1 flex-col gap-1">
+          <span class="text-[12px] font-medium text-[var(--muted)]">Broker type</span>
+          <USelect v-model="broker" :items="brokerOptions" aria-label="Broker type" />
+        </label>
+        <label class="min-w-0 flex flex-1 flex-col gap-1">
+          <span class="text-[12px] font-medium text-[var(--muted)]">Connection URL</span>
           <UInput
             v-model="url"
-            aria-label="Message queue URL"
+            aria-label="Connection URL"
             :placeholder="broker === 'kafka' ? 'localhost:9092' : 'amqp://localhost:5672/'"
+            required
           />
-        </div>
+        </label>
       </div>
-      <div class="mt-1 flex items-center justify-between gap-2">
-        <strong class="text-xs">Topics</strong>
-        <UButton type="button" color="neutral" variant="outline" @click="addTopic">New</UButton>
-      </div>
-      <SettingsAccordionCard
-        v-for="(topic, index) in topics"
-        :key="topic.id"
-        :title="topic.name || `Topic ${index + 1}`"
-        :subtitle="topic.codeKey"
-        :delete-label="`Remove ${topic.name || `Topic ${index + 1}`}`"
-        :open="expandedTopicId === topic.id"
-        @expand="expandTopic(topic.id)"
-        @collapse="collapseTopic(topic.id)"
-        @delete="topics.splice(index, 1)"
-      >
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Name</span>
-          <UInput v-model="topic.name" :aria-label="`Topic ${index + 1} name`" required />
-        </div>
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Stable code key</span>
-          <UInput v-model="topic.codeKey" :aria-label="`Topic ${index + 1} code key`" required />
-        </div>
-      </SettingsAccordionCard>
-      <p
-        v-if="!topics.length"
-        class="rounded-xl border border-dashed border-[var(--border)] p-4 text-xs text-[var(--muted)]"
-      >
-        No topics configured yet.
-      </p>
     </template>
     <template #footer>
-      <UButton type="button" color="neutral" variant="outline" @click="open = false"
-        >Discard</UButton
-      >
+      <UButton type="button" color="neutral" variant="outline" @click="close">Discard</UButton>
       <UButton
         type="button"
-        :disabled="
-          !url.trim() ||
-          !topics.length ||
-          topics.some(({ name, codeKey }) => !name.trim() || !codeKey.trim())
-        "
+        :disabled="!name.trim() || !codeKey.trim() || !url.trim()"
         @click="save"
-        >Save</UButton
+        >{{ destination ? "Save" : "Create" }}</UButton
       >
     </template>
-  </USlideover>
+  </WorkspaceDrawer>
 </template>

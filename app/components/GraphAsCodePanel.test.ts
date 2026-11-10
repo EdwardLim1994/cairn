@@ -2,6 +2,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { defineComponent, h } from "vue";
+import { parse } from "yaml";
 import GraphAsCodePanel from "./GraphAsCodePanel.vue";
 
 vi.mock("vue-codemirror", async () => {
@@ -27,7 +28,13 @@ const components = {
   USlideover: defineComponent({
     setup(_, { slots }) {
       return () =>
-        h("section", [slots.title?.(), slots.description?.(), slots.body?.(), slots.footer?.()]);
+        h("section", [
+          slots.title?.(),
+          slots.description?.(),
+          slots.actions?.(),
+          slots.body?.(),
+          slots.footer?.(),
+        ]);
     },
   }),
   UButton: defineComponent({
@@ -44,7 +51,11 @@ const components = {
   }),
 };
 
-const validCode = JSON.stringify({ version: 1, services: [] });
+const validCode = "version: 1\nservices: []\n";
+
+function applyButton(wrapper: ReturnType<typeof mountPanel>) {
+  return wrapper.findAll("button").find((button) => button.text() === "Apply changes")!;
+}
 
 function mountPanel(initialCode = "") {
   return mount(GraphAsCodePanel, {
@@ -59,7 +70,7 @@ describe("GraphAsCodePanel", () => {
     const editor = wrapper.get("textarea");
     expect((editor.element as HTMLTextAreaElement).value).toBe("");
     await editor.setValue(validCode);
-    await wrapper.get("button:last-child").trigger("click");
+    await applyButton(wrapper).trigger("click");
     expect(wrapper.emitted("apply")).toEqual([[{ version: 1, services: [] }]]);
   });
 
@@ -79,16 +90,36 @@ describe("GraphAsCodePanel", () => {
         ],
       }),
     );
-    await wrapper.get("button:last-child").trigger("click");
+    await applyButton(wrapper).trigger("click");
     expect(wrapper.emitted("apply")).toBeUndefined();
     expect(wrapper.get('[role="alert"]').text()).toContain("services.0.framework");
   });
 
-  it("blocks malformed JSON", async () => {
+  it("blocks malformed YAML", async () => {
     const wrapper = mountPanel();
     await wrapper.get("textarea").setValue("{ invalid");
-    await wrapper.get("button:last-child").trigger("click");
+    await applyButton(wrapper).trigger("click");
     expect(wrapper.emitted("apply")).toBeUndefined();
+    expect(wrapper.get('[role="alert"]').text()).toBeTruthy();
+  });
+
+  it("accepts a valid legacy JSON manifest", async () => {
+    const wrapper = mountPanel();
+    await wrapper.get("textarea").setValue(JSON.stringify({ version: 1, services: [] }));
+    await applyButton(wrapper).trigger("click");
+    expect(wrapper.emitted("apply")).toEqual([[{ version: 1, services: [] }]]);
+  });
+
+  it("parses YAML and reports malformed YAML", async () => {
+    const wrapper = mountPanel();
+    const yaml = "version: 1\nservices: []\n";
+    await wrapper.get("textarea").setValue(yaml);
+    await applyButton(wrapper).trigger("click");
+    expect(wrapper.emitted("apply")?.[0]?.[0]).toEqual(parse(yaml));
+
+    await wrapper.get("textarea").setValue("version: [unterminated");
+    await wrapper.get("button:last-child").trigger("click");
+    expect(wrapper.emitted("apply")).toHaveLength(1);
     expect(wrapper.get('[role="alert"]').text()).toBeTruthy();
   });
 
@@ -96,7 +127,7 @@ describe("GraphAsCodePanel", () => {
     const wrapper = mountPanel();
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, "files", {
-      value: [new File([validCode], "graph.json", { type: "application/json" })],
+      value: [new File([validCode], "graph.yaml", { type: "application/yaml" })],
       configurable: true,
     });
     await input.trigger("change");
@@ -105,13 +136,10 @@ describe("GraphAsCodePanel", () => {
     expect(wrapper.emitted("apply")).toBeUndefined();
   });
 
-  it("discards editor draft and closes panel", async () => {
+  it("discards editor draft when closing the panel", async () => {
     const wrapper = mountPanel(validCode);
     await wrapper.get("textarea").setValue("{}");
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Discard")!
-      .trigger("click");
+    await wrapper.get('[aria-label="Close panel"]').trigger("click");
     expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 });

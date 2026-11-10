@@ -270,7 +270,7 @@ export const otelAccessTokens = mysqlTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
     digest: varchar("digest", { length: 64 }).notNull(),
-    expiresAt: datetime("expires_at", { mode: "date", fsp: 3 }).notNull(),
+    expiresAt: datetime("expires_at", { mode: "date", fsp: 3 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

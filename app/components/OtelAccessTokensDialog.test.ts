@@ -5,17 +5,20 @@ import { defineComponent, h } from "vue";
 import OtelAccessTokensDialog from "./OtelAccessTokensDialog.vue";
 
 const components = {
-  UModal: defineComponent({
-    props: { open: Boolean },
-    setup(_, { slots, emit }) {
+  USlideover: defineComponent({
+    props: { open: Boolean, content: Object, ui: Object },
+    setup(props, { slots }) {
       return () =>
-        h("div", [
-          h(
-            "button",
-            { type: "button", onClick: () => emit("update:open", false) },
-            "Close dialog",
-          ),
-          ...(slots.body?.() ?? []),
+        h("div", { ...props.content, class: props.ui?.overlay }, [
+          h("section", { class: props.ui?.content }, [
+            h("header", [
+              ...(slots.title?.() ?? []),
+              ...(slots.description?.() ?? []),
+              ...(slots.actions?.() ?? []),
+            ]),
+            ...(slots.body?.() ?? []),
+            ...(slots.footer?.() ?? []),
+          ]),
         ]);
     },
   }),
@@ -83,6 +86,8 @@ describe("OtelAccessTokensDialog", () => {
     );
     expect(wrapper.text()).toContain("one-time-secret");
     expect(wrapper.text()).toContain("collector");
+    expect(wrapper.text()).toContain("Expires");
+    expect(wrapper.text()).not.toContain("operator login");
     const writeText = vi.fn();
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     await wrapper

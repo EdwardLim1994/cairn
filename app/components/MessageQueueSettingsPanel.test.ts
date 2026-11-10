@@ -2,143 +2,168 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vite-plus/test";
 import { defineComponent, h } from "vue";
+import type { CanvasGetResponse } from "#shared/api/canvas";
 import MessageQueueSettingsPanel from "./MessageQueueSettingsPanel.vue";
 
-const uiStubs = {
+type Destination = CanvasGetResponse["messageDestinations"][number];
+const destination = {
+  id: "destination-1",
+  projectId: "project-1",
+  queueId: "old-shared-queue",
+  queueName: "Legacy Queue",
+  codeKey: "orders-created",
+  broker: "rabbitmq" as const,
+  name: "orders.created",
+  connection: { host: "rabbit.local", port: 5671, virtualHost: "/events", tls: true },
+  x: 300,
+  y: 220,
+  health: true,
+} satisfies Destination;
+
+const components = {
   USlideover: defineComponent({
-    props: { open: Boolean, side: String, portal: Boolean, close: [Boolean, Object], ui: Object },
-    emits: ["update:open"],
-    setup(_, { slots }) {
+    props: { ui: Object },
+    setup(props, { slots }) {
       return () =>
-        h("aside", [slots.title?.(), slots.description?.(), slots.body?.(), slots.footer?.()]);
-    },
-  }),
-  UButton: defineComponent({
-    setup(_, { attrs, slots }) {
-      return () => h("button", attrs, slots.default?.());
-    },
-  }),
-  UInput: defineComponent({
-    inheritAttrs: true,
-    props: { modelValue: String },
-    setup(props, { attrs }) {
-      return () => h("input", { ...attrs, value: props.modelValue });
-    },
-  }),
-  USelect: defineComponent({
-    setup(_, { attrs }) {
-      return () => h("select", attrs);
-    },
-  }),
-  SettingsAccordionCard: defineComponent({
-    props: { title: String, subtitle: String, open: Boolean },
-    emits: ["toggle", "delete", "expand", "collapse"],
-    setup(props, { emit, slots }) {
-      return () =>
-        h("article", { "data-open": props.open }, [
-          h("strong", props.title),
-          h("span", props.subtitle),
-          h("button", { "data-action": "expand", onClick: () => emit("expand") }),
-          h("button", { "data-action": "collapse", onClick: () => emit("collapse") }),
-          slots.default?.(),
+        h("aside", { class: props.ui?.content }, [
+          h("header", [
+            ...(slots.title?.() ?? []),
+            ...(slots.description?.() ?? []),
+            ...(slots.actions?.() ?? []),
+          ]),
+          ...(slots.body?.() ?? []),
+          ...(slots.footer?.() ?? []),
         ]);
     },
   }),
-  UAccordion: defineComponent({
-    setup(_, { slots }) {
-      return () => h("div", [slots.default?.(), slots.body?.()]);
+  UButton: defineComponent({
+    inheritAttrs: false,
+    props: { type: String, disabled: Boolean },
+    setup(props, { attrs, slots }) {
+      return () =>
+        h(
+          "button",
+          { ...attrs, type: props.type ?? "button", disabled: props.disabled },
+          slots.default?.(),
+        );
     },
   }),
-  UIcon: defineComponent({ template: "<span />" }),
+  UInput: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h("input", {
+          ...attrs,
+          value: props.modelValue,
+          onInput: (event: Event) =>
+            emit("update:modelValue", (event.target as HTMLInputElement).value),
+        });
+    },
+  }),
+  USelect: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String, items: Array },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h(
+          "select",
+          {
+            ...attrs,
+            value: props.modelValue,
+            onChange: (event: Event) =>
+              emit("update:modelValue", (event.target as HTMLSelectElement).value),
+          },
+          props.items?.map((item) => {
+            const option = item as { label: string; value: string };
+            return h("option", { value: option.value }, option.label);
+          }),
+        );
+    },
+  }),
+  UIcon: defineComponent({ setup: () => () => h("span", { "aria-hidden": "true" }) }),
 };
 
+function mountPanel(overrides: Partial<{ destination: Destination | null; open: boolean }> = {}) {
+  return mount(MessageQueueSettingsPanel, {
+    props: {
+      open: true,
+      destination: null,
+      position: { x: 160, y: 120 },
+      projectId: "project-1",
+      ...overrides,
+    },
+    global: { components },
+  });
+}
+
 describe("MessageQueueSettingsPanel", () => {
-  it("shows shared broker settings and saves the topic list", async () => {
-    const wrapper = mount(MessageQueueSettingsPanel, {
-      props: {
-        open: true,
-        destinations: [
-          {
-            id: "orders-topic",
-            projectId: "project-1",
-            codeKey: "orders",
-            broker: "kafka",
-            name: "Orders",
-            connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
-            x: 200,
-            y: 100,
-            health: true,
-          },
-        ],
-      },
-      global: {
-        components: uiStubs,
-        stubs: { SettingsAccordionCard: uiStubs.SettingsAccordionCard },
-      },
-    });
-
-    expect(wrapper.text()).toContain("Orders");
-    expect(wrapper.findAll("output")).toHaveLength(0);
-    expect(wrapper.find('[aria-label="Message queue type"]').exists()).toBe(true);
-    expect(wrapper.find('[aria-label="Message queue name"]').exists()).toBe(true);
-    expect(
-      (wrapper.get('[aria-label="Message queue URL"]').element as HTMLInputElement).value,
-    ).toBe("localhost:9092");
+  it("creates one destination with its own broker connection and canvas position", async () => {
+    const wrapper = mountPanel();
+    await wrapper.get('[aria-label="Topic or exchange name"]').setValue("orders.created");
+    await wrapper.get('[aria-label="Stable code key"]').setValue("orders-created");
+    await wrapper.get('[aria-label="Connection URL"]').setValue("localhost:9092");
     await wrapper
       .findAll("button")
-      .find((button) => button.text() === "Save")
-      ?.trigger("click");
-    expect(wrapper.emitted("save")?.[0]).toMatchObject([
-      "legacy-queue",
-      [{ id: "orders-topic", broker: "kafka", connection: { brokers: "localhost:9092" } }],
-    ]);
+      .find((button) => button.text() === "Create")!
+      .trigger("click");
+
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      projectId: "project-1",
+      queueId: expect.any(String),
+      codeKey: "orders-created",
+      broker: "kafka",
+      name: "orders.created",
+      connection: { brokers: "localhost:9092" },
+      x: 160,
+      y: 120,
+    });
+    expect(wrapper.text()).not.toContain("Topics");
   });
 
-  it("adds a new topic card from the New button", async () => {
-    const wrapper = mount(MessageQueueSettingsPanel, {
-      props: { open: true, destinations: [] },
-      global: { components: uiStubs },
-    });
+  it("edits one existing destination and retains its RabbitMQ connection values", async () => {
+    const wrapper = mountPanel({ destination });
 
+    expect(wrapper.get('[aria-label="Connection URL"]').element).toHaveProperty(
+      "value",
+      "amqps://rabbit.local:5671/events",
+    );
+    await wrapper.get('[aria-label="Topic or exchange name"]').setValue("orders.updated");
+    await wrapper.get('[aria-label="Stable code key"]').setValue("orders-updated");
+    await wrapper.get("button[aria-label='Remove message queue']").trigger("click");
     await wrapper
       .findAll("button")
-      .find((button) => button.text() === "New")
-      ?.trigger("click");
-    expect(wrapper.text()).toContain("Topic 1");
-    expect(wrapper.find('[aria-label="Topic 1 name"]').exists()).toBe(true);
+      .find((button) => button.text() === "Save")!
+      .trigger("click");
+
+    expect(wrapper.emitted("remove")).toEqual([["destination-1"]]);
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      id: "destination-1",
+      queueId: "destination-1",
+      name: "orders.updated",
+      broker: "rabbitmq",
+      connection: {
+        host: "rabbit.local",
+        port: 5671,
+        virtualHost: "/events",
+        tls: true,
+      },
+      x: 300,
+      y: 220,
+    });
   });
 
-  it("expands and collapses a TLS RabbitMQ topic card", async () => {
-    const wrapper = mount(MessageQueueSettingsPanel, {
-      props: {
-        open: true,
-        destinations: [
-          {
-            id: "orders-topic",
-            projectId: "project-1",
-            codeKey: "orders",
-            broker: "rabbitmq",
-            name: "Orders",
-            connection: { host: "localhost", port: 5671, tls: true, virtualHost: "/" },
-            x: 200,
-            y: 100,
-            health: true,
-          },
-        ],
-      },
-      global: {
-        components: uiStubs,
-        stubs: { SettingsAccordionCard: uiStubs.SettingsAccordionCard },
-      },
-    });
+  it("discards without emitting a destination to save", async () => {
+    const wrapper = mountPanel({ open: true });
+    await wrapper.get('[aria-label="Topic or exchange name"]').setValue("discarded");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Discard")!
+      .trigger("click");
 
-    expect(
-      (wrapper.get('[aria-label="Message queue URL"]').element as HTMLInputElement).value,
-    ).toBe("amqps://localhost:5671/");
-    const card = wrapper.get("article");
-    await card.get('[data-action="expand"]').trigger("click");
-    expect(card.attributes("data-open")).toBe("true");
-    await card.get('[data-action="collapse"]').trigger("click");
-    expect(card.attributes("data-open")).toBe("false");
+    expect(wrapper.emitted("save")).toBeUndefined();
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 });

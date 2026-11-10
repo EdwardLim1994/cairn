@@ -1,4 +1,4 @@
-import { and, asc, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "../../db";
 import { otelAccessTokens } from "../../db/schema";
 
@@ -15,7 +15,7 @@ export async function createOtelAccessToken(input: {
   projectId: string;
   name: string;
   digest: string;
-  expiresAt: Date;
+  expiresAt: Date | null;
 }) {
   await getDb().insert(otelAccessTokens).values(input);
 }
@@ -35,7 +35,7 @@ export async function hasValidOtelAccessToken(projectId: string, digest: string,
       and(
         eq(otelAccessTokens.projectId, projectId),
         eq(otelAccessTokens.digest, digest),
-        gt(otelAccessTokens.expiresAt, now),
+        or(isNull(otelAccessTokens.expiresAt), gt(otelAccessTokens.expiresAt, now)),
       ),
     )
     .limit(1);

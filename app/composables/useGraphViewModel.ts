@@ -68,12 +68,16 @@ function timingLabel(edge: ObservedServiceEdge) {
   const callDurationsMs = edge.timing?.callDurationsMs ?? [];
   if (totalDurationMs === null) {
     return {
-      label: "N/A",
+      label: "No timing",
+      available: false,
+      callDurationsMs,
       tooltip: "Timing unavailable: outbound client-span telemetry was not found.",
     };
   }
   return {
     label: formatDuration(totalDurationMs),
+    available: true,
+    callDurationsMs,
     tooltip: `Cumulative call time: ${formatDuration(totalDurationMs)}\nCalls (${callDurationsMs.length}): ${callDurationsMs.map(formatDuration).join(", ")}`,
   };
 }
@@ -123,16 +127,52 @@ export function useGraphViewModel({
           observed.sourceService === sourceName && observed.targetService === targetName,
       );
     };
+    const outboundApiCallDetails = (edge: GraphServiceEdge) => {
+      const targetService = store.services.find((item) =>
+        item.endpoints.some((endpoint) => endpoint.id === edge.targetEndpointId),
+      );
+      const targetEndpoint = targetService?.endpoints.find(
+        (endpoint) => endpoint.id === edge.targetEndpointId,
+      );
+      const methodTag =
+        targetService?.apiType === "GRPC"
+          ? "gRPC"
+          : targetService?.apiType === "WEBSOCKET"
+            ? "WS"
+            : (targetEndpoint?.method ?? "API");
+      const endpointLabel =
+        targetService?.apiType === "GRPC"
+          ? (targetEndpoint?.rpcMethod ?? targetEndpoint?.name)
+          : targetService?.apiType === "WEBSOCKET"
+            ? (targetEndpoint?.url ?? targetEndpoint?.name)
+            : [targetEndpoint?.method, targetEndpoint?.url ?? targetEndpoint?.name]
+                .filter(Boolean)
+                .join(" ");
+      return {
+        targetServiceId: targetService?.id,
+        targetServiceName: targetService?.name,
+        targetEndpointLabel: endpointLabel,
+        sourceEndpointName: service.endpoints.find(
+          (endpoint) => endpoint.id === edge.sourceEndpointId,
+        )?.name,
+        methodTag,
+        label: targetService
+          ? `${targetService.name} · ${endpointLabel || "Outbound API call"}`
+          : (endpointLabel ?? "Outbound API call"),
+      };
+    };
     const outboundCalls = [
       ...store.serviceEdges
         .filter((edge) => edge.sourceServiceId === service.id)
         .map((edge) => ({
           id: edge.id,
           kind: "api" as const,
+          destinationId: undefined,
           sourceEndpointId:
             edge.sourceEndpointId ??
             (edge.sourceSubscriptionId ? undefined : service.endpoints[0]?.id),
           sourceSubscriptionId: edge.sourceSubscriptionId,
+          ...outboundApiCallDetails(edge),
         })),
       ...store.messageConnections
         .filter(
@@ -145,6 +185,12 @@ export function useGraphViewModel({
         .map((connection) => ({
           id: connection.id,
           kind: "message" as const,
+          targetServiceId: undefined,
+          destinationId: connection.destinationId,
+          methodTag: "PUB",
+          label:
+            store.messageDestinations.find((item) => item.id === connection.destinationId)?.name ??
+            "Message destination",
           sourceEndpointId:
             ("endpointId" in connection ? connection.endpointId : undefined) ??
             ("subscriptionId" in connection && connection.subscriptionId
@@ -190,6 +236,20 @@ export function useGraphViewModel({
         name: service.name,
         apiType: service.apiType,
         framework: frameworkLabel(service.framework),
+        inboundCount:
+          service.endpoints.length +
+          store.messageConnections.filter(
+            (connection) => connection.type === "subscribe" && connection.serviceId === service.id,
+          ).length,
+        outboundCount: new Set(
+          outboundCalls.map((call) =>
+            call.targetServiceId
+              ? `service:${call.targetServiceId}`
+              : call.destinationId
+                ? `destination:${call.destinationId}`
+                : `call:${call.id}`,
+          ),
+        ).size,
         hasMessagePublisher:
           !service.endpoints.length &&
           store.messageConnections.some(
@@ -267,6 +327,8 @@ export function useGraphViewModel({
           unread: websocketUnread?.(entry.id) ?? false,
           messages: websocketMessages?.(entry.id) ?? [],
           latestResponse: runResults?.()[entry.id],
+          endpoint: service.endpoints.find(({ id }) => id === entry.targetEndpointId),
+          serviceName: service.name,
           entry,
         },
         class: "app__flow-node app__flow-node--mock-trigger",
@@ -276,35 +338,22 @@ export function useGraphViewModel({
   }
 
   function messageQueueNodes(): Node[] {
-    const queues = new Map<string, typeof store.messageDestinations>();
-    for (const destination of store.messageDestinations) {
-      const queueId = destination.queueId ?? "legacy-queue";
-      queues.set(queueId, [...(queues.get(queueId) ?? []), destination]);
-    }
-    return [...queues].map(([queueId, destinations]) => {
-      const nodeId = messageQueueNodeId(queueId);
-      const destinationIds = new Set(destinations.map(({ id }) => id));
+    return store.messageDestinations.map((destination) => {
+      const nodeId = messageQueueNodeId(destination.id);
       const observed = store.messageConnections.some(
         (connection) =>
           store.observedMessageConnectionIds.includes(connection.id) &&
-          destinationIds.has(connection.destinationId),
+          connection.destinationId === destination.id,
       );
-      const online = onlineStatus(destinations);
+      const online = onlineStatus([destination]);
       return {
         id: nodeId,
         type: "messageQueue",
-        position: {
-          x:
-            destinations.reduce((total, destination) => total + destination.x, 0) /
-            destinations.length,
-          y:
-            destinations.reduce((total, destination) => total + destination.y, 0) /
-            destinations.length,
-        },
+        position: { x: destination.x, y: destination.y },
         data: {
-          queueId,
-          name: destinations[0]?.queueName ?? "Message Queue",
-          destinations,
+          destinationId: destination.id,
+          name: destination.queueName ?? "Message Queue",
+          destinations: [destination],
           online,
           topicsCollapsed: store.allNodesCollapsed,
         },
@@ -320,6 +369,7 @@ export function useGraphViewModel({
   }
 
   function buildEdges() {
+    const labeledServicePairs = new Set<string>();
     const declared: Edge[] = store.serviceEdges.flatMap((edge) => {
       const target = endpointTarget(edge.targetEndpointId);
       if (!target) return [];
@@ -349,7 +399,10 @@ export function useGraphViewModel({
         (item) => item.sourceService === sourceName && item.targetService === targetName,
       );
       const isObserved = Boolean(observedEdge);
-      const timing = observedEdge ? timingLabel(observedEdge) : undefined;
+      const servicePair = `${edge.sourceServiceId}:${target}`;
+      const showTiming = Boolean(observedEdge && !labeledServicePairs.has(servicePair));
+      if (observedEdge) labeledServicePairs.add(servicePair);
+      const timing = showTiming && observedEdge ? timingLabel(observedEdge) : undefined;
       return [
         {
           id: edge.id,
@@ -365,6 +418,14 @@ export function useGraphViewModel({
                 label: timing.label,
                 ariaLabel: `Observed call from ${sourceName} to ${targetName}: ${timing.tooltip}`,
                 domAttributes: { title: timing.tooltip },
+                data: {
+                  timing: {
+                    title: `${sourceName} → ${targetName}`,
+                    available: timing.available,
+                    callDurationsMs: timing.callDurationsMs,
+                    unavailableReason: timing.available ? undefined : timing.tooltip,
+                  },
+                },
               }
             : {}),
           class: isObserved ? "app__flow-edge app__flow-edge--observed" : "",
@@ -439,7 +500,7 @@ export function useGraphViewModel({
             id: `message-${connection.id}`,
             source,
             sourceHandle: `outbound-call:${connection.id}`,
-            target: messageQueueNodeId(destination.queueId),
+            target: messageQueueNodeId(destination.id),
             targetHandle: `publish-in:${destination.id}`,
             data: { messageConnectionId: connection.id },
             type: "default",
@@ -455,7 +516,7 @@ export function useGraphViewModel({
       return [
         {
           id: `message-${connection.id}`,
-          source: messageQueueNodeId(destination.queueId),
+          source: messageQueueNodeId(destination.id),
           sourceHandle: `subscribe-out:${destination.id}`,
           target: connection.serviceId,
           targetHandle: `subscriber-in:${connection.id}`,
@@ -497,17 +558,20 @@ export function useGraphViewModel({
         x: node.position.x,
         y: node.position.y,
       }));
-    const queuePositions = new Map(
+    const destinationPositions = new Map(
       graphNodes
-        .filter((node) => node.id === "message-queue" || node.id.startsWith("message-queue:"))
-        .map((node) => [node.id, node.position as { x: number; y: number }]),
+        .filter((node) => node.id.startsWith("message-queue:"))
+        .map((node) => [
+          node.id.slice("message-queue:".length),
+          node.position as { x: number; y: number },
+        ]),
     );
     const messageDestinations = store.messageDestinations.map((destination) => {
-      const queuePosition = queuePositions.get(messageQueueNodeId(destination.queueId));
+      const destinationPosition = destinationPositions.get(destination.id);
       return {
         ...destination,
-        x: queuePosition?.x ?? destination.x,
-        y: queuePosition?.y ?? destination.y,
+        x: destinationPosition?.x ?? destination.x,
+        y: destinationPosition?.y ?? destination.y,
       };
     });
     return {

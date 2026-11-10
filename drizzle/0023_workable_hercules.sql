@@ -1,0 +1,1 @@
+ALTER TABLE `otel_access_tokens` MODIFY COLUMN `expires_at` datetime(3);

@@ -85,16 +85,22 @@ export async function getCanvas(
       }),
     ),
     messageDestinations: destinationRows.map((destination) => {
-      const position =
-        positionByNode.get(`message_queue:${destination.queueId}`) ??
-        positionByNode.get(`message_destination:${destination.id}`);
+      const siblings = destinationRows
+        .filter((item) => item.queueId === destination.queueId)
+        .toSorted((left, right) => left.id.localeCompare(right.id));
+      const siblingIndex = siblings.findIndex((item) => item.id === destination.id);
+      const savedDestinationPosition = positionByNode.get(`message_destination:${destination.id}`);
+      const legacyQueuePosition = positionByNode.get(`message_queue:${destination.queueId}`);
+      const position = savedDestinationPosition ?? legacyQueuePosition;
       return {
         ...messageDestinationInputSchema.parse({
           ...destination,
           queueId: destination.queueId,
           connection: destination.connection as MessageDestinationInput["connection"],
           x: position?.positionX ?? 0,
-          y: position?.positionY ?? 0,
+          y:
+            (position?.positionY ?? 0) +
+            (!savedDestinationPosition && legacyQueuePosition ? siblingIndex * 193 : 0),
         }),
         projectId: destination.projectId,
         health: null,
@@ -264,10 +270,6 @@ export async function saveCanvas(
     const removedDestinationIds = oldDestinationRows
       .map(({ id }) => id)
       .filter((id) => !destinationIdSet.has(id));
-    const retainedQueueIds = new Set(destinations.map(({ queueId }) => queueId));
-    const removedQueueIds = [...new Set(oldDestinationRows.map(({ queueId }) => queueId))].filter(
-      (queueId) => !retainedQueueIds.has(queueId),
-    );
     await tx.delete(messageConnections).where(eq(messageConnections.projectId, projectId));
     if (removedDestinationIds.length) {
       await tx
@@ -288,16 +290,14 @@ export async function saveCanvas(
           ),
         );
     }
-    if (removedQueueIds.length)
-      await tx
-        .delete(graphNodePositions)
-        .where(
-          and(
-            eq(graphNodePositions.projectId, projectId),
-            eq(graphNodePositions.nodeType, "message_queue"),
-            inArray(graphNodePositions.entityId, removedQueueIds),
-          ),
-        );
+    await tx
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "message_queue"),
+        ),
+      );
     await Promise.all(
       destinations.map((destination) => {
         const values = {
@@ -322,25 +322,21 @@ export async function saveCanvas(
         return tx.insert(messageDestinations).values({ id: destination.id, ...values });
       }),
     );
-    const queuePositions = new Map<string, { x: number; y: number }>();
-    for (const destination of destinations) {
-      const queueId = destination.queueId ?? "legacy-queue";
-      if (!queuePositions.has(queueId))
-        queuePositions.set(queueId, { x: destination.x, y: destination.y });
-    }
     await Promise.all(
-      [...queuePositions].map(([queueId, position]) =>
+      destinations.map((destination) =>
         tx
           .insert(graphNodePositions)
           .values({
             id: randomUUID(),
             projectId,
-            nodeType: "message_queue",
-            entityId: queueId,
-            positionX: position.x,
-            positionY: position.y,
+            nodeType: "message_destination",
+            entityId: destination.id,
+            positionX: destination.x,
+            positionY: destination.y,
           })
-          .onDuplicateKeyUpdate({ set: { positionX: position.x, positionY: position.y } }),
+          .onDuplicateKeyUpdate({
+            set: { positionX: destination.x, positionY: destination.y },
+          }),
       ),
     );
     if (connections.length)

@@ -259,7 +259,6 @@ function buildInitialPositions(
   edges: { sourceServiceId: string; targetEndpointId: string }[],
   destinations: LayoutDestination[],
   connections: LayoutConnection,
-  queueIds: Map<string, string>,
   add: (type: PositionInput["nodeType"], id: string, point: { x: number; y: number }) => void,
 ) {
   const layout = arrangeGraph(services, edges, [], destinations, connections);
@@ -267,9 +266,9 @@ function buildInitialPositions(
     const point = layout.get(service.id);
     if (point) add("service", service.id, point);
   }
-  for (const queueId of new Set(queueIds.values())) {
-    const point = layout.get(messageQueueNodeId(queueId));
-    if (point) add("message_queue", queueId, point);
+  for (const destination of destinations) {
+    const point = layout.get(messageQueueNodeId(destination.id));
+    if (point) add("message_destination", destination.id, point);
   }
 }
 
@@ -278,8 +277,8 @@ function buildAppendedPositions(
   oldServices: ServiceRow[],
   oldDestinations: DestinationRow[],
   oldPositions: PositionRow[],
+  destinations: LayoutDestination[],
   serviceIds: Map<string, string>,
-  queueIds: Map<string, string>,
   add: (type: PositionInput["nodeType"], id: string, point: { x: number; y: number }) => void,
 ) {
   const positionByEntity = new Map(
@@ -298,20 +297,21 @@ function buildAppendedPositions(
       y += Math.max(320, 218 + service.endpoints.length * 47);
     }
   }
-  const oldQueuePositions = new Map<string, { x: number; y: number }>();
-  for (const destination of oldDestinations) {
-    if (oldQueuePositions.has(destination.queueId)) continue;
-    const saved = positionByEntity.get(`message_queue:${destination.queueId}`);
-    const legacy = positionByEntity.get(`message_destination:${destination.id}`);
-    if (saved || legacy)
-      oldQueuePositions.set(destination.queueId, {
-        x: (saved ?? legacy)!.positionX,
-        y: (saved ?? legacy)!.positionY,
-      });
-  }
-  for (const [index, queueId] of [...new Set(queueIds.values())].entries()) {
-    const saved = oldQueuePositions.get(queueId);
-    add("message_queue", queueId, saved ?? { x, y: y + index * 320 });
+  for (const [index, destination] of destinations.entries()) {
+    const old = oldDestinations.find(({ id }) => id === destination.id);
+    const direct = old && positionByEntity.get(`message_destination:${old.id}`);
+    const legacy = old && positionByEntity.get(`message_queue:${old.queueId}`);
+    const siblingIndex = old
+      ? oldDestinations
+          .filter(({ queueId }) => queueId === old.queueId)
+          .findIndex(({ id }) => id === old.id)
+      : 0;
+    const point = direct
+      ? { x: direct.positionX, y: direct.positionY }
+      : legacy
+        ? { x: legacy.positionX, y: legacy.positionY + siblingIndex * 193 }
+        : { x, y: y + index * 193 };
+    add("message_destination", destination.id, point);
   }
 }
 
@@ -325,7 +325,6 @@ type GraphPositionContext = {
   oldDestinations: DestinationRow[];
   oldPositions: PositionRow[];
   serviceIds: Map<string, string>;
-  queueIds: Map<string, string>;
 };
 
 function buildGraphPositions(context: GraphPositionContext) {
@@ -339,7 +338,6 @@ function buildGraphPositions(context: GraphPositionContext) {
     oldDestinations,
     oldPositions,
     serviceIds,
-    queueIds,
   } = context;
   const positions: PositionInput[] = [];
   const add = (
@@ -348,15 +346,15 @@ function buildGraphPositions(context: GraphPositionContext) {
     point: { x: number; y: number },
   ) => positions.push({ nodeType, entityId, ...point });
   if (oldServices.length === 0 && oldDestinations.length === 0)
-    buildInitialPositions(services, edges, destinations, connections, queueIds, add);
+    buildInitialPositions(services, edges, destinations, connections, add);
   else
     buildAppendedPositions(
       definitions,
       oldServices,
       oldDestinations,
       oldPositions,
+      destinations,
       serviceIds,
-      queueIds,
       add,
     );
   return positions;
@@ -483,7 +481,6 @@ export async function applyGraphCode(
       oldDestinations,
       oldPositions,
       serviceIds: nextServiceIds,
-      queueIds: nextQueueIds,
     });
     await Promise.all(
       nextPositions.map(({ nodeType, entityId, x, y }) =>

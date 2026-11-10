@@ -1,668 +1,498 @@
-{
+﻿{
   "destinations": [
     {
-      "broker": "kafka",
-      "key": "order-created",
-      "name": "order.created",
       "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
-    },
-    {
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
       "broker": "kafka",
-      "key": "inventory-reserved",
       "name": "inventory.reserved",
-      "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
+      "key": "topic-inventory-reserved",
+      "queueKey": "queue-topic-inventory-reserved"
     },
     {
-      "broker": "kafka",
-      "key": "payment-completed",
-      "name": "payment.completed",
       "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
-    },
-    {
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
       "broker": "kafka",
-      "key": "shipment-created",
-      "name": "shipment.created",
-      "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
-    },
-    {
-      "broker": "kafka",
-      "key": "review-added",
-      "name": "review.added",
-      "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
-    },
-    {
-      "broker": "kafka",
-      "key": "notification-created",
       "name": "notification.created",
+      "key": "topic-notification-created",
+      "queueKey": "queue-topic-notification-created"
+    },
+    {
       "connection": {
-        "securityProtocol": "PLAINTEXT",
-        "brokers": "host.docker.internal:19092"
-      }
-    }
-  ],
-  "messageConnections": [
-    {
-      "serviceKey": "order-service",
-      "endpointKey": "place-order",
-      "destinationKey": "order-created",
-      "type": "publish"
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
+      "broker": "kafka",
+      "name": "order.created",
+      "key": "topic-order-created",
+      "queueKey": "queue-topic-order-created"
     },
     {
-      "serviceKey": "inventory-service",
-      "consumerGroup": "inventory-service",
-      "destinationKey": "order-created",
-      "type": "subscribe"
+      "connection": {
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
+      "broker": "kafka",
+      "name": "payment.completed",
+      "key": "topic-payment-completed",
+      "queueKey": "queue-topic-payment-completed"
     },
     {
-      "serviceKey": "inventory-service",
-      "destinationKey": "inventory-reserved",
-      "type": "publish"
+      "connection": {
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
+      "broker": "kafka",
+      "name": "review.added",
+      "key": "topic-review-added",
+      "queueKey": "queue-topic-review-added"
     },
     {
-      "serviceKey": "payment-service",
-      "consumerGroup": "payment-service",
-      "destinationKey": "inventory-reserved",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "order-service",
-      "consumerGroup": "order-service",
-      "destinationKey": "inventory-reserved",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "notification-service",
-      "consumerGroup": "notification-service",
-      "destinationKey": "inventory-reserved",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "payment-service",
-      "destinationKey": "payment-completed",
-      "type": "publish"
-    },
-    {
-      "serviceKey": "shipping-service",
-      "consumerGroup": "shipping-service",
-      "destinationKey": "payment-completed",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "order-service",
-      "consumerGroup": "order-service",
-      "destinationKey": "payment-completed",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "notification-service",
-      "consumerGroup": "notification-service",
-      "destinationKey": "payment-completed",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "shipping-service",
-      "destinationKey": "shipment-created",
-      "type": "publish"
-    },
-    {
-      "serviceKey": "order-service",
-      "consumerGroup": "order-service",
-      "destinationKey": "shipment-created",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "notification-service",
-      "consumerGroup": "notification-service",
-      "destinationKey": "shipment-created",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "review-service",
-      "endpointKey": "add-review",
-      "destinationKey": "review-added",
-      "type": "publish"
-    },
-    {
-      "serviceKey": "notification-service",
-      "consumerGroup": "notification-service",
-      "destinationKey": "review-added",
-      "type": "subscribe"
-    },
-    {
-      "serviceKey": "notification-service",
-      "destinationKey": "notification-created",
-      "type": "publish"
-    },
-    {
-      "serviceKey": "push-service",
-      "consumerGroup": "push-service",
-      "destinationKey": "notification-created",
-      "type": "subscribe"
+      "connection": {
+        "brokers": "host.docker.internal:19092",
+        "clientId": "cairn-shop",
+        "securityProtocol": "PLAINTEXT"
+      },
+      "queueName": "Message Queue",
+      "broker": "kafka",
+      "name": "shipment.created",
+      "key": "topic-shipment-created",
+      "queueKey": "queue-topic-shipment-created"
     }
   ],
   "mockApis": [
     {
+      "message": "ping",
       "key": "notification-stream",
       "name": "Notification Stream",
-      "serviceKey": "push-service",
       "endpointKey": "user-notifications",
-      "message": "ping"
+      "serviceKey": "push-service"
+    }
+  ],
+  "messageConnections": [
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-order-created",
+      "serviceKey": "shop-inventory-service",
+      "consumerGroup": "inventory-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-payment-completed",
+      "serviceKey": "shop-order-service",
+      "consumerGroup": "order-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-review-added",
+      "serviceKey": "shop-review-service",
+      "endpointKey": "add-review"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-shipment-created",
+      "serviceKey": "shop-order-service",
+      "consumerGroup": "order-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-order-created",
+      "serviceKey": "shop-order-service",
+      "endpointKey": "place-order"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-inventory-reserved",
+      "serviceKey": "shop-payment-service",
+      "consumerGroup": "payment-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-notification-created",
+      "serviceKey": "push-service",
+      "consumerGroup": "push-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-inventory-reserved",
+      "serviceKey": "shop-order-service",
+      "consumerGroup": "order-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-inventory-reserved",
+      "serviceKey": "shop-inventory-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-payment-completed",
+      "serviceKey": "shop-payment-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-payment-completed",
+      "serviceKey": "shop-notification-service",
+      "consumerGroup": "notification-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-shipment-created",
+      "serviceKey": "shop-notification-service",
+      "consumerGroup": "notification-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-notification-created",
+      "serviceKey": "shop-notification-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-inventory-reserved",
+      "serviceKey": "shop-notification-service",
+      "consumerGroup": "notification-service"
+    },
+    {
+      "type": "publish",
+      "destinationKey": "topic-shipment-created",
+      "serviceKey": "shop-shipping-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-review-added",
+      "serviceKey": "shop-notification-service",
+      "consumerGroup": "notification-service"
+    },
+    {
+      "type": "subscribe",
+      "destinationKey": "topic-payment-completed",
+      "serviceKey": "shop-shipping-service",
+      "consumerGroup": "shipping-service"
     }
   ],
   "version": 2,
   "services": [
     {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/user/actuator/health/readiness"
-      },
+      "key": "shop-review-service",
+      "name": "Review Service",
       "apiType": "GRPC",
+      "framework": "Spring Boot",
       "baseUrl": "localhost:9000",
       "grpcTls": false,
-      "key": "user-service",
-      "name": "User Service",
-      "framework": "Spring Boot",
       "endpoints": [
         {
-          "key": "get-user",
-          "name": "Get user",
-          "rpcMethod": "shop.user.UserService/GetUser",
-          "outboundConnections": []
-        },
-        {
-          "key": "list-users",
-          "name": "List users",
-          "rpcMethod": "shop.user.UserService/ListUsers",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/product/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "product-service",
-      "name": "Product Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "get-product",
-          "name": "Get product",
-          "rpcMethod": "shop.product.ProductService/GetProduct",
+          "key": "add-review",
+          "name": "AddReview",
+          "rpcMethod": "/shop.review.ReviewService/AddReview",
           "outboundConnections": [
             {
-              "endpointKey": "get-price",
-              "serviceKey": "pricing-service"
+              "endpointKey": "get-user",
+              "serviceKey": "shop-user-service"
             },
             {
-              "endpointKey": "get-stock",
-              "serviceKey": "inventory-service"
+              "endpointKey": "get-product",
+              "serviceKey": "shop-product-service"
             }
           ]
         },
         {
-          "key": "list-products",
-          "name": "List products",
-          "rpcMethod": "shop.product.ProductService/ListProducts",
+          "key": "list-reviews",
+          "name": "ListReviews",
+          "rpcMethod": "/shop.review.ReviewService/ListReviews",
           "outboundConnections": []
         }
-      ]
-    },
-    {
+      ],
       "healthCheck": {
         "headers": [],
-        "url": "http://localhost/services/pricing/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "pricing-service",
-      "name": "Pricing Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "get-price",
-          "name": "Get price",
-          "rpcMethod": "shop.pricing.PricingService/GetPrice",
-          "outboundConnections": []
-        }
-      ]
+        "url": "http://localhost/services/review/actuator/health/readiness"
+      }
     },
     {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/inventory/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "inventory-service",
+      "key": "shop-inventory-service",
       "name": "Inventory Service",
+      "apiType": "GRPC",
       "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
       "endpoints": [
         {
           "key": "get-stock",
-          "name": "Get stock",
-          "rpcMethod": "shop.inventory.InventoryService/GetStock",
+          "name": "GetStock",
+          "rpcMethod": "/shop.inventory.InventoryService/GetStock",
           "outboundConnections": []
         }
-      ]
-    },
-    {
+      ],
       "healthCheck": {
         "headers": [],
-        "url": "http://localhost/services/cart/actuator/health/readiness"
-      },
+        "url": "http://localhost/services/inventory/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-notification-service",
+      "name": "Notification Service",
       "apiType": "GRPC",
+      "framework": "Spring Boot",
       "baseUrl": "localhost:9000",
       "grpcTls": false,
-      "key": "cart-service",
-      "name": "Cart Service",
+      "endpoints": [
+        {
+          "key": "list-notifications",
+          "name": "ListNotifications",
+          "rpcMethod": "/shop.notification.NotificationService/ListNotifications",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/notification/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-pricing-service",
+      "name": "Pricing Service",
+      "apiType": "GRPC",
       "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
+      "endpoints": [
+        {
+          "key": "get-price",
+          "name": "GetPrice",
+          "rpcMethod": "/shop.pricing.PricingService/GetPrice",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/pricing/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-shipping-service",
+      "name": "Shipping Service",
+      "apiType": "GRPC",
+      "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
+      "endpoints": [
+        {
+          "key": "get-shipment",
+          "name": "GetShipment",
+          "rpcMethod": "/shop.shipping.ShippingService/GetShipment",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/shipping/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-user-service",
+      "name": "User Service",
+      "apiType": "GRPC",
+      "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
+      "endpoints": [
+        {
+          "key": "get-user",
+          "name": "GetUser",
+          "rpcMethod": "/shop.user.UserService/GetUser",
+          "outboundConnections": []
+        },
+        {
+          "key": "list-users",
+          "name": "ListUsers",
+          "rpcMethod": "/shop.user.UserService/ListUsers",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/user/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-payment-service",
+      "name": "Payment Service",
+      "apiType": "GRPC",
+      "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
+      "endpoints": [
+        {
+          "key": "get-payment",
+          "name": "GetPayment",
+          "rpcMethod": "/shop.payment.PaymentService/GetPayment",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/payment/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "push-service",
+      "name": "Notification Push Service",
+      "apiType": "WEBSOCKET",
+      "framework": "Spring Boot",
+      "baseUrl": "ws://localhost/",
+      "grpcTls": false,
+      "endpoints": [
+        {
+          "key": "user-notifications",
+          "name": "User notifications",
+          "url": "ws://localhost/ws/notifications?token=test-token-u1",
+          "outboundConnections": []
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/push/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-cart-service",
+      "name": "Cart Service",
+      "apiType": "GRPC",
+      "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
       "endpoints": [
         {
           "key": "get-cart",
-          "name": "Get cart",
-          "rpcMethod": "shop.cart.CartService/GetCart",
+          "name": "GetCart",
+          "rpcMethod": "/shop.cart.CartService/GetCart",
           "outboundConnections": []
         },
         {
           "key": "add-item",
-          "name": "Add item",
-          "rpcMethod": "shop.cart.CartService/AddItem",
+          "name": "AddItem",
+          "rpcMethod": "/shop.cart.CartService/AddItem",
           "outboundConnections": [
             {
               "endpointKey": "get-product",
-              "serviceKey": "product-service"
+              "serviceKey": "shop-product-service"
             }
           ]
         },
         {
           "key": "clear-cart",
-          "name": "Clear cart",
-          "rpcMethod": "shop.cart.CartService/ClearCart",
+          "name": "ClearCart",
+          "rpcMethod": "/shop.cart.CartService/ClearCart",
           "outboundConnections": []
         }
-      ]
-    },
-    {
+      ],
       "healthCheck": {
         "headers": [],
-        "url": "http://localhost/services/order/actuator/health/readiness"
-      },
+        "url": "http://localhost/services/cart/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-product-service",
+      "name": "Product Service",
       "apiType": "GRPC",
+      "framework": "Spring Boot",
       "baseUrl": "localhost:9000",
       "grpcTls": false,
-      "key": "order-service",
-      "name": "Order Service",
-      "framework": "Spring Boot",
       "endpoints": [
         {
-          "key": "place-order",
-          "name": "Place order",
-          "rpcMethod": "shop.order.OrderService/PlaceOrder",
+          "key": "get-product",
+          "name": "GetProduct",
+          "rpcMethod": "/shop.product.ProductService/GetProduct",
           "outboundConnections": [
             {
-              "endpointKey": "get-user",
-              "serviceKey": "user-service"
-            },
-            {
-              "endpointKey": "get-cart",
-              "serviceKey": "cart-service"
-            },
-            {
               "endpointKey": "get-price",
-              "serviceKey": "pricing-service"
+              "serviceKey": "shop-pricing-service"
+            },
+            {
+              "endpointKey": "get-stock",
+              "serviceKey": "shop-inventory-service"
             }
           ]
         },
         {
+          "key": "list-products",
+          "name": "ListProducts",
+          "rpcMethod": "/shop.product.ProductService/ListProducts",
+          "outboundConnections": [
+            {
+              "endpointKey": "get-price",
+              "serviceKey": "shop-pricing-service"
+            },
+            {
+              "endpointKey": "get-stock",
+              "serviceKey": "shop-inventory-service"
+            }
+          ]
+        }
+      ],
+      "healthCheck": {
+        "headers": [],
+        "url": "http://localhost/services/product/actuator/health/readiness"
+      }
+    },
+    {
+      "key": "shop-order-service",
+      "name": "Order Service",
+      "apiType": "GRPC",
+      "framework": "Spring Boot",
+      "baseUrl": "localhost:9000",
+      "grpcTls": false,
+      "endpoints": [
+        {
           "key": "get-order",
-          "name": "Get order",
-          "rpcMethod": "shop.order.OrderService/GetOrder",
+          "name": "GetOrder",
+          "rpcMethod": "/shop.order.OrderService/GetOrder",
           "outboundConnections": []
         },
         {
           "key": "list-orders",
-          "name": "List orders",
-          "rpcMethod": "shop.order.OrderService/ListOrders",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/payment/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "payment-service",
-      "name": "Payment Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "get-payment",
-          "name": "Get payment",
-          "rpcMethod": "shop.payment.PaymentService/GetPayment",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/shipping/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "shipping-service",
-      "name": "Shipping Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "get-shipment",
-          "name": "Get shipment",
-          "rpcMethod": "shop.shipping.ShippingService/GetShipment",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/notification/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "notification-service",
-      "name": "Notification Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "list-notifications",
-          "name": "List notifications",
-          "rpcMethod": "shop.notification.NotificationService/ListNotifications",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "apiType": "WEBSOCKET",
-      "baseUrl": "ws://localhost",
-      "key": "push-service",
-      "name": "Notification Push Service",
-      "framework": "Spring Boot",
-      "healthCheck": {
-        "url": "http://localhost/services/push/actuator/health/readiness",
-        "headers": []
-      },
-      "endpoints": [
-        {
-          "key": "user-notifications",
-          "name": "User notifications WebSocket",
-          "url": "ws://localhost/ws/notifications?token=test-token-u1",
-          "outboundConnections": []
-        }
-      ]
-    },
-    {
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/services/review/actuator/health/readiness"
-      },
-      "apiType": "GRPC",
-      "baseUrl": "localhost:9000",
-      "grpcTls": false,
-      "key": "review-service",
-      "name": "Review Service",
-      "framework": "Spring Boot",
-      "endpoints": [
-        {
-          "key": "list-reviews",
-          "name": "List reviews",
-          "rpcMethod": "shop.review.ReviewService/ListReviews",
+          "name": "ListOrders",
+          "rpcMethod": "/shop.order.OrderService/ListOrders",
           "outboundConnections": []
         },
         {
-          "key": "add-review",
-          "name": "Add review",
-          "rpcMethod": "shop.review.ReviewService/AddReview",
+          "key": "place-order",
+          "name": "PlaceOrder",
+          "rpcMethod": "/shop.order.OrderService/PlaceOrder",
           "outboundConnections": [
             {
               "endpointKey": "get-user",
-              "serviceKey": "user-service"
-            },
-            {
-              "endpointKey": "get-product",
-              "serviceKey": "product-service"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "framework": "Spring Boot",
-      "name": "User Subgraph",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "user-subgraph",
-      "endpoints": [
-        {
-          "url": "/subgraphs/user/graphql",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL endpoint",
-          "outboundConnections": [
-            {
-              "endpointKey": "get-user",
-              "serviceKey": "user-service"
-            },
-            {
-              "endpointKey": "list-users",
-              "serviceKey": "user-service"
-            }
-          ]
-        }
-      ],
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/subgraphs/user/actuator/health/readiness"
-      }
-    },
-    {
-      "framework": "Spring Boot",
-      "name": "Product Subgraph",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "product-subgraph",
-      "endpoints": [
-        {
-          "url": "/subgraphs/product/graphql",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL endpoint",
-          "outboundConnections": [
-            {
-              "endpointKey": "get-product",
-              "serviceKey": "product-service"
-            },
-            {
-              "endpointKey": "list-products",
-              "serviceKey": "product-service"
-            }
-          ]
-        }
-      ],
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/subgraphs/product/actuator/health/readiness"
-      }
-    },
-    {
-      "framework": "Spring Boot",
-      "name": "Cart Subgraph",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "cart-subgraph",
-      "endpoints": [
-        {
-          "url": "/subgraphs/cart/graphql",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL endpoint",
-          "outboundConnections": [
-            {
-              "endpointKey": "get-cart",
-              "serviceKey": "cart-service"
-            },
-            {
-              "endpointKey": "add-item",
-              "serviceKey": "cart-service"
+              "serviceKey": "shop-user-service"
             },
             {
               "endpointKey": "clear-cart",
-              "serviceKey": "cart-service"
+              "serviceKey": "shop-cart-service"
+            },
+            {
+              "endpointKey": "get-cart",
+              "serviceKey": "shop-cart-service"
+            },
+            {
+              "endpointKey": "get-price",
+              "serviceKey": "shop-pricing-service"
             }
           ]
         }
       ],
       "healthCheck": {
         "headers": [],
-        "url": "http://localhost/subgraphs/cart/actuator/health/readiness"
-      }
-    },
-    {
-      "framework": "Spring Boot",
-      "name": "Order Subgraph",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "order-subgraph",
-      "endpoints": [
-        {
-          "url": "/subgraphs/order/graphql",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL endpoint",
-          "outboundConnections": [
-            {
-              "endpointKey": "place-order",
-              "serviceKey": "order-service"
-            },
-            {
-              "endpointKey": "get-order",
-              "serviceKey": "order-service"
-            },
-            {
-              "endpointKey": "list-orders",
-              "serviceKey": "order-service"
-            },
-            {
-              "endpointKey": "get-payment",
-              "serviceKey": "payment-service"
-            },
-            {
-              "endpointKey": "get-shipment",
-              "serviceKey": "shipping-service"
-            }
-          ]
-        }
-      ],
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/subgraphs/order/actuator/health/readiness"
-      }
-    },
-    {
-      "framework": "Spring Boot",
-      "name": "Review Subgraph",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "review-subgraph",
-      "endpoints": [
-        {
-          "url": "/subgraphs/review/graphql",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL endpoint",
-          "outboundConnections": [
-            {
-              "endpointKey": "list-reviews",
-              "serviceKey": "review-service"
-            },
-            {
-              "endpointKey": "add-review",
-              "serviceKey": "review-service"
-            }
-          ]
-        }
-      ],
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost/subgraphs/review/actuator/health/readiness"
-      }
-    },
-    {
-      "framework": "Other",
-      "name": "Apollo Router",
-      "apiType": "REST",
-      "baseUrl": "http://localhost",
-      "key": "apollo-router",
-      "endpoints": [
-        {
-          "url": "/",
-          "method": "POST",
-          "key": "graphql",
-          "name": "GraphQL API",
-          "outboundConnections": [
-            {
-              "endpointKey": "graphql",
-              "serviceKey": "user-subgraph"
-            },
-            {
-              "endpointKey": "graphql",
-              "serviceKey": "product-subgraph"
-            },
-            {
-              "endpointKey": "graphql",
-              "serviceKey": "cart-subgraph"
-            },
-            {
-              "endpointKey": "graphql",
-              "serviceKey": "order-subgraph"
-            },
-            {
-              "endpointKey": "graphql",
-              "serviceKey": "review-subgraph"
-            }
-          ]
-        }
-      ],
-      "healthCheck": {
-        "headers": [],
-        "url": "http://localhost:8088/health"
+        "url": "http://localhost/services/order/actuator/health/readiness"
       }
     }
   ]

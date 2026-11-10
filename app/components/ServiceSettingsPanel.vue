@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import SettingsAccordionCard from "./SettingsAccordionCard.vue";
 import HeaderRowsEditor from "./HeaderRowsEditor.vue";
+import WorkspaceDrawer from "./WorkspaceDrawer.vue";
 import type { HeaderTemplateDraft } from "../models/mock-api";
 import type { CanvasGetResponse } from "#shared/api/canvas";
 
@@ -49,6 +50,8 @@ const frameworkMenuOpen = defineModel<boolean>("frameworkMenuOpen", { required: 
 const props = withDefaults(
   defineProps<{
     editingServiceId: string | null;
+    returnToManageNodes?: boolean;
+    lastHealthCheckAt?: string | null;
     headerTemplates: HeaderTemplateDraft[];
     outboundCallEdges?: OutboundCall[];
     endpointOptions?: EndpointOption[];
@@ -71,6 +74,33 @@ const props = withDefaults(
     messageConnections: () => [],
   },
 );
+const ageNow = ref(Date.now());
+let ageTimer: ReturnType<typeof setInterval> | undefined;
+const lastCheckAge = computed(() => {
+  if (!props.lastHealthCheckAt) return "No health checks completed yet";
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((ageNow.value - new Date(props.lastHealthCheckAt).getTime()) / 1000),
+  );
+  if (elapsedSeconds < 60)
+    return `Checked ${elapsedSeconds} second${elapsedSeconds === 1 ? "" : "s"} ago`;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  return `Checked ${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"} ago`;
+});
+watch(
+  () => props.lastHealthCheckAt,
+  (timestamp) => {
+    if (timestamp && !ageTimer) ageTimer = setInterval(() => (ageNow.value = Date.now()), 1000);
+    else if (!timestamp && ageTimer) {
+      clearInterval(ageTimer);
+      ageTimer = undefined;
+    }
+  },
+  { immediate: true },
+);
+onUnmounted(() => {
+  if (ageTimer) clearInterval(ageTimer);
+});
 const openApiFileInput = ref<HTMLInputElement | null>(null);
 const protoUpload = ref<File | undefined>(undefined);
 const expandedEndpointKey = ref<string | null>(null);
@@ -101,6 +131,7 @@ const emit = defineEmits<{
   removeService: [id: string];
   setOutboundCall: [sourceId: string, connectionId: string | undefined, target: string];
   removeOutboundCall: [edgeId: string];
+  backToManageNodes: [];
 }>();
 
 function addSubscription() {
@@ -368,7 +399,7 @@ function handleOpenChange(open: boolean) {
 </script>
 
 <template>
-  <USlideover
+  <WorkspaceDrawer
     :open="true"
     side="right"
     :portal="false"
@@ -389,7 +420,24 @@ function handleOpenChange(open: boolean) {
     @update:open="handleOpenChange"
   >
     <template #title>
-      {{ props.editingServiceId ? "Service settings" : "Add service node" }}
+      <div class="flex min-w-0 items-center gap-2">
+        <UButton
+          v-if="props.returnToManageNodes"
+          type="button"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          class="shrink-0 gap-1 px-1.5 text-[12px]"
+          aria-label="Back to Manage Nodes"
+          @click="emit('backToManageNodes')"
+        >
+          <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
+          Back
+        </UButton>
+        <span class="truncate">{{
+          props.editingServiceId ? "Service settings" : "Add service node"
+        }}</span>
+      </div>
     </template>
     <template #description>Configure the service and its endpoints</template>
     <template #actions>
@@ -407,34 +455,41 @@ function handleOpenChange(open: boolean) {
       </UButton>
     </template>
     <template #body>
+      <section class="rounded-xl border border-[var(--border)] bg-[var(--panel2)] p-3">
+        <div class="flex items-center justify-between gap-3 text-xs">
+          <strong>Health checks</strong>
+          <span class="text-[var(--muted)]">Checks every 1 minute</span>
+        </div>
+        <p class="mt-1 text-[12.5px] text-[var(--muted)]">{{ lastCheckAge }}</p>
+      </section>
       <div class="flex flex-col gap-0">
         <label for="service-name" class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Service name</span>
+          <span class="text-[12px] font-medium text-[var(--muted)]">Service name</span>
           <UInput
             id="service-name"
             v-model="draft.name"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
             placeholder="e.g. Checkout API"
             required
           />
         </label>
         <label for="service-api-type" class="mt-2 flex flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">API type</span>
+          <span class="text-[12px] font-medium text-[var(--muted)]">API type</span>
           <USelect
             id="service-api-type"
             :model-value="draft.apiType"
             @update:model-value="selectApiType(String($event))"
             :items="apiTypes"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
           />
         </label>
         <div class="flex gap-2.5 max-[720px]:flex-col">
           <div class="min-w-0 flex flex-1 flex-col gap-1">
-            <span class="text-[10px] font-medium text-[var(--muted)]"
+            <span class="text-[12px] font-medium text-[var(--muted)]"
               >Framework <span aria-hidden="true">*</span></span
             >
             <USelect
@@ -446,7 +501,7 @@ function handleOpenChange(open: boolean) {
               placeholder="Select framework"
               class="app__framework-select"
               :ui="{
-                base: 'min-h-[38px] w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                base: 'min-h-[38px] w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
                 content:
                   'app__framework-select-menu rounded-lg border border-[var(--border)] bg-[var(--panel)] shadow-lg',
               }"
@@ -472,7 +527,7 @@ function handleOpenChange(open: boolean) {
             </USelect>
           </div>
           <label for="service-base-url" class="min-w-0 flex flex-1 flex-col gap-1">
-            <span class="text-[10px] font-medium text-[var(--muted)]">{{
+            <span class="text-[12px] font-medium text-[var(--muted)]">{{
               draft.apiType === "REST"
                 ? "Base URL"
                 : draft.apiType === "WEBSOCKET"
@@ -483,7 +538,7 @@ function handleOpenChange(open: boolean) {
               id="service-base-url"
               v-model="draft.baseUrl"
               :ui="{
-                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
               }"
               :placeholder="
                 draft.apiType === 'REST'
@@ -495,7 +550,7 @@ function handleOpenChange(open: boolean) {
             />
           </label>
         </div>
-        <div v-if="draft.apiType === 'GRPC'" class="mt-2 flex items-center gap-2 text-[11px]">
+        <div v-if="draft.apiType === 'GRPC'" class="mt-2 flex items-center gap-2 text-[12.5px]">
           <UCheckbox v-model="draft.grpcTls" aria-label="Use TLS for gRPC calls" />
           <span>Use TLS</span>
         </div>
@@ -512,7 +567,7 @@ function handleOpenChange(open: boolean) {
               />
               <div class="min-w-0">
                 <p class="truncate text-xs font-medium">{{ draft.protoFileName }}</p>
-                <p class="text-[10px] text-[var(--muted)]">Proto definition</p>
+                <p class="text-[12px] text-[var(--muted)]">Proto definition</p>
               </div>
             </div>
             <UButton
@@ -542,28 +597,28 @@ function handleOpenChange(open: boolean) {
       <section class="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3">
         <strong class="text-xs">Health check</strong>
         <label for="service-health-check-url" class="flex flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Health-check URL override</span>
+          <span class="text-[12px] font-medium text-[var(--muted)]">Health-check URL override</span>
           <UInput
             id="service-health-check-url"
             v-model="draft.healthCheckUrl"
             placeholder="Leave blank to use the framework default"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
           />
-          <span class="text-[10px] text-[var(--muted)]">
+          <span class="text-[12px] text-[var(--muted)]">
             Spring Boot defaults to Actuator readiness; use an absolute URL when the health endpoint
             uses a different host or port.
           </span>
         </label>
         <label for="service-health-header-template" class="flex flex-col gap-1">
-          <span class="text-[10px] font-medium text-[var(--muted)]">Header template</span>
+          <span class="text-[12px] font-medium text-[var(--muted)]">Header template</span>
           <USelect
             id="service-health-header-template"
             v-model="draft.healthCheckHeaderTemplateId"
             :items="healthTemplateOptions()"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
           />
         </label>
@@ -597,7 +652,7 @@ function handleOpenChange(open: boolean) {
           @delete="subscriptions.splice(index, 1)"
         >
           <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-medium text-[var(--muted)]">Message queue topic</span>
+            <span class="text-[12px] font-medium text-[var(--muted)]">Message queue topic</span>
             <USelect
               :model-value="subscription.destinationId"
               :items="availableDestinations(subscription)"
@@ -612,7 +667,7 @@ function handleOpenChange(open: boolean) {
             "
             class="flex flex-col gap-1"
           >
-            <span class="text-[10px] font-medium text-[var(--muted)]">Consumer group</span>
+            <span class="text-[12px] font-medium text-[var(--muted)]">Consumer group</span>
             <UInput
               v-model="subscription.consumerGroup"
               :aria-label="`Subscriber ${index + 1} consumer group`"
@@ -620,7 +675,7 @@ function handleOpenChange(open: boolean) {
             />
           </div>
           <div v-else class="flex flex-col gap-1">
-            <span class="text-[10px] font-medium text-[var(--muted)]">RabbitMQ binding key</span>
+            <span class="text-[12px] font-medium text-[var(--muted)]">RabbitMQ binding key</span>
             <UInput
               v-model="subscription.bindingKey"
               :aria-label="`Subscriber ${index + 1} binding key`"
@@ -629,7 +684,7 @@ function handleOpenChange(open: boolean) {
           </div>
           <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
             <div class="flex items-center justify-between gap-2">
-              <strong class="text-[10px] font-medium">Outbound calls</strong>
+              <strong class="text-[12px] font-medium">Outbound calls</strong>
               <UButton
                 v-if="isSavedSubscription(subscription.id)"
                 type="button"
@@ -665,14 +720,14 @@ function handleOpenChange(open: boolean) {
             </div>
             <span
               v-if="!isSavedSubscription(subscription.id)"
-              class="text-[10px] text-[var(--muted)]"
+              class="text-[12px] text-[var(--muted)]"
               >Save this consumer before adding outbound calls.</span
             >
           </section>
         </SettingsAccordionCard>
         <p
           v-if="!subscriptions.length"
-          class="rounded-xl border border-dashed border-[var(--border)] p-3 text-[10px] text-[var(--muted)]"
+          class="rounded-xl border border-dashed border-[var(--border)] p-3 text-[12px] text-[var(--muted)]"
         >
           {{
             props.messageDestinations.length
@@ -680,7 +735,7 @@ function handleOpenChange(open: boolean) {
               : "Add a message queue topic before configuring consumers."
           }}
         </p>
-        <p v-if="!props.editingServiceId" class="text-[10px] text-[var(--muted)]">
+        <p v-if="!props.editingServiceId" class="text-[12px] text-[var(--muted)]">
           Save the service before adding subscribers.
         </p>
       </section>
@@ -692,7 +747,7 @@ function handleOpenChange(open: boolean) {
             type="button"
             color="neutral"
             variant="outline"
-            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
             @click="openApiFileInput?.click()"
           >
             Import OpenAPI
@@ -710,7 +765,7 @@ function handleOpenChange(open: boolean) {
             type="button"
             color="neutral"
             variant="outline"
-            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[11px] font-medium hover:bg-[var(--panel2)]"
+            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
             @click="emit('addEndpoint')"
           >
             + New endpoint
@@ -732,12 +787,12 @@ function handleOpenChange(open: boolean) {
           :for="`service-endpoint-name-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[10px] font-medium text-[var(--muted)]">Name</span>
+          <span class="text-[12px] font-medium text-[var(--muted)]">Name</span>
           <UInput
             :id="`service-endpoint-name-${endpoint.id || index}`"
             v-model="endpoint.name"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
             placeholder="e.g. Get order"
           />
@@ -748,13 +803,13 @@ function handleOpenChange(open: boolean) {
             :for="`service-endpoint-method-${endpoint.id || index}`"
             class="min-w-0 flex flex-1 flex-col gap-1"
           >
-            <span class="text-[10px] font-medium text-[var(--muted)]">Method</span>
+            <span class="text-[12px] font-medium text-[var(--muted)]">Method</span>
             <USelect
               :id="`service-endpoint-method-${endpoint.id || index}`"
               v-model="endpoint.method"
               :items="methods"
               :ui="{
-                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
               }"
             />
           </label>
@@ -764,14 +819,14 @@ function handleOpenChange(open: boolean) {
           :for="`service-endpoint-url-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[10px] font-medium text-[var(--muted)]">{{
+          <span class="text-[12px] font-medium text-[var(--muted)]">{{
             draft.apiType === "WEBSOCKET" ? "WebSocket URL" : "URL"
           }}</span>
           <UInput
             :id="`service-endpoint-url-${endpoint.id || index}`"
             v-model="endpoint.url"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
             :placeholder="draft.apiType === 'WEBSOCKET' ? 'ws://localhost:4000/events' : '/orders'"
           />
@@ -781,21 +836,21 @@ function handleOpenChange(open: boolean) {
           :for="`service-endpoint-rpc-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[10px] font-medium text-[var(--muted)]"
+          <span class="text-[12px] font-medium text-[var(--muted)]"
             >Fully qualified RPC method</span
           >
           <UInput
             :id="`service-endpoint-rpc-${endpoint.id || index}`"
             v-model="endpoint.rpcMethod"
             :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2 text-[11px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
             }"
             placeholder="/example.v1.Orders/GetOrder"
           />
         </label>
         <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
           <div class="flex items-center justify-between gap-2">
-            <strong class="text-[10px] font-medium">Outbound calls</strong>
+            <strong class="text-[12px] font-medium">Outbound calls</strong>
             <UButton
               v-if="endpoint.id"
               type="button"
@@ -829,7 +884,7 @@ function handleOpenChange(open: boolean) {
               <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
             </UButton>
           </div>
-          <span v-if="!endpoint.id" class="text-[10px] text-[var(--muted)]"
+          <span v-if="!endpoint.id" class="text-[12px] text-[var(--muted)]"
             >Save endpoint before adding calls.</span
           >
         </section>
@@ -854,5 +909,5 @@ function handleOpenChange(open: boolean) {
         Save
       </UButton>
     </template>
-  </USlideover>
+  </WorkspaceDrawer>
 </template>

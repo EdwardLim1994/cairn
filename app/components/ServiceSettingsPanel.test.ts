@@ -197,6 +197,25 @@ const draft = {
 };
 
 describe("ServiceSettingsPanel", () => {
+  it("shows the health polling cadence and live last-check age only in settings", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-09T00:00:05.000Z"));
+    const wrapper = mountPanel({
+      draft: structuredClone(draft),
+      frameworkMenuOpen: false,
+      editingServiceId: "service-1",
+      lastHealthCheckAt: "2026-11-09T00:00:00.000Z",
+    });
+
+    expect(wrapper.text()).toContain("Checks every 1 minute");
+    expect(wrapper.text()).toContain("Checked 5 seconds ago");
+    vi.advanceTimersByTime(1000);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain("Checked 6 seconds ago");
+    wrapper.unmount();
+    vi.useRealTimers();
+  });
+
   it("discards when Escape is pressed in the settings dialog", async () => {
     const wrapper = mountPanel({
       draft: structuredClone(draft),
@@ -560,7 +579,7 @@ describe("ServiceSettingsPanel", () => {
 
     expect(wrapper.findAll('input:not([type="file"])')).toHaveLength(5);
     expect(wrapper.findAll("select")).toHaveLength(4);
-    expect(wrapper.findAll("button")).toHaveLength(9);
+    expect(wrapper.findAll("button")).toHaveLength(10);
     expect(wrapper.find('select option[value="PATCH"]').exists()).toBe(true);
     await wrapper.get('input[placeholder="e.g. Checkout API"]').setValue("Catalog API");
     await wrapper.findAll("select").at(3)!.setValue("POST");

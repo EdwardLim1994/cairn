@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { Handle, Position } from "@vue-flow/core";
 
+const emit = defineEmits<{ edit: [destinationId: string] }>();
+
 defineProps<{
   data: {
+    destinationId: string;
     name: string;
     destinations: {
       id: string;
@@ -16,8 +19,10 @@ defineProps<{
 </script>
 
 <template>
-  <article class="app__graph-node app__graph-node--message-queue relative w-72 rounded-2xl">
-    <div class="flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3">
+  <article class="app__graph-node app__graph-node--message-queue relative w-72 rounded-[10px]">
+    <div
+      class="relative flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3 pr-[4.5rem]"
+    >
       <div class="grid size-[31px] shrink-0 place-items-center rounded-[9px]">
         <img
           v-if="data.destinations[0]?.broker === 'kafka'"
@@ -33,7 +38,7 @@ defineProps<{
             class="inline-block size-[9px] shrink-0 rounded-full border-2 border-[var(--panel)]"
             :class="
               data.online === true
-                ? 'bg-[#15966f]'
+                ? 'bg-[var(--success)]'
                 : data.online === false
                   ? 'bg-[var(--danger)]'
                   : 'bg-[var(--muted)]'
@@ -51,8 +56,22 @@ defineProps<{
           />
           <strong class="truncate font-semibold">{{ data.name }}</strong>
         </div>
-        <span class="text-[10px] text-[var(--muted)]">{{ data.destinations.length }} topics</span>
+        <span class="text-[10px] text-[var(--muted)]">
+          {{
+            data.destinations[0]?.broker === "rabbitmq" ? "RabbitMQ topic exchange" : "Kafka topic"
+          }}
+        </span>
       </div>
+      <button
+        type="button"
+        class="nodrag absolute right-2 top-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-[11.5px] font-medium text-[var(--muted)] hover:border-[var(--border-strong)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+        :aria-label="`Edit ${data.name}`"
+        title="Edit message queue"
+        @click.stop="emit('edit', data.destinationId)"
+      >
+        <UIcon name="i-lucide-pencil" class="size-3" aria-hidden="true" />
+        Edit
+      </button>
     </div>
     <template v-if="data.topicsCollapsed">
       <template v-for="destination in data.destinations" :key="destination.id">
@@ -74,7 +93,7 @@ defineProps<{
       <div
         class="flex h-[47px] items-center border-t border-dashed border-[var(--border)] px-3 text-[10px] text-[var(--muted)]"
       >
-        {{ data.destinations.length }} topics · connections bundled
+        Queue connections bundled
       </div>
     </template>
     <div v-else class="flex flex-col">

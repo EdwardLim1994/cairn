@@ -236,14 +236,16 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
   }
 
   async function deleteService(id: string, confirmDelete: () => boolean) {
-    if (!confirmDelete()) return;
+    if (!confirmDelete()) return false;
     try {
       await options.saveCanvas();
       await options.apiClient.deleteService(id);
       await options.loadCanvas();
       await options.saveCanvas();
+      return true;
     } catch (cause) {
       options.onError(cause instanceof Error ? cause.message : "Could not remove service");
+      return false;
     }
   }
 

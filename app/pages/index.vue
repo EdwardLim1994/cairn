@@ -10,6 +10,7 @@ import OtelAccessTokensDialog from "../components/OtelAccessTokensDialog.vue";
 import AppToastStack from "../components/AppToastStack.vue";
 import MockApiCallHistoryPanel from "../components/MockApiCallHistoryPanel.vue";
 import MessageQueueSettingsPanel from "../components/MessageQueueSettingsPanel.vue";
+import ManageNodesPanel from "../components/ManageNodesPanel.vue";
 import { createApiClient } from "../models/api-client";
 import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
 import type { GraphCodeManifest } from "#shared/api/graph-code";
@@ -28,6 +29,8 @@ import { useCanvasViewModel } from "../composables/useCanvasViewModel";
 import { useGraphInteractionViewModel } from "../composables/useGraphInteractionViewModel";
 import { useSettingsPanelViewModel } from "../composables/useSettingsPanelViewModel";
 import { serializeGraphCode } from "../utils/graph-code";
+import { useWorkspaceDrawerState } from "../composables/useWorkspaceDrawerState";
+import { useServiceHealthPolling } from "../composables/useServiceHealthPolling";
 import type { MockApiDraft } from "../models/mock-api";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
@@ -36,6 +39,7 @@ import "@vue-flow/controls/dist/style.css";
 const GraphCanvas = defineAsyncComponent(() => import("../components/graph/GraphCanvas.vue"));
 const authStatus = useState("auth-session-status", () => ({ enabled: true, authenticated: false }));
 const route = useRoute();
+const runtimeConfig = useRuntimeConfig();
 
 const mockApiStore = useMockApiStore();
 const {
@@ -51,8 +55,7 @@ const graphStore = useGraphStore();
 const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
-const { nodes, edges, services, serviceEdges, allNodesCollapsed, nodesLocked } =
-  storeToRefs(graphStore);
+const { nodes, edges, services, serviceEdges, allNodesCollapsed } = storeToRefs(graphStore);
 const dark = useCookie("cairn-dark-mode", {
   default: () => false,
   maxAge: 60 * 60 * 24 * 365,
@@ -65,6 +68,7 @@ useHead({
 });
 const loading = ref(true);
 const errorMessage = ref("");
+const lastServiceHealthCheckAt = ref<Record<string, string>>({});
 const importWarnings = ref<{ id: number; message: string }[]>([]);
 const contextMenu = ref<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
 const contextMenuOpen = computed({
@@ -73,11 +77,23 @@ const contextMenuOpen = computed({
     if (!open) contextMenu.value = null;
   },
 });
-const serviceDialog = ref(false);
-const messageQueuePanel = ref(false);
-const editingMessageQueueId = ref("legacy-queue");
+const { model: drawerModel } = useWorkspaceDrawerState();
+const serviceDialog = drawerModel("service");
+const messageQueuePanel = drawerModel("message-queue");
+const editingMessageDestinationId = ref<string | null>(null);
 const newMessageQueuePosition = ref({ x: 160, y: 120 });
 const editingServiceId = ref<string | null>(null);
+const serviceReturnsToManageNodes = ref(false);
+const activeObservedTrace = ref<{
+  traceId: string;
+  apiName: string;
+  status: "completed" | "failed";
+  totalDurationMs: number | null;
+  connectionCount: number;
+} | null>(null);
+const editingServiceLastHealthCheckAt = computed(() =>
+  editingServiceId.value ? (lastServiceHealthCheckAt.value[editingServiceId.value] ?? null) : null,
+);
 type SubscriberDraft = {
   id: string;
   destinationId: string;
@@ -107,24 +123,25 @@ const serviceDraft = ref<ServiceDraft>({
   endpoints: [{ name: "", method: "GET", url: "/" }],
 });
 const frameworkMenuOpen = ref(false);
-const mockPanel = ref(false);
+const mockPanel = drawerModel("mock-apis");
 const focusedMockApiId = ref<string | null>(null);
 const focusMockApiRequest = ref(0);
 const expandedEnvironmentVariableId = ref<string | null>(null);
 const registeredMockApisOpen = ref(true);
 const sharedEnvironmentVariablesOpen = ref(true);
 const environmentVariablesLoading = ref(false);
-const accessTokensOpen = ref(false);
-const historyOpen = ref(false);
+const accessTokensOpen = drawerModel("access-tokens");
+const historyOpen = drawerModel("history");
 const historyReplayEntryId = ref<string | null>(null);
 const historyEntries = ref<MockApiCallHistoryEntry[]>([]);
 const historyLoading = ref(false);
-const graphCodeOpen = ref(false);
+const graphCodeOpen = drawerModel("graph-code");
+const manageNodesOpen = drawerModel("manage-nodes");
 const graphCodeInitial = ref("");
 const graphCodeApplying = ref(false);
+const followActiveTraceInLogs = ref(true);
 const editingEnvironmentVariableId = ref<string | null>(null);
 const environmentCardDraft = ref({ name: "", value: "" });
-let healthTimer: ReturnType<typeof setInterval> | undefined;
 
 async function signOut() {
   try {
@@ -192,6 +209,12 @@ const canvasViewModel = useCanvasViewModel({
   graphCanvas,
   loading,
   errorMessage,
+  onServiceHealthCompleted: (serviceIds, checkedAt) => {
+    lastServiceHealthCheckAt.value = {
+      ...lastServiceHealthCheckAt.value,
+      ...Object.fromEntries(serviceIds.map((id) => [id, checkedAt])),
+    };
+  },
 });
 const {
   buildEdges,
@@ -202,7 +225,6 @@ const {
   loadServiceHealth,
   loadMessageDestinationHealth,
   saveCanvas,
-  toggleNodesLocked,
   autoArrange,
   onMoveEnd,
   onConnect,
@@ -212,6 +234,10 @@ const {
   setOutboundCall: saveOutboundCall,
   removeServiceCall,
 } = canvasViewModel;
+const serviceHealthPolling = useServiceHealthPolling(() => {
+  void loadServiceHealth();
+  void loadMessageDestinationHealth();
+});
 const { closeSettings, closeSettingsOutside } = useSettingsPanelViewModel({
   serviceDialog,
   mockPanel,
@@ -249,15 +275,25 @@ const mockApiRunViewModel = useMockApiRunViewModel({
   focusResponsePanel: (id) => graphCanvas.value?.focusResponsePanel(id),
   saveCanvas,
   loadLogs: observabilityViewModel.loadLogs,
+  onFlowCollected: ({ flow, apiName, status, totalDurationMs }) => {
+    activeObservedTrace.value = {
+      traceId: flow.traceId,
+      apiName,
+      status,
+      totalDurationMs,
+      connectionCount: flow.edges.length + flow.observedMessageConnectionIds.length,
+    };
+  },
 });
 type MockApi = MockApiDraft;
 const resetEnvironmentCardEdit = mockApiViewModel.resetEnvironmentCardEdit;
 const dismissImportWarning = mockApiViewModel.dismissImportWarning;
-const openEnvironmentVariable = mockApiViewModel.openEnvironmentVariable;
-const closeEnvironmentVariable = mockApiViewModel.closeEnvironmentVariable;
-const updateEnvironmentVariable = mockApiViewModel.updateEnvironmentVariable;
-const addEnvironmentVariable = mockApiViewModel.addEnvironmentVariable;
 const deleteEnvironmentVariable = mockApiViewModel.deleteEnvironmentVariable;
+const saveEnvironmentVariable = mockApiViewModel.saveEnvironmentVariable;
+const saveHeaderTemplate = mockApiViewModel.saveHeaderTemplate;
+const saveAuthorizationTemplate = mockApiViewModel.saveAuthorizationTemplate;
+const saveMockApi = mockApiViewModel.saveMockApi;
+const deleteMockApi = mockApiViewModel.deleteMockApi;
 const loadLogs = observabilityViewModel.loadLogs;
 
 async function loadMockApiCallHistory() {
@@ -321,13 +357,14 @@ watch(historyOpen, (open) => {
 
 function beginAddService() {
   if (!contextMenu.value) return;
+  serviceReturnsToManageNodes.value = false;
   serviceViewModel.beginAddService({ x: contextMenu.value.flowX, y: contextMenu.value.flowY });
   contextMenu.value = null;
 }
 
 function beginAddMessageDestination() {
   if (!contextMenu.value) return;
-  editingMessageQueueId.value = crypto.randomUUID();
+  editingMessageDestinationId.value = null;
   newMessageQueuePosition.value = {
     x: contextMenu.value.flowX,
     y: contextMenu.value.flowY,
@@ -336,31 +373,52 @@ function beginAddMessageDestination() {
   contextMenu.value = null;
 }
 
-function openMessageQueuePanel(queueId: string) {
-  editingMessageQueueId.value = queueId;
+function openMessageQueuePanel(destinationId: string) {
+  editingMessageDestinationId.value = destinationId;
   messageQueuePanel.value = true;
 }
 
-const editingMessageQueueDestinations = computed(() =>
-  graphStore.messageDestinations.filter(
-    (destination) => (destination.queueId ?? "legacy-queue") === editingMessageQueueId.value,
-  ),
+function addServiceFromManager() {
+  serviceReturnsToManageNodes.value = true;
+  manageNodesOpen.value = false;
+  serviceViewModel.beginAddService({ x: 160, y: 120 });
+}
+
+function returnToManageNodes() {
+  serviceReturnsToManageNodes.value = false;
+  serviceDialog.value = false;
+  manageNodesOpen.value = true;
+}
+
+function addQueueFromManager() {
+  manageNodesOpen.value = false;
+  editingMessageDestinationId.value = null;
+  newMessageQueuePosition.value = { x: 160, y: 120 };
+  messageQueuePanel.value = true;
+}
+
+function editDestinationFromManager(destinationId: string) {
+  const destination = graphStore.messageDestinations.find(({ id }) => id === destinationId);
+  if (destination) {
+    manageNodesOpen.value = false;
+    openMessageQueuePanel(destinationId);
+  }
+}
+
+const editingMessageDestination = computed(
+  () =>
+    graphStore.messageDestinations.find(({ id }) => id === editingMessageDestinationId.value) ??
+    null,
 );
 
-async function saveMessageQueue(
-  queueId: string,
-  destinations: typeof graphStore.messageDestinations,
-) {
-  const allDestinations = [
-    ...graphStore.messageDestinations.filter(
-      (destination) => (destination.queueId ?? "legacy-queue") !== queueId,
-    ),
-    ...destinations,
-  ];
-  const retainedIds = new Set(allDestinations.map(({ id }) => id));
-  graphStore.setMessageDestinations(allDestinations);
-  graphStore.setMessageConnections(
-    graphStore.messageConnections.filter(({ destinationId }) => retainedIds.has(destinationId)),
+async function saveMessageQueue(destination: CanvasGetResponse["messageDestinations"][number]) {
+  const exists = graphStore.messageDestinations.some(({ id }) => id === destination.id);
+  graphStore.setMessageDestinations(
+    exists
+      ? graphStore.messageDestinations.map((item) =>
+          item.id === destination.id ? destination : item,
+        )
+      : [...graphStore.messageDestinations, destination],
   );
   syncNodes();
   if (!(await saveCanvas())) {
@@ -370,20 +428,17 @@ async function saveMessageQueue(
   messageQueuePanel.value = false;
 }
 
-async function removeMessageQueue(queueId: string) {
-  const queueDestinations = graphStore.messageDestinations.filter(
-    (destination) => (destination.queueId ?? "legacy-queue") === queueId,
-  );
-  if (!queueDestinations.length) return;
-  const queueName = queueDestinations[0]?.queueName ?? "Message Queue";
-  if (!confirm(`Remove ${queueName} and all its topics and connections from the graph?`)) return;
-
-  const removedIds = new Set(queueDestinations.map(({ id }) => id));
+async function removeMessageQueue(destinationId: string) {
+  const destination = graphStore.messageDestinations.find(({ id }) => id === destinationId);
+  if (!destination) return;
+  if (!confirm(`Remove ${destination.name} and its producer and consumer connections?`)) return;
   graphStore.setMessageDestinations(
-    graphStore.messageDestinations.filter(({ id }) => !removedIds.has(id)),
+    graphStore.messageDestinations.filter(({ id }) => id !== destinationId),
   );
   graphStore.setMessageConnections(
-    graphStore.messageConnections.filter(({ destinationId }) => !removedIds.has(destinationId)),
+    graphStore.messageConnections.filter(
+      (connection) => connection.destinationId !== destinationId,
+    ),
   );
   syncNodes();
   if (!(await saveCanvas())) {
@@ -424,6 +479,8 @@ const graphInteractionViewModel = useGraphInteractionViewModel({
 const handleCanvasContextMenu = graphInteractionViewModel.handleCanvasContextMenu;
 
 function editService(id: string, focusEndpointId?: string) {
+  manageNodesOpen.value = false;
+  serviceReturnsToManageNodes.value = false;
   if (!serviceViewModel.editService(id)) return;
   if (focusEndpointId)
     void nextTick(() => {
@@ -431,6 +488,11 @@ function editService(id: string, focusEndpointId?: string) {
       if (card instanceof HTMLDetailsElement) card.open = true;
       card?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+}
+
+function editServiceFromManager(id: string) {
+  editService(id);
+  serviceReturnsToManageNodes.value = serviceDialog.value;
 }
 
 function openServiceEndpoint(endpointId: string) {
@@ -495,20 +557,18 @@ function saveService(subscriptions: SubscriberDraft[] = []) {
 }
 
 async function handleServiceDelete(id: string) {
-  await serviceViewModel.deleteService(id, () =>
+  const deleted = await serviceViewModel.deleteService(id, () =>
     confirm("Remove this service and its endpoints from the graph?"),
   );
-  closeSettings();
+  if (!deleted) return;
+  if (serviceReturnsToManageNodes.value) returnToManageNodes();
+  else closeSettings();
 }
 
 async function openMockPanel(focusMockApiId?: string) {
   focusedMockApiId.value = focusMockApiId ?? null;
   if (focusMockApiId) focusMockApiRequest.value++;
   await mockApiViewModel.openPanel(focusMockApiId);
-}
-function addMockDraft(apiType: "HTTP" | "GRPC" | "WEBSOCKET") {
-  registeredMockApisOpen.value = true;
-  mockApiViewModel.addMockDraft(apiType);
 }
 function endpointPathParameterNames(entry: MockApi) {
   return mockApiViewModel.endpointPathParameterNames(entry);
@@ -548,20 +608,14 @@ async function importPostmanEnvironment(event: Event) {
       cause instanceof Error ? cause.message : "Could not import Postman environment";
   }
 }
-function removeMockDraft(index: number) {
-  mockApiViewModel.removeMockDraft(index);
-}
-
 function deleteHeaderTemplate(template: (typeof headerTemplates.value)[number]) {
-  mockApiViewModel.removeHeaderTemplate(template, (message) => window.confirm(message));
-}
-
-function addAuthorizationTemplate() {
-  mockApiViewModel.addAuthorizationTemplate();
+  return mockApiViewModel.removeHeaderTemplate(template, (message) => window.confirm(message));
 }
 
 function deleteAuthorizationTemplate(template: (typeof authorizationTemplates.value)[number]) {
-  mockApiViewModel.removeAuthorizationTemplate(template, (message) => window.confirm(message));
+  return mockApiViewModel.removeAuthorizationTemplate(template, (message) =>
+    window.confirm(message),
+  );
 }
 
 function saveMockDraft() {
@@ -572,11 +626,8 @@ function discardMockSettings() {
   mockApiViewModel.discardMockSettings();
 }
 
-function addHeaderTemplate() {
-  mockApiViewModel.addHeaderTemplate();
-}
-
 async function runMock(entry: MockApi) {
+  activeObservedTrace.value = null;
   const result = await mockApiRunViewModel.runMock(entry);
   if (historyOpen.value) await loadMockApiCallHistory();
   return result;
@@ -633,6 +684,25 @@ function openGraphAsCode() {
   graphCodeOpen.value = true;
 }
 
+function toggleGraphAsCode() {
+  if (graphCodeOpen.value) graphCodeOpen.value = false;
+  else openGraphAsCode();
+}
+
+function toggleMockApis() {
+  if (mockPanel.value) closeSettings();
+  else void openMockPanel();
+}
+
+function showActiveTraceLogs() {
+  followActiveTraceInLogs.value = true;
+  logSearch.value = "";
+  logService.value = [];
+  logSeverity.value = [];
+  logsOpen.value = true;
+  void loadLogs();
+}
+
 async function applyGraphCode(manifest: GraphCodeManifest) {
   graphCodeApplying.value = true;
   errorMessage.value = "";
@@ -657,38 +727,86 @@ onMounted(async () => {
   );
   await loadCanvas();
   await loadLogs();
-  healthTimer = setInterval(() => {
-    void loadServiceHealth();
-    void loadMessageDestinationHealth();
-  }, 10000);
+  serviceHealthPolling.start();
 });
 
 onUnmounted(() => {
   document.removeEventListener("pointerdown", closeSettingsOutside);
-  if (healthTimer) clearInterval(healthTimer);
 });
 </script>
 
 <template>
   <main
-    class="relative h-screen min-h-[620px] overflow-hidden text-sm leading-[1.4] app"
+    class="relative h-screen min-h-[620px] overflow-hidden text-[13px] leading-[1.4] app"
     :class="{ 'app--dark': dark }"
   >
     <AppToolbar
-      :all-nodes-collapsed="allNodesCollapsed"
       :dark="dark"
-      :nodes-locked="nodesLocked"
-      :auth-enabled="authStatus.enabled"
-      @toggle-all="toggleAllNodes"
-      @auto-arrange="autoArrange"
-      @toggle-nodes-locked="toggleNodesLocked"
+      :logs-open="logsOpen"
+      :project-id="runtimeConfig.public.projectId"
+      :manage-nodes-open="manageNodesOpen"
+      :mock-apis-open="mockPanel"
+      :history-open="historyOpen"
+      :graph-code-open="graphCodeOpen"
       @toggle-theme="dark = !dark"
-      @open-mock-apis="openMockPanel"
-      @open-graph-as-code="openGraphAsCode"
+      @open-mock-apis="toggleMockApis"
+      @open-manage-nodes="manageNodesOpen = !manageNodesOpen"
+      @open-logs="logsOpen = !logsOpen"
+      @open-graph-as-code="toggleGraphAsCode"
       @open-access-tokens="accessTokensOpen = true"
-      @open-history="historyOpen = true"
+      @open-history="historyOpen = !historyOpen"
       @sign-out="signOut"
     />
+
+    <section
+      v-if="activeObservedTrace"
+      class="app__surface absolute left-3 top-[82px] z-20 flex min-h-12 max-w-[calc(100vw-24px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3.5 py-1.5 text-[12px] shadow-[var(--shadow)] max-[720px]:left-2 max-[720px]:top-[66px]"
+      aria-label="Active observed trace"
+      role="status"
+    >
+      <span class="text-[11px] font-medium text-[var(--muted)]">Active observed trace</span>
+      <span class="max-w-48 truncate font-mono font-medium" :title="activeObservedTrace.traceId">
+        {{ activeObservedTrace.traceId }}
+      </span>
+      <span
+        class="rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+        :class="
+          activeObservedTrace.status === 'completed'
+            ? 'app__run-state--completed'
+            : 'app__run-state--failed'
+        "
+        >{{ activeObservedTrace.status }}</span
+      >
+      <span class="font-semibold">
+        {{
+          activeObservedTrace.totalDurationMs == null
+            ? "N/A"
+            : `${activeObservedTrace.totalDurationMs} ms`
+        }}
+      </span>
+      <span class="text-[var(--muted)]">
+        {{ activeObservedTrace.connectionCount }} connections
+      </span>
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="h-7 px-2 text-[11.5px]"
+        @click="showActiveTraceLogs"
+        >Logs</UButton
+      >
+      <UButton
+        type="button"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="h-7 px-2 text-[11.5px]"
+        aria-label="Clear active observed trace"
+        @click="activeObservedTrace = null"
+        ><UIcon name="i-lucide-x" class="size-3.5" aria-hidden="true"
+      /></UButton>
+    </section>
 
     <OtelAccessTokensDialog v-model:open="accessTokensOpen" />
     <GraphAsCodePanel
@@ -699,11 +817,22 @@ onUnmounted(() => {
     />
     <MessageQueueSettingsPanel
       v-model:open="messageQueuePanel"
-      :queue-id="editingMessageQueueId"
+      :destination="editingMessageDestination"
       :position="newMessageQueuePosition"
-      :destinations="editingMessageQueueDestinations"
+      :project-id="runtimeConfig.public.projectId"
       @save="saveMessageQueue"
       @remove="removeMessageQueue"
+    />
+    <ManageNodesPanel
+      :open="manageNodesOpen"
+      :services="services"
+      :service-health="graphStore.serviceHealth"
+      :destinations="graphStore.messageDestinations"
+      @update:open="manageNodesOpen = $event"
+      @edit-service="editServiceFromManager"
+      @edit-destination="editDestinationFromManager"
+      @add-service="addServiceFromManager"
+      @add-queue="addQueueFromManager"
     />
 
     <section class="absolute inset-0">
@@ -717,7 +846,9 @@ onUnmounted(() => {
           v-model:nodes="nodes"
           v-model:edges="edges"
           :dark="dark"
-          :nodes-locked="nodesLocked"
+          :all-nodes-collapsed="allNodesCollapsed"
+          @auto-arrange="autoArrange"
+          @toggle-all="toggleAllNodes"
           @connect="onConnect"
           @edge-double-click="onEdgeDoubleClick"
           @edge-update="onEdgeUpdate"
@@ -727,6 +858,9 @@ onUnmounted(() => {
           @move-end="onMoveEnd"
           @node-drag-stop="saveCanvas"
           @toggle-service-endpoints="toggleServiceEndpoints"
+          @edit-service="editService"
+          @edit-message-queue="editDestinationFromManager"
+          @edit-mock-api="openMockPanel"
           @open-service-endpoint="openServiceEndpoint"
           @run-mock-api="runMock"
           @connect-web-socket="connectWebSocket"
@@ -758,13 +892,12 @@ onUnmounted(() => {
     <LogsPanel
       v-model:open="logsOpen"
       v-model:search="logSearch"
-      v-model:service-filter="logService"
       v-model:severity-filter="logSeverity"
+      v-model:active-trace-only="followActiveTraceInLogs"
       :logs="logs"
-      :services="services"
+      :active-trace-id="activeObservedTrace?.traceId ?? null"
       :height="logsPanelHeight"
       :format-time="observabilityViewModel.formatTime"
-      @refresh="loadLogs"
       @resize="resizeLogsPanel"
       @adjust-height="adjustLogsPanelHeight"
     />
@@ -774,6 +907,8 @@ onUnmounted(() => {
       v-model:draft="serviceDraft"
       v-model:framework-menu-open="frameworkMenuOpen"
       :editing-service-id="editingServiceId"
+      :return-to-manage-nodes="serviceReturnsToManageNodes"
+      :last-health-check-at="editingServiceLastHealthCheckAt"
       :header-templates="headerTemplates"
       :outbound-call-edges="serviceEdges"
       :endpoint-options="servicesForSelect"
@@ -789,6 +924,7 @@ onUnmounted(() => {
       @remove-proto="serviceViewModel.removeProtoFile"
       @save="saveService"
       @discard="closeSettings"
+      @back-to-manage-nodes="returnToManageNodes"
       @remove-service="handleServiceDelete"
     />
 
@@ -800,32 +936,26 @@ onUnmounted(() => {
       v-model:authorization-templates="authorizationTemplates"
       v-model:variables-open="sharedEnvironmentVariablesOpen"
       v-model:apis-open="registeredMockApisOpen"
-      v-model:variable-draft="environmentCardDraft"
       :environment-variables-loading="environmentVariablesLoading"
-      :editing-environment-variable-id="editingEnvironmentVariableId"
-      :expanded-environment-variable-id="expandedEnvironmentVariableId"
       :focus-mock-api-id="focusedMockApiId"
       :focus-mock-api-request="focusMockApiRequest"
       :services-for-select="servicesForSelect"
       :endpoint-details="endpointDetails"
       :endpoint-path-parameter-names="endpointPathParameterNames"
+      :save-environment-variable="saveEnvironmentVariable"
+      :save-header-template="saveHeaderTemplate"
+      :save-authorization-template="saveAuthorizationTemplate"
+      :save-mock-api="saveMockApi"
+      :delete-environment-variable="deleteEnvironmentVariable"
+      :delete-header-template="deleteHeaderTemplate"
+      :delete-authorization-template="deleteAuthorizationTemplate"
+      :delete-mock-api="deleteMockApi"
       @discard="discardMockSettings"
       @save="saveMockDraft"
-      @add-variable="addEnvironmentVariable"
-      @open-variable="openEnvironmentVariable"
-      @close-variable="closeEnvironmentVariable"
-      @update-variable="updateEnvironmentVariable"
-      @delete-variable="deleteEnvironmentVariable"
       @import-collection="importPostmanCollection"
       @import-environment="importPostmanEnvironment"
-      @add-mock-api="addMockDraft"
-      @remove-mock-api="removeMockDraft"
       @set-mock-endpoint="setMockEndpoint"
       @format-request="formatRequestJson"
-      @add-header-template="addHeaderTemplate"
-      @delete-header-template="deleteHeaderTemplate"
-      @add-authorization-template="addAuthorizationTemplate"
-      @delete-authorization-template="deleteAuthorizationTemplate"
     />
 
     <MockApiCallHistoryPanel

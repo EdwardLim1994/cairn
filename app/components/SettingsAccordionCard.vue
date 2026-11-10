@@ -8,11 +8,14 @@ const props = defineProps<{
   deleteLabel: string;
   open?: boolean;
   compact?: boolean;
+  navigation?: boolean;
+  hideDelete?: boolean;
 }>();
 
 const emit = defineEmits<{
   delete: [];
   toggle: [open: boolean];
+  select: [];
   expand: [];
   collapse: [];
 }>();
@@ -28,6 +31,49 @@ function updateOpen(value: string | string[] | undefined) {
 
 <template>
   <div
+    v-if="props.navigation"
+    :id="id"
+    class="flex items-center overflow-hidden rounded-[9px] border border-[var(--border)] bg-[var(--panel)]"
+  >
+    <button
+      type="button"
+      class="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2.5 text-left hover:bg-[var(--panel2)]"
+      :aria-label="`Edit ${title}`"
+      @click="emit('select')"
+    >
+      <slot name="leading" />
+      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="truncate font-mono text-[12.5px] font-semibold">{{ title }}</span>
+        <span v-if="subtitle" class="truncate text-[11.5px] text-[var(--muted)]">{{
+          subtitle
+        }}</span>
+      </span>
+      <slot name="summary" />
+      <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-[var(--muted)]" />
+    </button>
+    <div
+      v-if="!props.hideDelete || $slots.actions"
+      class="flex shrink-0 items-center gap-1.5 px-2"
+      @click.stop
+      @keydown.stop
+    >
+      <slot name="actions" />
+      <UButton
+        v-if="!props.hideDelete"
+        type="button"
+        color="error"
+        variant="outline"
+        class="grid size-6 shrink-0 place-items-center rounded-md border border-[var(--danger)] bg-transparent p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        :aria-label="deleteLabel"
+        :title="deleteLabel"
+        @click.stop.prevent="emit('delete')"
+      >
+        <UIcon name="i-lucide-trash" class="size-4" aria-hidden="true" />
+      </UButton>
+    </div>
+  </div>
+  <div
+    v-else
     :id="id"
     class="relative flex flex-col rounded-xl border border-[var(--border)] bg-[var(--panel2)]"
     :class="[
@@ -74,6 +120,7 @@ function updateOpen(value: string | string[] | undefined) {
     >
       <slot name="actions" />
       <UButton
+        v-if="!props.hideDelete"
         type="button"
         color="error"
         variant="outline"

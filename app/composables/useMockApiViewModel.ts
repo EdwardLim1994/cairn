@@ -5,6 +5,7 @@ import type { GraphService } from "../models/graph";
 import type {
   AuthorizationTemplateDraft,
   EnvironmentVariable,
+  HeaderTemplateDraft,
   MockApiDraft,
 } from "../models/mock-api";
 import { parsePostmanCollection, retryUnmatchedPostmanDrafts } from "../utils/postman-import";
@@ -198,6 +199,20 @@ export function useMockApiViewModel(options: {
     options.store.removeMockDraft(index);
   }
 
+  async function deleteMockApi(entry: MockApiDraft) {
+    const id = entry.id;
+    if (!id || id.startsWith("draft-")) {
+      const index = options.store.mockDraft.findIndex((item) => item.id === id);
+      if (index >= 0) options.store.removeMockDraft(index);
+      return true;
+    }
+
+    await options.apiClient.deleteMockApi(id);
+    options.store.mockDraft = options.store.mockDraft.filter((item) => item.id !== id);
+    await options.loadCanvas();
+    return true;
+  }
+
   function addHeaderTemplate() {
     const template = {
       id: `draft-${crypto.randomUUID()}`,
@@ -209,19 +224,42 @@ export function useMockApiViewModel(options: {
     return template;
   }
 
-  function removeHeaderTemplate(
+  async function removeHeaderTemplate(
     template: (typeof options.store.headerTemplates)[number],
     confirmDelete: (message: string) => boolean,
   ) {
-    const affected = options.store.mockDraft.filter((api) => api.headerTemplateId === template.id);
-    const names = affected.map(({ name }) => name || "Untitled API");
+    const affected = [
+      ...options.store.mockApis.filter((api) => api.headerTemplateId === template.id),
+      ...options.store.mockDraft.filter((api) => api.headerTemplateId === template.id),
+    ];
+    const names = [...new Set(affected.map(({ name }) => name || "Untitled API"))];
     const detail = names.length ? ` It is used by: ${names.join(", ")}.` : "";
     if (!confirmDelete(`Delete header template ${template.name || "Untitled"}?${detail}`))
       return false;
-    for (const api of affected) api.headerTemplateId = null;
-    options.store.headerTemplates = options.store.headerTemplates.filter(
-      ({ id }) => id !== template.id,
+    if (template.pendingCreate || template.id.startsWith("draft-")) {
+      for (const api of options.store.mockDraft)
+        if (api.headerTemplateId === template.id) api.headerTemplateId = null;
+      options.store.headerTemplates = options.store.headerTemplates.filter(
+        ({ id }) => id !== template.id,
+      );
+      return true;
+    }
+    const pendingHeaders = options.store.headerTemplates.filter(
+      (item) => item.pendingCreate && item.id !== template.id,
     );
+    const pendingAuthorization = options.store.authorizationTemplates.filter(
+      (item) => item.pendingCreate,
+    );
+    const nextHeaders = options.store.savedHeaderTemplates.filter(({ id }) => id !== template.id);
+    const nextApis = savedMockApiPayload().map((api) =>
+      api.headerTemplateId === template.id ? { ...api, headerTemplateId: null } : api,
+    );
+    await saveTemplateSettings(nextHeaders, options.store.savedAuthorizationTemplates, nextApis);
+    for (const api of options.store.mockDraft)
+      if (api.headerTemplateId === template.id) api.headerTemplateId = null;
+    await options.loadCanvas();
+    options.store.headerTemplates.push(...pendingHeaders);
+    options.store.authorizationTemplates.push(...pendingAuthorization);
     return true;
   }
 
@@ -237,21 +275,42 @@ export function useMockApiViewModel(options: {
     return template;
   }
 
-  function removeAuthorizationTemplate(
+  async function removeAuthorizationTemplate(
     template: AuthorizationTemplateDraft,
     confirmDelete: (message: string) => boolean,
   ) {
-    const affected = options.store.mockDraft.filter(
-      (api) => api.authorizationTemplateId === template.id,
-    );
-    const names = affected.map(({ name }) => name || "Untitled API");
+    const affected = [
+      ...options.store.mockApis.filter((api) => api.authorizationTemplateId === template.id),
+      ...options.store.mockDraft.filter((api) => api.authorizationTemplateId === template.id),
+    ];
+    const names = [...new Set(affected.map(({ name }) => name || "Untitled API"))];
     const detail = names.length ? ` It is used by: ${names.join(", ")}.` : "";
     if (!confirmDelete(`Delete authorization template ${template.name || "Untitled"}?${detail}`))
       return false;
-    for (const api of affected) api.authorizationTemplateId = null;
-    options.store.authorizationTemplates = options.store.authorizationTemplates.filter(
+    if (template.pendingCreate || template.id.startsWith("draft-")) {
+      for (const api of options.store.mockDraft)
+        if (api.authorizationTemplateId === template.id) api.authorizationTemplateId = null;
+      options.store.authorizationTemplates = options.store.authorizationTemplates.filter(
+        ({ id }) => id !== template.id,
+      );
+      return true;
+    }
+    const pendingHeaders = options.store.headerTemplates.filter((item) => item.pendingCreate);
+    const pendingAuthorization = options.store.authorizationTemplates.filter(
+      (item) => item.pendingCreate && item.id !== template.id,
+    );
+    const nextAuthorization = options.store.savedAuthorizationTemplates.filter(
       ({ id }) => id !== template.id,
     );
+    const nextApis = savedMockApiPayload().map((api) =>
+      api.authorizationTemplateId === template.id ? { ...api, authorizationTemplateId: null } : api,
+    );
+    await saveTemplateSettings(options.store.savedHeaderTemplates, nextAuthorization, nextApis);
+    for (const api of options.store.mockDraft)
+      if (api.authorizationTemplateId === template.id) api.authorizationTemplateId = null;
+    await options.loadCanvas();
+    options.store.headerTemplates.push(...pendingHeaders);
+    options.store.authorizationTemplates.push(...pendingAuthorization);
     return true;
   }
 
@@ -370,13 +429,155 @@ export function useMockApiViewModel(options: {
     editEnvironmentVariable(variable);
   }
 
-  function deleteEnvironmentVariable(variable: EnvironmentVariable) {
-    options.store.deleteEnvironmentVariable(variable.id);
-    if (options.editingEnvironmentVariableId.value === variable.id) resetEnvironmentCardEdit();
+  async function saveEnvironmentVariable(
+    id: string | null,
+    draft: { name: string; value: string },
+  ) {
+    const name = draft.name.trim();
+    if (!/^[A-Za-z_]\w{0,254}$/.test(name))
+      throw new Error(
+        "Variable name must start with a letter or underscore and contain only letters, numbers, or underscores",
+      );
+    if (options.store.environmentVariables.some((item) => item.name === name && item.id !== id))
+      throw new Error(`Variable "${name}" already exists`);
+
+    const created = !id || id.startsWith("draft-");
+    const result = created
+      ? await options.apiClient.createEnvironmentVariable({ name, value: draft.value })
+      : await options.apiClient.updateEnvironmentVariable(id, { name, value: draft.value });
+    const savedId = created ? result.id : id;
+    const saved: EnvironmentVariable = { id: savedId, name, value: draft.value };
+    const current = options.store.environmentVariables.findIndex(({ id: itemId }) => itemId === id);
+    if (current >= 0) options.store.environmentVariables.splice(current, 1, saved);
+    else options.store.environmentVariables.push(saved);
+    options.store.savedEnvironmentVariableIds = [
+      ...new Set([
+        ...options.store.savedEnvironmentVariableIds.filter((itemId) => itemId !== id),
+        savedId,
+      ]),
+    ];
+    delete options.store.savedEnvironmentVariableValues[id ?? ""];
+    options.store.savedEnvironmentVariableValues[savedId] = { name, value: draft.value };
+    retryUnmatchedImports();
+    return saved;
   }
 
-  function parseMockDrafts() {
-    return options.store.mockDraft.map((entry) => {
+  async function deleteEnvironmentVariable(variable: EnvironmentVariable) {
+    if (!variable.pendingCreate && !variable.id.startsWith("draft-"))
+      await options.apiClient.deleteEnvironmentVariable(variable.id);
+    options.store.deleteEnvironmentVariable(variable.id);
+    options.store.savedEnvironmentVariableIds = options.store.savedEnvironmentVariableIds.filter(
+      (id) => id !== variable.id,
+    );
+    delete options.store.savedEnvironmentVariableValues[variable.id];
+    retryUnmatchedImports();
+    if (!variable.pendingCreate && !variable.id.startsWith("draft-")) await options.loadCanvas();
+    return true;
+  }
+
+  function savedVariablePayload() {
+    return options.store.savedEnvironmentVariableIds.flatMap((id) => {
+      const saved = options.store.savedEnvironmentVariableValues[id];
+      return saved ? [{ id, ...saved }] : [];
+    });
+  }
+
+  function savedMockApiPayload() {
+    return options.store.mockApis.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      apiType: entry.apiType,
+      targetEndpointId: entry.targetEndpointId,
+      headerTemplateId: entry.headerTemplateId,
+      authorizationTemplateId: entry.authorizationTemplateId,
+      customHeaders: entry.customHeaders,
+      active: entry.active,
+      description: entry.description,
+      requestJson: entry.requestJson,
+      pathParameters: entry.pathParameters,
+      importMethod: entry.importMethod,
+      importUrl: entry.importUrl,
+      matchUrl: entry.matchUrl,
+    }));
+  }
+
+  async function saveTemplateSettings(
+    nextHeaders: HeaderTemplateDraft[],
+    nextAuthorization: AuthorizationTemplateDraft[],
+    mockApis = savedMockApiPayload(),
+  ) {
+    return options.apiClient.saveMockApiSettings({
+      environmentVariables: savedVariablePayload(),
+      headerTemplates: nextHeaders.map(({ id, name, headers }) => ({ id, name, headers })),
+      authorizationTemplates: nextAuthorization.map(
+        ({ pendingCreate: _pending, ...template }) => template,
+      ),
+      mockApis,
+    });
+  }
+
+  async function saveHeaderTemplate(template: HeaderTemplateDraft) {
+    const next = options.store.savedHeaderTemplates.map((item) =>
+      item.id === template.id ? template : item,
+    );
+    if (!next.some(({ id }) => id === template.id)) next.push(template);
+    const result = await saveTemplateSettings(next, options.store.savedAuthorizationTemplates);
+    const id = result.idMap.headerTemplates[template.id] ?? template.id;
+    const saved = { ...template, id, pendingCreate: false };
+    options.store.setHeaderTemplates(
+      next.map((item) => (item.id === template.id ? saved : { ...item, pendingCreate: false })),
+    );
+    await options.loadCanvas();
+    return saved;
+  }
+
+  async function saveAuthorizationTemplate(template: AuthorizationTemplateDraft) {
+    const next = options.store.savedAuthorizationTemplates.map((item) =>
+      item.id === template.id ? template : item,
+    );
+    if (!next.some(({ id }) => id === template.id)) next.push(template);
+    const result = await saveTemplateSettings(options.store.savedHeaderTemplates, next);
+    const id = result.idMap.authorizationTemplates[template.id] ?? template.id;
+    const saved = { ...template, id, pendingCreate: false };
+    options.store.setAuthorizationTemplates(
+      next.map((item) => (item.id === template.id ? saved : { ...item, pendingCreate: false })),
+    );
+    await options.loadCanvas();
+    return saved;
+  }
+
+  async function saveMockApi(id: string | null, entry: MockApiDraft) {
+    const parsed = parseMockDrafts([entry])[0]!;
+    const sourceId = id ?? entry.id ?? null;
+    const persistedId = sourceId && !sourceId.startsWith("draft-") ? sourceId : null;
+    const input = {
+      name: parsed.name,
+      apiType: parsed.apiType ?? "HTTP",
+      targetEndpointId: parsed.targetEndpointId,
+      headerTemplateId: parsed.headerTemplateId ?? null,
+      authorizationTemplateId: parsed.authorizationTemplateId ?? null,
+      customHeaders: parsed.customHeaders ?? [],
+      active: parsed.active ?? false,
+      description: parsed.description,
+      requestJson: parsed.requestJson,
+      pathParameters: parsed.pathParameters,
+      importMethod: parsed.importMethod ?? null,
+      importUrl: parsed.importUrl ?? null,
+      matchUrl: parsed.matchUrl ?? null,
+    };
+    const result = persistedId
+      ? await options.apiClient.updateMockApi(persistedId, input)
+      : await options.apiClient.createMockApi(input);
+    const saved = { ...parsed, id: result.id };
+    const draftIndex = options.store.mockDraft.findIndex(({ id: draftId }) => draftId === sourceId);
+    if (draftIndex >= 0) options.store.mockDraft.splice(draftIndex, 1, saved);
+    else options.store.mockDraft.push(saved);
+    await options.loadCanvas();
+    return saved;
+  }
+
+  function parseMockDrafts(drafts = options.store.mockDraft) {
+    return drafts.map((entry) => {
       try {
         const requestJson =
           entry.apiType === "WEBSOCKET"
@@ -473,6 +674,11 @@ export function useMockApiViewModel(options: {
     removeHeaderTemplate,
     addAuthorizationTemplate,
     removeAuthorizationTemplate,
+    deleteMockApi,
+    saveEnvironmentVariable,
+    saveHeaderTemplate,
+    saveAuthorizationTemplate,
+    saveMockApi,
     discardMockSettings,
     openPanel,
     editEnvironmentVariable,

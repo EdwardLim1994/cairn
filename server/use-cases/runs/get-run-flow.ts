@@ -90,24 +90,37 @@ function messageConnectionObserved(
   const serviceName = services.find((service) => service.id === serviceId)?.name;
   if (!serviceName) return false;
   const system = destination.broker === "rabbitmq" ? "rabbitmq" : "kafka";
+  const textAttribute = (value: unknown) => (typeof value === "string" ? value : "");
   return spans.some((span) => {
     if (span.traceId !== traceId) return false;
     const attrs = span.attributes;
-    const spanSystem = attrs["messaging.system"] ?? attrs["messaging.system.name"];
-    const destinationName =
-      attrs["messaging.destination.name"] ??
-      attrs["messaging.destination"] ??
-      attrs["messaging.source.name"];
-    const operation = attrs["messaging.operation.type"] ?? attrs["messaging.operation"];
+    const spanSystem = textAttribute(attrs["messaging.system"] ?? attrs["messaging.system.name"])
+      .trim()
+      .toLowerCase();
+    const destinationName = [
+      attrs["messaging.destination.name"],
+      attrs["messaging.destination"],
+      attrs["messaging.source.name"],
+      attrs["messaging.kafka.topic"],
+      attrs["messaging.kafka.destination"],
+    ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    const operation = textAttribute(
+      attrs["messaging.operation.type"] ?? attrs["messaging.operation"] ?? span.operationName,
+    )
+      .trim()
+      .toLowerCase();
     if (
       normalizeServiceName(span.serviceName, services) !== serviceName ||
-      spanSystem !== system ||
-      destinationName !== destination.name
+      !destinationName ||
+      destinationName.trim() !== destination.name
     )
       return false;
-    const operations =
-      connection.type === "publish" ? ["publish", "send"] : ["receive", "process", "consume"];
-    return operations.includes(String(operation).toLowerCase());
+    if (spanSystem && spanSystem !== system) return false;
+    const operationMatches =
+      connection.type === "publish"
+        ? /publish|send|produce/.test(operation)
+        : /receive|process|consume|poll/.test(operation);
+    return operationMatches;
   });
 }
 

@@ -39,27 +39,24 @@ export function useGraphInteractionViewModel(options: {
 
   function onNodeClick(nodeId: string) {
     if (nodeId.startsWith("mock-api-")) {
-      options.editMockApi?.(nodeId.slice("mock-api-".length));
+      options.store.setSelection(nodeId);
+      options.syncNodes();
       return;
     }
     if (nodeId === "message-queue" || nodeId.startsWith("message-queue:")) {
       options.store.setSelection(nodeId);
-      options.editMessageQueue?.(
-        nodeId === "message-queue" ? "legacy-queue" : nodeId.slice("message-queue:".length),
-      );
+      options.syncNodes();
       return;
     }
     if (nodeId.startsWith("message-destination-")) {
-      const id = nodeId.slice("message-destination-".length);
       options.store.setSelection(nodeId);
-      options.editMessageDestination(id);
+      options.syncNodes();
       return;
     }
     if (!options.store.services.some((service) => service.id === nodeId)) return;
     options.store.setSelection(nodeId);
     options.syncNodes();
     void options.graphCanvas.value?.fitView({ nodes: [nodeId], padding: 0.45, duration: 300 });
-    options.editService(nodeId);
   }
 
   return { handleCanvasContextMenu, onNodeClick };

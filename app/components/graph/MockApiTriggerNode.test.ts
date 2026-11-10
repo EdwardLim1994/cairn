@@ -60,6 +60,18 @@ describe("MockApiTriggerNode", () => {
     expect(wrapper.emitted("trigger")).toEqual([["mock-1"]]);
   });
 
+  it("emits its identity from the edit action without triggering the API", async () => {
+    const wrapper = mount(MockApiTriggerNode, {
+      props: { data },
+      global: { stubs: { Handle: true, UIcon: true } },
+    });
+
+    await wrapper.get('[aria-label="Edit List orders"]').trigger("click");
+
+    expect(wrapper.emitted("edit")).toEqual([["mock-1"]]);
+    expect(wrapper.emitted("trigger")).toBeUndefined();
+  });
+
   it("does not emit a trigger while inactive or while another API is running", async () => {
     const wrapper = mount(MockApiTriggerNode, {
       props: {
@@ -148,6 +160,7 @@ describe("MockApiTriggerNode", () => {
     expect(wrapper.text()).toContain("Latest response");
     expect(wrapper.text()).toContain('"ok": true');
     expect(wrapper.find("aside").classes()).toContain("right-full");
+    expect(wrapper.find("aside").classes()).toContain("app__mock-response-panel");
     await wrapper.get('[aria-label="Hide latest response"]').trigger("click");
     expect(wrapper.emitted("toggleResponse")).toEqual([["mock-1"]]);
   });
