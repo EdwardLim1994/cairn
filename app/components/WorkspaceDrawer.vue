@@ -6,10 +6,15 @@
     :portal="false"
     :close="false"
     :ui="drawerUi"
+    class="w-1/3"
     @update:open="emit('update:open', $event)"
   >
-    <template #title><slot name="title" /></template>
-    <template #description><slot name="description" /></template>
+    <template #title>
+      <slot name="title" />
+    </template>
+    <template #description>
+      <slot name="description" />
+    </template>
     <template #actions>
       <slot name="actions" />
       <UButton
@@ -23,8 +28,12 @@
         <UIcon name="i-lucide-x" class="size-4" aria-hidden="true" />
       </UButton>
     </template>
-    <template #body><slot name="body" /></template>
-    <template #footer><slot name="footer" /></template>
+    <template #body>
+      <slot name="body" />
+    </template>
+    <template #footer>
+      <slot name="footer" />
+    </template>
   </USlideover>
 </template>
 
@@ -52,7 +61,7 @@ const drawerUi = computed(() => ({
   ),
   content: appendClass(
     [
-      "absolute z-[71] inset-[76px_12px_12px_auto] flex w-1/4 max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] shadow-[var(--shadow-lg)]",
+      "absolute z-[71] inset-[76px_12px_12px_auto] flex w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] shadow-[var(--shadow-lg)] sm:w-1/2 lg:w-1/3",
       props.ui.content,
     ],
     "app__workspace-drawer-content",

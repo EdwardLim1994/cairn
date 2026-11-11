@@ -334,7 +334,7 @@ body {
   position: absolute !important;
   z-index: 71 !important;
   inset: 76px 12px 12px auto !important;
-  width: 25vw !important;
+  width: 33.333vw !important;
   max-width: calc(100vw - 24px) !important;
   max-height: none !important;
   height: auto !important;
