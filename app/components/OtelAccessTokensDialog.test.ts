@@ -11,11 +11,7 @@ const components = {
       return () =>
         h("div", { ...props.content, class: props.ui?.overlay }, [
           h("section", { class: props.ui?.content }, [
-            h("header", [
-              ...(slots.title?.() ?? []),
-              ...(slots.description?.() ?? []),
-              ...(slots.actions?.() ?? []),
-            ]),
+            h("header", [...(slots.header?.() ?? [])]),
             ...(slots.body?.() ?? []),
             ...(slots.footer?.() ?? []),
           ]),
@@ -34,6 +30,26 @@ const components = {
           onInput: (event: Event) =>
             emit("update:modelValue", (event.target as HTMLInputElement).value),
         });
+    },
+  }),
+  USelect: defineComponent({
+    inheritAttrs: false,
+    props: { modelValue: String, items: Array },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () =>
+        h(
+          "select",
+          {
+            ...attrs,
+            value: props.modelValue,
+            onChange: (event: Event) =>
+              emit("update:modelValue", (event.target as HTMLSelectElement).value),
+          },
+          (props.items as { label: string; value: string }[]).map((item) =>
+            h("option", { value: item.value }, item.label),
+          ),
+        );
     },
   }),
   UButton: defineComponent({
@@ -67,7 +83,7 @@ function mountDialog() {
   vi.stubGlobal("$fetch", fetch);
   const wrapper = mount(OtelAccessTokensDialog, {
     props: { open: true },
-    global: { components },
+    global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
   });
   return { wrapper, fetch };
 }
@@ -77,7 +93,7 @@ describe("OtelAccessTokensDialog", () => {
     const { wrapper, fetch } = mountDialog();
     await flushPromises();
     await wrapper.get('[aria-label="Token name"]').setValue("collector");
-    await wrapper.get('[aria-label="Expiration date"]').setValue("2030-01-01");
+    await wrapper.get('[aria-label="Expires after"]').setValue("30");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
     expect(fetch).toHaveBeenCalledWith(
@@ -116,11 +132,11 @@ describe("OtelAccessTokensDialog", () => {
     const { wrapper } = mountDialog();
     await flushPromises();
     await wrapper.get('[aria-label="Token name"]').setValue("collector");
-    await wrapper.get('[aria-label="Expiration date"]').setValue("2030-01-01");
+    await wrapper.get('[aria-label="Expires after"]').setValue("30");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
     expect(wrapper.text()).toContain("one-time-secret");
-    await wrapper.get("button").trigger("click");
+    await wrapper.get('[aria-label="Close panel"]').trigger("click");
     await flushPromises();
     expect(wrapper.text()).not.toContain("one-time-secret");
   });

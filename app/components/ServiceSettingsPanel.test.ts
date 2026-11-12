@@ -39,11 +39,7 @@ const nuxtUiStubs = {
                 },
               },
               [
-                h("header", { class: props.ui?.header }, [
-                  ...(slots.title?.() ?? []),
-                  ...(slots.description?.() ?? []),
-                  ...(slots.actions?.() ?? []),
-                ]),
+                h("header", { class: props.ui?.header }, [...(slots.header?.() ?? [])]),
                 h("div", { class: props.ui?.body }, slots.body?.()),
                 h("footer", { class: props.ui?.footer }, slots.footer?.()),
               ],
@@ -170,7 +166,7 @@ const nuxtUiStubs = {
 function mountPanel(props: Record<string, unknown>) {
   return mount(ServiceSettingsPanel, {
     props: { headerTemplates: [], outboundCallEdges: [], endpointOptions: [], ...props },
-    global: { components: nuxtUiStubs },
+    global: { components: nuxtUiStubs, stubs: { DialogTitle: true, DialogDescription: true } },
   });
 }
 

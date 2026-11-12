@@ -11,11 +11,7 @@ const components = {
     setup(props, { slots }) {
       return () =>
         h("aside", { ...props.content, class: props.ui?.content }, [
-          h("header", [
-            ...(slots.title?.() ?? []),
-            ...(slots.description?.() ?? []),
-            ...(slots.actions?.() ?? []),
-          ]),
+          h("header", [...(slots.header?.() ?? [])]),
           ...(slots.body?.() ?? []),
         ]);
     },
@@ -54,7 +50,7 @@ describe("MockApiCallHistoryPanel", () => {
   it("renders newest-first history card fields and closes on request", async () => {
     const wrapper = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [entry], loading: false, replaying: false },
-      global: { components },
+      global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
     });
     expect(wrapper.get("aside").attributes("aria-label")).toBe("Mock API call history");
     expect(wrapper.text()).toContain("Create order");
@@ -84,12 +80,12 @@ describe("MockApiCallHistoryPanel", () => {
   it("shows loading and empty states", () => {
     const wrapper = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [], loading: true, replaying: false },
-      global: { components },
+      global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
     });
     expect(wrapper.text()).toContain("Loading call history...");
     const empty = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [], loading: false, replaying: false },
-      global: { components },
+      global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
     });
     expect(empty.text()).toContain("No mock API calls recorded yet.");
   });
@@ -97,7 +93,7 @@ describe("MockApiCallHistoryPanel", () => {
   it("emits a clear-all intent while entries exist", async () => {
     const wrapper = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [entry], loading: false, replaying: false },
-      global: { components },
+      global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
     });
     await wrapper.get("button").trigger("click");
     expect(wrapper.emitted("clearHistory")).toEqual([[]]);
@@ -106,7 +102,7 @@ describe("MockApiCallHistoryPanel", () => {
   it("keeps the shared drawer layout during replay and can stop replay", async () => {
     const wrapper = mount(MockApiCallHistoryPanel, {
       props: { open: true, entries: [entry], loading: false, replaying: true },
-      global: { components },
+      global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
     });
     expect(wrapper.get("aside").classes()).not.toContain("translate-x-[80%]");
     await wrapper.get('[aria-label="Stop replay and restore history"]').trigger("click");

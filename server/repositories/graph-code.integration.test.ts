@@ -330,11 +330,11 @@ integration("graph code repository with MySQL", () => {
     const originalPosition = await db!
       .select()
       .from(graphNodePositions)
-      .where(eq(graphNodePositions.entityId, destination!.queueId));
+      .where(eq(graphNodePositions.entityId, destination!.id));
     await db!
       .update(graphNodePositions)
       .set({ positionX: 444, positionY: 222 })
-      .where(eq(graphNodePositions.entityId, destination!.queueId));
+      .where(eq(graphNodePositions.entityId, destination!.id));
 
     await applyGraphCode(
       projectId,
@@ -365,7 +365,7 @@ integration("graph code repository with MySQL", () => {
     const preserved = await db!
       .select()
       .from(graphNodePositions)
-      .where(eq(graphNodePositions.entityId, destination!.queueId));
+      .where(eq(graphNodePositions.entityId, destination!.id));
     expect(preserved[0]).toMatchObject({ positionX: 444, positionY: 222 });
     expect(originalPosition[0]).toBeDefined();
 

@@ -36,7 +36,7 @@ describe("service graph code schema", () => {
     if (parsed.version !== 2) return;
     const push = parsed.services.find(({ key }) => key === "push-service");
     expect(push?.apiType).toBe("WEBSOCKET");
-    expect(push?.baseUrl).toBe("ws://localhost");
+    expect(push?.baseUrl).toBe("ws://localhost/");
     expect(push?.healthCheck).toEqual({
       url: "http://localhost/services/push/actuator/health/readiness",
       headers: [],
@@ -44,22 +44,22 @@ describe("service graph code schema", () => {
     expect(push?.endpoints[0]?.url).toBe("ws://localhost/ws/notifications?token=test-token-u1");
     expect(parsed.destinations).toContainEqual(
       expect.objectContaining({
-        key: "notification-created",
+        key: "topic-notification-created",
         name: "notification.created",
         broker: "kafka",
       }),
     );
     expect(parsed.messageConnections).toContainEqual(
       expect.objectContaining({
-        serviceKey: "notification-service",
-        destinationKey: "notification-created",
+        serviceKey: "shop-notification-service",
+        destinationKey: "topic-notification-created",
         type: "publish",
       }),
     );
     expect(parsed.messageConnections).toContainEqual(
       expect.objectContaining({
         serviceKey: "push-service",
-        destinationKey: "notification-created",
+        destinationKey: "topic-notification-created",
         consumerGroup: "push-service",
         type: "subscribe",
       }),

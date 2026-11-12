@@ -40,7 +40,7 @@ describe("OpenTelemetry access tokens", () => {
       projectId: string;
       name: string;
       digest: string;
-      expiresAt: Date;
+      expiresAt: Date | null;
     }> = [];
     const create = createOtelAccessTokenUseCase({
       ensureProject: async () => "project",

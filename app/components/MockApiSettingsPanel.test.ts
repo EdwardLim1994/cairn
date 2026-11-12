@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vite-plus/test";
-import { defineComponent, h, nextTick, ref } from "vue";
+import { describe, expect, it, vi } from "vite-plus/test";
+import { defineComponent, h, ref } from "vue";
 import MockApiSettingsPanel from "./MockApiSettingsPanel.vue";
 import type { MockApiDraft } from "../models/mock-api";
 
@@ -70,10 +70,7 @@ const settingsUiStubs = {
                 },
               },
               [
-                h("header", { class: props.ui?.header }, [
-                  ...(slots.title?.() ?? []),
-                  ...(slots.description?.() ?? []),
-                ]),
+                h("header", { class: props.ui?.header }, [...(slots.header?.() ?? [])]),
                 h("div", { class: props.ui?.body }, slots.body?.()),
                 h("footer", { class: props.ui?.footer }, slots.footer?.()),
               ],
@@ -158,523 +155,252 @@ const mockDraft = [
   },
 ];
 
-describe("MockApiSettingsPanel", () => {
-  it("discards when Escape is pressed in the settings dialog", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: structuredClone(mockDraft),
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: false,
-        apisOpen: false,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [],
-        endpointDetails: [],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-
-    await wrapper.get('[aria-label="Mock API settings"]').trigger("keydown.esc");
-
-    expect(wrapper.emitted("discard")).toEqual([[]]);
+function mountPanel(overrides: Record<string, unknown> = {}) {
+  return mount(MockApiSettingsPanel, {
+    props: {
+      mockDraft: structuredClone(mockDraft),
+      environmentVariables: [],
+      headerTemplates: [],
+      variablesOpen: true,
+      apisOpen: true,
+      variableDraft: { name: "", value: "" },
+      environmentVariablesLoading: false,
+      editingEnvironmentVariableId: null,
+      expandedEnvironmentVariableId: null,
+      servicesForSelect: [
+        { id: "endpoint-1", label: "Orders | List orders (GET)", apiType: "HTTP" },
+      ],
+      endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
+      endpointPathParameterNames: () => [],
+      ...overrides,
+    } as never,
+    global: { components: settingsUiStubs, stubs: { DialogTitle: true, DialogDescription: true } },
   });
+}
 
-  it("keeps the panel open on backdrop clicks and renders header template and custom rows", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [
-          {
-            id: "mock-1",
-            name: "Fetch orders",
-            targetEndpointId: "endpoint-1",
-            headerTemplateId: "template-1",
-            customHeaders: [{ name: "X-Request", value: "{{requestId}}" }],
-            active: false,
-            description: "",
-            requestJson: "{}",
-            pathParameters: {},
-          },
-        ],
-        environmentVariables: [],
-        headerTemplates: [
-          {
-            id: "template-1",
-            name: "Tenant headers",
-            headers: [{ name: "X-Tenant", value: "{{tenant}}" }],
-          },
-        ],
-        variablesOpen: true,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
-        endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
+function labelControl(wrapper: ReturnType<typeof mountPanel>, label: string, tag: string) {
+  return wrapper
+    .findAll("label")
+    .find((item) => item.text().includes(label))!
+    .get(tag);
+}
+
+describe("MockApiSettingsPanel", () => {
+  it("closes on Escape but keeps the overview open on backdrop clicks", async () => {
+    const wrapper = mountPanel();
     await wrapper
       .findAll("div")
       .find((node) => node.classes().includes("fixed"))!
       .trigger("click");
     expect(wrapper.emitted("discard")).toBeUndefined();
-    const closedAccordionTriggers = wrapper.findAll('button[aria-expanded="false"]');
-    await closedAccordionTriggers[0]!.trigger("click");
-    await closedAccordionTriggers[1]!.trigger("click");
-    expect(wrapper.text()).toContain("Tenant headers");
-    expect(wrapper.find('input[aria-label="Custom header name"]').exists()).toBe(true);
-    expect(wrapper.find("#mock-api-template-mock-1").exists()).toBe(true);
-    expect(wrapper.text()).not.toContain("Active");
-    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(1);
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "New template")!
-      .trigger("click");
-    await wrapper.get('[aria-label="Delete Tenant headers"]').trigger("click");
-    expect(wrapper.emitted("addHeaderTemplate")).toEqual([[]]);
-    expect(wrapper.emitted("deleteHeaderTemplate")).toHaveLength(1);
-    const templateRowsBefore = wrapper.findAll('input[aria-label="Header name"]').length;
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Add header")!
-      .trigger("click");
-    expect(wrapper.findAll('input[aria-label="Header name"]')).toHaveLength(templateRowsBefore + 1);
+    await wrapper.get('[aria-label="Mock API settings"]').trigger("keydown.esc");
+    expect(wrapper.emitted("discard")).toEqual([[]]);
   });
 
-  it("lets users select and see a mock API target endpoint in its card", async () => {
-    const entry: MockApiDraft = {
-      id: "mock-1",
-      apiType: "HTTP",
-      name: "Fetch orders",
-      targetEndpointId: "endpoint-1",
-      active: true,
-      description: "",
-      requestJson: "{}",
-      pathParameters: {},
-    };
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [entry],
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: false,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [
-          { id: "endpoint-1", label: "Orders | List orders (GET)" },
-          { id: "endpoint-2", label: "Payments | Create payment (POST)" },
-        ],
-        endpointDetails: [
-          { id: "endpoint-1", url: "/orders" },
-          { id: "endpoint-2", url: "/payments" },
-        ],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
+  it("shows overview cards and import controls without Save or Discard", async () => {
+    const wrapper = mountPanel({
+      environmentVariables: [{ id: "variable-1", name: "TOKEN", value: "secret" }],
+      headerTemplates: [{ id: "template-1", name: "Tenant headers", headers: [] }],
+      authorizationTemplates: [{ id: "auth-1", name: "Bearer", type: "bearer", token: "secret" }],
     });
-
-    await wrapper.get('#mock-api-mock-1 [aria-expanded="false"]').trigger("click");
-    const target = wrapper.get("#mock-api-endpoint-mock-1");
-    (target.element as HTMLSelectElement).value = "endpoint-2";
-    await target.trigger("change");
-
-    expect(entry.targetEndpointId).toBe("endpoint-2");
-    expect(wrapper.get("#mock-api-mock-1").text()).toContain("Payments | Create payment (POST)");
-    expect(wrapper.emitted("setMockEndpoint")).toEqual([[entry]]);
-  });
-
-  it("filters WebSocket endpoints and edits the exact text message", async () => {
-    const entry: MockApiDraft = {
-      id: "mock-ws",
-      apiType: "WEBSOCKET",
-      name: "Watch events",
-      targetEndpointId: "socket-endpoint",
-      active: true,
-      customHeaders: [],
-      description: "",
-      requestJson: "  subscribe {{channel}}\n",
-      pathParameters: {},
-    };
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [entry],
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: false,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [
-          { id: "http-endpoint", label: "Orders | List (GET)", apiType: "HTTP" },
-          { id: "grpc-endpoint", label: "Orders | Read (gRPC)", apiType: "GRPC" },
-          { id: "socket-endpoint", label: "Events | Stream (WebSocket)", apiType: "WEBSOCKET" },
-        ],
-        endpointDetails: [
-          { id: "http-endpoint", url: "/orders", apiType: "REST" },
-          { id: "socket-endpoint", url: "wss://example.test/events", apiType: "WEBSOCKET" },
-        ],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-
-    const card = wrapper.get("#mock-api-mock-ws");
-    await card.get('[aria-expanded="false"]').trigger("click");
-    expect(card.find("#mock-api-template-mock-ws").exists()).toBe(true);
-    expect(card.find("#mock-api-authorization-mock-ws").exists()).toBe(true);
-    expect(card.findAll("button").some((button) => button.text() === "Add header")).toBe(true);
-    const endpoint = card.get("#mock-api-endpoint-mock-ws");
-    expect(
-      Array.from((endpoint.element as HTMLSelectElement).options).map(({ value }) => value),
-    ).toEqual(["", "socket-endpoint"]);
-    const message = card.get('[aria-label="WebSocket message"]');
-    expect((message.element as HTMLTextAreaElement).value).toBe("  subscribe {{channel}}\n");
-    await message.setValue("  next frame\n");
-    expect(entry.requestJson).toBe("  next frame\n");
-  });
-
-  it("deactivates invalid staged APIs and does not reactivate them when variables return", async () => {
-    const entry: MockApiDraft = {
-      apiType: "HTTP",
-      name: "Fetch orders",
-      targetEndpointId: "endpoint-1",
-      customHeaders: [{ name: "X-Auth", value: "{{token}}" }],
-      active: true,
-      description: "",
-      requestJson: "{}",
-      pathParameters: {},
-    };
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [entry],
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: true,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [],
-        endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-    await nextTick();
-    expect(entry.active).toBe(false);
-    expect(entry.status).toBe("draft");
-    await wrapper.setProps({
-      environmentVariables: [{ id: "var-1", name: "token", value: "ok" }],
-    } as never);
-    await nextTick();
-    expect(entry.active).toBe(false);
-    expect(entry.status).toBe("inactive");
-  });
-
-  it("renders shared variables, mock APIs, and import controls", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: structuredClone(mockDraft),
-        environmentVariables: [{ id: "var-1", name: "TOKEN", value: "secret" }],
-        headerTemplates: [],
-        variablesOpen: true,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: "var-1",
-        expandedEnvironmentVariableId: "var-1",
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
-        endpointDetails: [{ id: "endpoint-1", url: "/orders/{orderId}" }],
-        endpointPathParameterNames: () => ["orderId"],
-      },
-      global: { components: settingsUiStubs },
-    });
-
     expect(wrapper.text()).toContain("Shared environment variables");
     expect(wrapper.text()).toContain("Registered mock APIs");
     expect(wrapper.text()).toContain("Fetch orders");
     expect(wrapper.text()).toContain("Import APIs");
-    expect(wrapper.text()).toContain("+ New WebSocket API");
     expect(wrapper.text()).toContain("Import environment");
-    expect(wrapper.text()).toContain("New variable");
-    expect(wrapper.find('[aria-label="Close"]').exists()).toBe(false);
-    expect(wrapper.get('label[for="environment-variable-name-var-1"]').attributes("for")).toBe(
-      "environment-variable-name-var-1",
-    );
-    expect(wrapper.get('label[for="environment-variable-value-var-1"]').attributes("for")).toBe(
-      "environment-variable-value-var-1",
-    );
-    await wrapper.get("#mock-api-mock-1 [aria-expanded='false']").trigger("click");
-    expect(wrapper.get('label[for="mock-api-name-mock-1"]').attributes("for")).toBe(
-      "mock-api-name-mock-1",
-    );
-    expect(wrapper.get('label[for="mock-api-endpoint-mock-1"]').attributes("for")).toBe(
-      "mock-api-endpoint-mock-1",
-    );
-    expect(wrapper.get('label[for="mock-api-path-mock-1-orderId"]').attributes("for")).toBe(
-      "mock-api-path-mock-1-orderId",
-    );
-    expect(wrapper.get("fieldset legend").text()).toBe("Request (JSON)");
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(false);
+    expect(wrapper.findAll("button").some((button) => button.text() === "Save")).toBe(false);
+    expect(wrapper.findAll("button").some((button) => button.text() === "Discard")).toBe(false);
+    expect(wrapper.find('[aria-label="Edit Tenant headers"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Edit Bearer"]').exists()).toBe(true);
   });
 
-  it("emits a WebSocket mock API draft intent", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [],
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: false,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [],
-        endpointDetails: [],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "+ New WebSocket API")!
-      .trigger("click");
-
-    expect(wrapper.emitted("addMockApi")).toEqual([["WEBSOCKET"]]);
-  });
-
-  it("shows type-specific authorization fields and supports template type edits", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [],
-        environmentVariables: [],
-        headerTemplates: [],
-        authorizationTemplates: [
-          { id: "bearer", name: "Bearer", type: "bearer", token: "token" },
-          { id: "basic", name: "Basic", type: "basic", username: "user", password: "pass" },
-          { id: "key", name: "Key", type: "api-key", headerName: "X-Key", value: "secret" },
-          {
-            id: "oauth",
-            name: "OAuth",
-            type: "oauth-client-credentials",
-            tokenUrl: "https://auth.example.com/token",
-            clientId: "client",
-            clientSecret: "secret",
-            scope: "read",
-          },
-        ],
-        variablesOpen: false,
-        apisOpen: false,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [],
-        endpointDetails: [],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-
-    for (const [id, labels] of [
-      ["bearer", ["Bearer token"]],
-      ["basic", ["Basic username", "Basic password"]],
-      ["key", ["API key header name", "API key value"]],
-      ["oauth", ["OAuth token URL", "OAuth client ID", "OAuth client secret", "OAuth scope"]],
-    ] as const) {
-      const card = wrapper.get(`#authorization-template-${id}`);
-      await card.get('[aria-expanded="false"]').trigger("click");
-      for (const label of labels) expect(card.find(`[aria-label="${label}"]`).exists()).toBe(true);
-    }
-
-    const bearer = wrapper.get("#authorization-template-bearer");
-    await bearer.get('[aria-label="Authorization type"]').setValue("basic");
-    expect(bearer.find('[aria-label="Basic username"]').exists()).toBe(true);
-    expect(bearer.find('[aria-label="Bearer token"]').exists()).toBe(false);
-  });
-
-  it("opens new authorization templates and masks secrets until revealed", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [],
-        environmentVariables: [],
-        headerTemplates: [],
-        authorizationTemplates: [],
-        variablesOpen: false,
-        apisOpen: false,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [],
-        endpointDetails: [],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
-    });
-
-    await wrapper
-      .get("#authorization-templates")
-      .findAll("button")
-      .find((button) => button.text() === "New template")!
-      .trigger("click");
-    expect(wrapper.emitted("addAuthorizationTemplate")).toEqual([[]]);
-    await wrapper.setProps({
-      authorizationTemplates: [
+  it("opens a header template editor with rows and returns to the overview", async () => {
+    const wrapper = mountPanel({
+      headerTemplates: [
         {
-          id: "draft-auth",
-          name: "New auth",
-          type: "bearer",
-          token: "secret",
-          pendingCreate: true,
+          id: "template-1",
+          name: "Tenant headers",
+          headers: [{ name: "X-Tenant", value: "{{tenant}}" }],
         },
       ],
-    } as never);
-    const card = wrapper.get("#authorization-template-draft-auth");
-    expect(card.find('[aria-expanded="true"]').exists()).toBe(true);
-    const token = card.get('[aria-label="Bearer token"]');
-    expect(token.attributes("type")).toBe("password");
-    await card.get('[aria-label="Show Bearer token"]').trigger("click");
-    expect(card.get('[aria-label="Bearer token"]').attributes("type")).toBe("text");
+    });
+    await wrapper.get('[aria-label="Edit Tenant headers"]').trigger("click");
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(true);
+    expect(wrapper.findAll('input[aria-label="Header name"]')).toHaveLength(1);
+    expect(wrapper.find('[aria-label="Delete Edit header template"]').exists()).toBe(true);
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Add header")!
+      .trigger("click");
+    expect(wrapper.findAll('input[aria-label="Header name"]')).toHaveLength(2);
+    await wrapper.get('[aria-label="Back to Mock APIs"]').trigger("click");
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(false);
   });
 
-  it("stages per-API authorization assignment and no-auth selection", async () => {
-    const api = {
-      id: "api-1",
-      name: "Fetch orders",
-      targetEndpointId: "endpoint-1",
-      authorizationTemplateId: "auth-1",
-      description: "",
-      requestJson: "{}",
-      pathParameters: {},
-    };
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: [api],
-        environmentVariables: [],
-        headerTemplates: [],
-        authorizationTemplates: [{ id: "auth-1", name: "Bearer", type: "bearer", token: "secret" }],
-        variablesOpen: false,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: null,
-        expandedEnvironmentVariableId: null,
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
-        endpointDetails: [{ id: "endpoint-1", url: "/orders" }],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
+  it("edits a WebSocket API on its own page and saves the text message", async () => {
+    const saveMockApi = vi.fn(async (_id: string | null, entry: MockApiDraft) => entry);
+    const wrapper = mountPanel({
+      mockDraft: [
+        {
+          id: "mock-ws",
+          apiType: "WEBSOCKET",
+          name: "Watch events",
+          targetEndpointId: "socket-endpoint",
+          active: true,
+          customHeaders: [],
+          description: "",
+          requestJson: "subscribe",
+          pathParameters: {},
+        },
+      ],
+      servicesForSelect: [
+        { id: "http-endpoint", label: "Orders | List (GET)", apiType: "HTTP" },
+        { id: "socket-endpoint", label: "Events | Stream (WebSocket)", apiType: "WEBSOCKET" },
+      ],
+      saveMockApi,
     });
-
-    const apiCard = wrapper.get("#mock-api-api-1");
-    await apiCard.get('[aria-expanded="false"]').trigger("click");
-    const authorization = apiCard.get("#mock-api-authorization-api-1");
-    await authorization.get('[aria-expanded="false"]').trigger("click");
-    const select = authorization.get('[aria-label="Authorization for Fetch orders"]');
-    expect((select.element as HTMLSelectElement).value).toBe("auth-1");
-    await select.setValue("");
-    expect(api.authorizationTemplateId).toBeNull();
-    await select.setValue("auth-1");
-    expect(api.authorizationTemplateId).toBe("auth-1");
-    expect(authorization.text()).toContain("Bearer (Bearer token)");
-
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Save")!
-      .trigger("click");
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Discard")!
-      .trigger("click");
-    expect(wrapper.emitted("save")).toEqual([[]]);
-    expect(wrapper.emitted("discard")).toEqual([[]]);
+    await wrapper.get('[aria-label="Edit Watch events"]').trigger("click");
+    const endpoint = labelControl(wrapper, "Service endpoint", "select");
+    expect(
+      Array.from((endpoint.element as HTMLSelectElement).options).map(({ value }) => value),
+    ).toEqual(["", "socket-endpoint"]);
+    const message = labelControl(wrapper, "Message", "textarea");
+    expect((message.element as HTMLTextAreaElement).value).toBe("subscribe");
+    await message.setValue("next frame");
+    await wrapper.get("#mock-api-entity-editor").trigger("submit");
+    expect(saveMockApi).toHaveBeenCalledWith(
+      "mock-ws",
+      expect.objectContaining({
+        apiType: "WEBSOCKET",
+        requestJson: "next frame",
+      }),
+    );
   });
 
-  it("emits variable, import, mock API, save, and discard interactions", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: structuredClone(mockDraft),
-        environmentVariables: [{ id: "var-1", name: "TOKEN", value: "secret" }],
-        headerTemplates: [],
-        variablesOpen: true,
-        apisOpen: true,
-        variableDraft: { name: "TOKEN", value: "secret" },
-        environmentVariablesLoading: false,
-        editingEnvironmentVariableId: "var-1",
-        expandedEnvironmentVariableId: "var-1",
-        servicesForSelect: [{ id: "endpoint-1", label: "Orders | List orders (GET)" }],
-        endpointDetails: [{ id: "endpoint-1", url: "/orders/{orderId}" }],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
+  it("shows the authorization fields for each selected template type", async () => {
+    const wrapper = mountPanel({
+      authorizationTemplates: [
+        { id: "bearer", name: "Bearer", type: "bearer", token: "token" },
+        { id: "basic", name: "Basic", type: "basic", username: "user", password: "pass" },
+        { id: "key", name: "Key", type: "api-key", headerName: "X-Key", value: "secret" },
+        {
+          id: "oauth",
+          name: "OAuth",
+          type: "oauth-client-credentials",
+          tokenUrl: "https://auth.test/token",
+          clientId: "client",
+          clientSecret: "secret",
+          scope: "read",
+        },
+      ],
     });
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Save")!
-      .trigger("click");
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Discard")!
-      .trigger("click");
+    for (const [name, field] of [
+      ["Bearer", "Bearer token"],
+      ["Basic", "Username"],
+      ["Key", "API key value"],
+      ["OAuth", "Client ID"],
+    ]) {
+      await wrapper.get('[aria-label="Edit ' + name + '"]').trigger("click");
+      expect(wrapper.findAll("label").some((item) => item.text().includes(field!))).toBe(true);
+      await wrapper.get('[aria-label="Back to Mock APIs"]').trigger("click");
+    }
+    await wrapper.get('[aria-label="Edit Bearer"]').trigger("click");
+    await labelControl(wrapper, "Authorization type", "select").setValue("basic");
+    expect(wrapper.findAll("label").some((item) => item.text().includes("Password"))).toBe(true);
+  });
+
+  it("opens new variable and authorization pages, with Save and Discard only there", async () => {
+    const saveEnvironmentVariable = vi.fn(
+      async (_id: string | null, draft: { name: string; value: string }) => ({
+        id: "saved-variable",
+        ...draft,
+      }),
+    );
+    const wrapper = mountPanel({ mockDraft: [], saveEnvironmentVariable });
     await wrapper
       .findAll("button")
       .find((button) => button.text() === "New variable")!
       .trigger("click");
+    await labelControl(wrapper, "Variable name", "input").setValue("TOKEN");
+    await labelControl(wrapper, "Value", "textarea").setValue("secret");
+    expect(wrapper.findAll("button").some((button) => button.text() === "Discard")).toBe(true);
+    await wrapper.get("#mock-api-entity-editor").trigger("submit");
+    expect(saveEnvironmentVariable).toHaveBeenCalledWith(null, { name: "TOKEN", value: "secret" });
     await wrapper
       .findAll("button")
-      .find((button) => button.text().includes("+ New HTTP API"))!
+      .find((button) => button.text() === "New template")!
       .trigger("click");
-    const fileInput = wrapper.get("#postman-collection-file");
-    Object.defineProperty(fileInput.element, "files", {
-      value: [new File(["{}"], "collection.json")],
-    });
-    await fileInput.trigger("change");
-
-    expect(wrapper.emitted("save")).toEqual([[]]);
-    expect(wrapper.emitted("discard")).toEqual([[]]);
-    expect(wrapper.emitted("addVariable")).toEqual([[]]);
-    expect(wrapper.emitted("addMockApi")).toEqual([["HTTP"]]);
-    expect(wrapper.emitted("importCollection")).toHaveLength(1);
-    expect(wrapper.find("#postman-environment-file").exists()).toBe(true);
-    await wrapper.find("#postman-environment-file").trigger("change");
-    expect(wrapper.emitted("importEnvironment")).toHaveLength(1);
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(true);
+    await wrapper.get('[aria-label="Back to Mock APIs"]').trigger("click");
+    expect(wrapper.findAll("button").some((button) => button.text() === "Save")).toBe(false);
   });
 
-  it("uses accordion triggers to expand and collapse each settings section", async () => {
-    const wrapper = mount(MockApiSettingsPanel, {
-      props: {
-        mockDraft: structuredClone(mockDraft),
-        environmentVariables: [],
-        headerTemplates: [],
-        variablesOpen: true,
-        apisOpen: true,
-        variableDraft: { name: "", value: "" },
-        environmentVariablesLoading: false,
-        servicesForSelect: [],
-        endpointDetails: [],
-        endpointPathParameterNames: () => [],
-      },
-      global: { components: settingsUiStubs },
+  it("opens a new API page and emits both import intents", async () => {
+    const wrapper = mountPanel({ mockDraft: [] });
+    const fileInput = wrapper.get("#postman-collection-file");
+    await fileInput.trigger("change");
+    await wrapper.get("#postman-environment-file").trigger("change");
+    expect(wrapper.emitted("importCollection")).toHaveLength(1);
+    expect(wrapper.emitted("importEnvironment")).toHaveLength(1);
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("+ New API"))!
+      .trigger("click");
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(true);
+    expect(labelControl(wrapper, "API type", "select").element).toBeInstanceOf(HTMLSelectElement);
+  });
+
+  it("changes a new API to WebSocket and offers only WebSocket endpoints", async () => {
+    const wrapper = mountPanel({
+      mockDraft: [],
+      servicesForSelect: [
+        { id: "http-endpoint", label: "Orders HTTP", apiType: "HTTP" },
+        { id: "socket-endpoint", label: "Events WebSocket", apiType: "WEBSOCKET" },
+      ],
     });
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("+ New API"))!
+      .trigger("click");
+    await labelControl(wrapper, "API type", "select").setValue("WEBSOCKET");
+    const endpoint = labelControl(wrapper, "Service endpoint", "select");
+    expect(
+      Array.from((endpoint.element as HTMLSelectElement).options).map(({ value }) => value),
+    ).toEqual(["", "socket-endpoint"]);
+    expect(labelControl(wrapper, "Message", "textarea").element).toBeInstanceOf(
+      HTMLTextAreaElement,
+    );
+  });
 
-    await wrapper.get("#shared-environment-variables-toggle [aria-expanded]").trigger("click");
-    await wrapper.get("#registered-mock-apis-toggle [aria-expanded]").trigger("click");
-
-    expect(wrapper.emitted("update:variablesOpen")).toEqual([[false]]);
-    expect(wrapper.emitted("update:apisOpen")).toEqual([[false]]);
+  it("edits authorization assignment on the mock API page", async () => {
+    const saveMockApi = vi.fn(async (_id: string | null, entry: MockApiDraft) => entry);
+    const wrapper = mountPanel({
+      mockDraft: [
+        {
+          id: "mock-1",
+          name: "Fetch orders",
+          apiType: "HTTP",
+          targetEndpointId: "endpoint-1",
+          authorizationTemplateId: "auth-1",
+          description: "",
+          requestJson: "{}",
+          pathParameters: {},
+        },
+      ],
+      authorizationTemplates: [{ id: "auth-1", name: "Bearer", type: "bearer", token: "secret" }],
+      saveMockApi,
+    });
+    await wrapper.get('[aria-label="Edit Fetch orders"]').trigger("click");
+    const authorization = labelControl(wrapper, "Authorization", "select");
+    expect((authorization.element as HTMLSelectElement).value).toBe("auth-1");
+    await authorization.setValue("");
+    await wrapper.get("#mock-api-entity-editor").trigger("submit");
+    expect(saveMockApi).toHaveBeenCalledWith(
+      "mock-1",
+      expect.objectContaining({
+        authorizationTemplateId: "",
+      }),
+    );
   });
 });

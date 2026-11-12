@@ -208,7 +208,7 @@ describe("graph view model", () => {
       targetHandle: "in:endpoint-1",
     });
     expect(edges[0]?.animated).toBe(true);
-    expect(edges[0]).toMatchObject({ type: "default", label: "N/A" });
+    expect(edges[0]).toMatchObject({ type: "default", label: "No timing" });
     expect(edges[0]?.domAttributes).toMatchObject({
       title: "Timing unavailable: outbound client-span telemetry was not found.",
     });

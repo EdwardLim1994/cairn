@@ -83,7 +83,10 @@ const nuxtUiStubs = {
 };
 
 function mountPanel(props: Record<string, unknown>) {
-  return mount(LogsPanel, { props, global: { components: nuxtUiStubs } });
+  return mount(LogsPanel, {
+    props: { activeTraceId: null, activeTraceOnly: false, ...props },
+    global: { components: nuxtUiStubs },
+  });
 }
 
 const log = {
@@ -110,11 +113,8 @@ describe("LogsPanel", () => {
       height: 280,
       formatTime: () => "12:00:00",
     });
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text().includes("Logs"))!
-      .trigger("click");
-    expect(wrapper.emitted("update:open")).toEqual([[true]]);
+    expect(wrapper.find("#logs-panel").exists()).toBe(false);
+    await wrapper.setProps({ open: true } as never);
     expect(wrapper.text()).toContain("Logs");
   });
 
@@ -130,40 +130,32 @@ describe("LogsPanel", () => {
       formatTime: () => "12:00:00",
     });
     expect(wrapper.text()).toContain("Rejected order");
-    await wrapper.get('[aria-label="Filter by service"]').trigger("click");
-    await wrapper.get('[role="menu"] [role="menuitem"]:nth-child(3)').trigger("click");
-    await wrapper.get('[aria-label="Filter by severity"]').trigger("click");
-    await wrapper
-      .findAll('[role="menu"]')[1]!
-      .get('[role="menuitem"]:nth-child(2)')
-      .trigger("click");
-    await wrapper.get('[aria-label="Refresh logs"]').trigger("click");
+    await wrapper.findAll('[aria-label="Log level"] button')[2]!.trigger("click");
+    await wrapper.get('[aria-label="Filter logs by service or text"]').setValue("Orders");
     await wrapper.get('[aria-label="Resize logs panel"]').trigger("keydown", { key: "ArrowUp" });
     await wrapper.get('[aria-label="Close logs"]').trigger("click");
 
-    expect(wrapper.emitted("update:serviceFilter")?.at(-1)?.[0]).toEqual(["Orders"]);
-    expect(wrapper.emitted("update:severityFilter")?.at(-1)?.[0]).toEqual(["ERROR"]);
-    expect(wrapper.emitted("refresh")).toEqual([[]]);
+    expect(wrapper.emitted("update:severityFilter")?.at(-1)?.[0]).toEqual(["WARN", "ERROR"]);
+    expect(wrapper.emitted("update:search")?.at(-1)?.[0]).toBe("Orders");
     expect(wrapper.emitted("adjustHeight")).toEqual([[24]]);
     expect(wrapper.emitted("update:open")?.at(-1)?.[0]).toBe(false);
   });
 
-  it("keeps multi-select menus open and allows clearing the service filter", async () => {
+  it("filters to the active trace and allows clearing the trace filter", async () => {
     const wrapper = mountPanel({
       open: true,
       search: "",
       serviceFilter: ["Orders"],
       severityFilter: [],
-      logs: [log],
+      logs: [log, { ...log, id: 2, traceId: "other-trace", message: "Other log" }],
       services: [{ name: "Orders" }, { name: "Inventory" }],
       height: 320,
       formatTime: () => "12:00:00",
+      activeTraceId: "trace-1",
+      activeTraceOnly: true,
     });
-
-    await wrapper.get('[aria-label="Filter by service"]').trigger("click");
-    await wrapper.get('[role="menu"] [role="menuitem"]:nth-child(1)').trigger("click");
-
-    expect(wrapper.emitted("update:serviceFilter")?.at(-1)?.[0]).toEqual([]);
-    expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Other log");
+    await wrapper.get('input[type="checkbox"]').setValue(false);
+    expect(wrapper.emitted("update:activeTraceOnly")?.at(-1)?.[0]).toBe(false);
   });
 });

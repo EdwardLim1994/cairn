@@ -349,8 +349,8 @@ describe("mock API view model", () => {
     expect(context.store.mockDraft).toEqual([]);
   });
 
-  it("confirms template deletion and detaches staged APIs while retaining custom headers", () => {
-    const { store, viewModel } = setup();
+  it("confirms template deletion and detaches staged APIs while retaining custom headers", async () => {
+    const { store, viewModel, savedBodies, operations } = setup();
     const template = { id: "template-1", name: "Tenant", headers: [] };
     store.headerTemplates = [template];
     store.setMockDraft([
@@ -366,15 +366,16 @@ describe("mock API view model", () => {
     ]);
     let confirmation = "";
     expect(
-      viewModel.removeHeaderTemplate(template, (message) => {
+      await viewModel.removeHeaderTemplate(template, (message) => {
         confirmation = message;
         return false;
       }),
     ).toBe(false);
     expect(confirmation).toContain("Get order");
     expect(store.headerTemplates).toEqual([template]);
-    expect(viewModel.removeHeaderTemplate(template, () => true)).toBe(true);
-    expect(store.headerTemplates).toEqual([]);
+    expect(await viewModel.removeHeaderTemplate(template, () => true)).toBe(true);
+    expect(savedBodies.at(-1)).toMatchObject({ headerTemplates: [] });
+    expect(operations).toContain("load");
     expect(store.mockDraft[0]).toMatchObject({
       headerTemplateId: null,
       customHeaders: [{ name: "X-Local", value: "kept" }],
@@ -501,7 +502,7 @@ describe("mock API view model", () => {
     });
     expect(variable.value).toBe("new");
     viewModel.openEnvironmentVariable(variable);
-    viewModel.deleteEnvironmentVariable(variable);
+    await viewModel.deleteEnvironmentVariable(variable);
     expect(store.environmentVariables).toEqual([]);
     expect(errors).toEqual([]);
   });

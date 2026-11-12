@@ -27,14 +27,7 @@ vi.mock("vue-codemirror", async () => {
 const components = {
   USlideover: defineComponent({
     setup(_, { slots }) {
-      return () =>
-        h("section", [
-          slots.title?.(),
-          slots.description?.(),
-          slots.actions?.(),
-          slots.body?.(),
-          slots.footer?.(),
-        ]);
+      return () => h("section", [slots.header?.(), slots.body?.(), slots.footer?.()]);
     },
   }),
   UButton: defineComponent({
@@ -60,7 +53,7 @@ function applyButton(wrapper: ReturnType<typeof mountPanel>) {
 function mountPanel(initialCode = "") {
   return mount(GraphAsCodePanel, {
     props: { open: true, initialCode },
-    global: { components },
+    global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
   });
 }
 
@@ -118,7 +111,7 @@ describe("GraphAsCodePanel", () => {
     expect(wrapper.emitted("apply")?.[0]?.[0]).toEqual(parse(yaml));
 
     await wrapper.get("textarea").setValue("version: [unterminated");
-    await wrapper.get("button:last-child").trigger("click");
+    await applyButton(wrapper).trigger("click");
     expect(wrapper.emitted("apply")).toHaveLength(1);
     expect(wrapper.get('[role="alert"]').text()).toBeTruthy();
   });

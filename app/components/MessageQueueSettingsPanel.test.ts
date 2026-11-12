@@ -26,11 +26,7 @@ const components = {
     setup(props, { slots }) {
       return () =>
         h("aside", { class: props.ui?.content }, [
-          h("header", [
-            ...(slots.title?.() ?? []),
-            ...(slots.description?.() ?? []),
-            ...(slots.actions?.() ?? []),
-          ]),
+          h("header", [...(slots.header?.() ?? [])]),
           ...(slots.body?.() ?? []),
           ...(slots.footer?.() ?? []),
         ]);
@@ -95,7 +91,7 @@ function mountPanel(overrides: Partial<{ destination: Destination | null; open: 
       projectId: "project-1",
       ...overrides,
     },
-    global: { components },
+    global: { components, stubs: { DialogTitle: true, DialogDescription: true } },
   });
 }
 
