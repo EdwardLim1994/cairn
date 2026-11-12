@@ -14,6 +14,10 @@ import { parsePostmanEnvironment } from "../utils/postman-environment-import";
 type Store = ReturnType<typeof useMockApiStore>;
 type ImportWarning = { id: number; message: string };
 
+function websocketMessageValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
 export function useMockApiViewModel(options: {
   store: Store;
   apiClient: ReturnType<typeof createApiClient>;
@@ -123,13 +127,8 @@ export function useMockApiViewModel(options: {
     }
   }
 
-  function websocketMessageValue(value: unknown) {
-    return typeof value === "string" ? value : "";
-  }
-
   function addMockDraft(apiType: MockApiDraft["apiType"] = "HTTP") {
-    const serviceApiType =
-      apiType === "HTTP" ? "REST" : apiType === "WEBSOCKET" ? "WEBSOCKET" : "GRPC";
+    const serviceApiType = { HTTP: "REST", WEBSOCKET: "WEBSOCKET", GRPC: "GRPC" }[apiType];
     const endpointId = options
       .services()
       .filter((service) => (service.apiType ?? "REST") === serviceApiType)
@@ -579,12 +578,11 @@ export function useMockApiViewModel(options: {
   function parseMockDrafts(drafts = options.store.mockDraft) {
     return drafts.map((entry) => {
       try {
-        const requestJson =
-          entry.apiType === "WEBSOCKET"
-            ? websocketMessageValue(entry.requestJson)
-            : typeof entry.requestJson === "string"
-              ? JSON.parse(entry.requestJson.trim() || "{}")
-              : (entry.requestJson ?? {});
+        let requestJson = entry.requestJson;
+        if (entry.apiType === "WEBSOCKET") requestJson = websocketMessageValue(requestJson);
+        else if (typeof requestJson === "string")
+          requestJson = JSON.parse(requestJson.trim() || "{}");
+        else requestJson ??= {};
         return { ...entry, requestJson };
       } catch {
         throw new Error(`Request for ${entry.name || "mock API"} must be valid JSON`);

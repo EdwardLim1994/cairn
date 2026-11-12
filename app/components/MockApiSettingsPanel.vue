@@ -163,7 +163,7 @@ function beginCreate(
     };
   } else {
     const type = apiType ?? "HTTP";
-    const serviceType = type === "HTTP" ? "REST" : type === "WEBSOCKET" ? "WEBSOCKET" : "GRPC";
+    const serviceType = { HTTP: "REST", WEBSOCKET: "WEBSOCKET", GRPC: "GRPC" }[type];
     const endpointId =
       props.servicesForSelect.find((item) => (item.apiType ?? "HTTP") === serviceType)?.id ?? null;
     editor.value = {
@@ -218,6 +218,13 @@ function beginEditMock(entry: MockApiDraft) {
   editorError.value = "";
   const pending = !entry.id || entry.id.startsWith("draft-");
   const source = toRaw(entry);
+  let requestJson = source.requestJson;
+  if (typeof requestJson !== "string") {
+    requestJson =
+      source.apiType === "WEBSOCKET"
+        ? JSON.stringify(requestJson ?? "")
+        : JSON.stringify(requestJson ?? {}, null, 2);
+  }
   const draft: MockApiDraft = {
     ...source,
     pathParameters: { ...source.pathParameters },
@@ -225,14 +232,7 @@ function beginEditMock(entry: MockApiDraft) {
     ...(source.readinessReasons
       ? { readinessReasons: source.readinessReasons.map((reason) => ({ ...reason })) }
       : {}),
-    requestJson:
-      source.apiType === "WEBSOCKET"
-        ? typeof source.requestJson === "string"
-          ? source.requestJson
-          : String(source.requestJson ?? "")
-        : typeof source.requestJson === "string"
-          ? source.requestJson
-          : JSON.stringify(source.requestJson ?? {}, null, 2),
+    requestJson,
   };
   editor.value = {
     kind: "mock",
@@ -300,7 +300,7 @@ async function deleteEditor() {
 
 watch(
   () => [props.focusMockApiId, props.focusMockApiRequest] as const,
-  async ([id]) => {
+  ([id]) => {
     if (!id) return;
     const entry = mockDraft.value.find((mock) => mock.id === id);
     if (entry) beginEditMock(entry);
@@ -526,24 +526,39 @@ watchEffect(() => {
         @submit.prevent="saveEditor"
       >
         <template v-if="editor.kind === 'variable'">
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
             Variable name
-            <UInput v-model="editor.draft.name" placeholder="e.g. API_BASE_URL" required />
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <UInput
+              v-model="editor.draft.name"
+              aria-label="Variable name"
+              placeholder="e.g. API_BASE_URL"
+              required
+            />
+          </div>
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
             Value
-            <UTextarea v-model="editor.draft.value" :rows="4" placeholder="Variable value" />
-          </label>
+            <UTextarea
+              v-model="editor.draft.value"
+              aria-label="Value"
+              :rows="4"
+              placeholder="Variable value"
+            />
+          </div>
           <p class="text-xs text-[var(--muted)]">
             Use <code class="font-mono">&#123;&#123;name&#125;&#125;</code> to reference this value
             in requests.
           </p>
         </template>
         <template v-else-if="editor.kind === 'header'">
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
             Template name
-            <UInput v-model="editor.draft.name" placeholder="e.g. Internal API headers" required />
-          </label>
+            <UInput
+              v-model="editor.draft.name"
+              aria-label="Template name"
+              placeholder="e.g. Internal API headers"
+              required
+            />
+          </div>
           <div class="flex flex-col gap-2">
             <div
               v-for="(header, index) in editor.draft.headers"
@@ -577,27 +592,34 @@ watchEffect(() => {
           </div>
         </template>
         <template v-else-if="editor.kind === 'authorization'">
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
             Template name
-            <UInput v-model="editor.draft.name" placeholder="e.g. Service bearer token" required />
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <UInput
+              v-model="editor.draft.name"
+              aria-label="Template name"
+              placeholder="e.g. Service bearer token"
+              required
+            />
+          </div>
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
             Authorization type
             <USelect
               :model-value="editor.draft.type"
+              aria-label="Authorization type"
               :items="authorizationTypeOptions"
               @update:model-value="setAuthorizationType(editor.draft, $event)"
             />
-          </label>
+          </div>
           <template v-if="editor.draft.type === 'bearer'">
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Bearer token
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Bearer token
               <UInput
                 v-model="editor.draft.token"
+                aria-label="Bearer token"
                 :type="secretVisible(editor.draft, 'token') ? 'text' : 'password'"
                 placeholder="Token or {{variable}}"
               />
-            </label>
+            </div>
             <UButton
               type="button"
               color="neutral"
@@ -609,66 +631,89 @@ watchEffect(() => {
             >
           </template>
           <template v-else-if="editor.draft.type === 'basic'">
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Username<UInput
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Username<UInput
                 v-model="editor.draft.username"
+                aria-label="Username"
                 placeholder="Username or {{variable}}"
-            /></label>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Password<UInput
+              />
+            </div>
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Password<UInput
                 v-model="editor.draft.password"
+                aria-label="Password"
                 :type="secretVisible(editor.draft, 'password') ? 'text' : 'password'"
-            /></label>
+              />
+            </div>
           </template>
           <template v-else-if="editor.draft.type === 'api-key'">
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Header name<UInput v-model="editor.draft.headerName" placeholder="X-API-Key"
-            /></label>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >API key value<UInput
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Header name<UInput
+                v-model="editor.draft.headerName"
+                aria-label="Header name"
+                placeholder="X-API-Key"
+              />
+            </div>
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              API key value<UInput
                 v-model="editor.draft.value"
+                aria-label="API key value"
                 :type="secretVisible(editor.draft, 'value') ? 'text' : 'password'"
-            /></label>
+              />
+            </div>
           </template>
           <template v-else>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Token URL<UInput
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Token URL<UInput
                 v-model="editor.draft.tokenUrl"
+                aria-label="Token URL"
                 placeholder="https://auth.example.com/token"
-            /></label>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Client ID<UInput v-model="editor.draft.clientId"
-            /></label>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Client secret<UInput v-model="editor.draft.clientSecret" type="password"
-            /></label>
-            <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-              >Scope (optional)<UInput v-model="editor.draft.scope"
-            /></label>
+              />
+            </div>
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Client ID<UInput v-model="editor.draft.clientId" aria-label="Client ID" />
+            </div>
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Client secret<UInput
+                v-model="editor.draft.clientSecret"
+                aria-label="Client secret"
+                type="password"
+              />
+            </div>
+            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+              Scope (optional)<UInput v-model="editor.draft.scope" aria-label="Scope (optional)" />
+            </div>
           </template>
         </template>
         <template v-else>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >Mock API name
-            <UInput v-model="editor.draft.name" placeholder="e.g. Create order" required />
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >API type
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            Mock API name
+            <UInput
+              v-model="editor.draft.name"
+              aria-label="Mock API name"
+              placeholder="e.g. Create order"
+              required
+            />
+          </div>
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            API type
             <USelect
               :model-value="editor.draft.apiType ?? 'HTTP'"
+              aria-label="API type"
               :items="mockApiTypeOptions"
               @update:model-value="setMockApiType(editor.draft, $event)"
             />
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >Service endpoint
+          </div>
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            Service endpoint
             <USelect
               v-model="editor.draft.targetEndpointId"
+              aria-label="Service endpoint"
               :items="endpointOptions(editor.draft)"
               @update:model-value="emit('setMockEndpoint', editor.draft)"
             />
-          </label>
-          <label
+          </div>
+          <div
             v-for="name in props.endpointPathParameterNames(editor.draft)"
             :key="name"
             class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
@@ -676,33 +721,42 @@ watchEffect(() => {
             Path parameter: {{ name }}
             <UInput
               v-model="editor.draft.pathParameters[name]"
+              :aria-label="`Path parameter: ${name}`"
               :placeholder="`Value or {{${name}}}`"
             />
-          </label>
-          <label
+          </div>
+          <div
             v-if="supportsHandshakeSettings(editor.draft)"
             class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >Header template
-            <USelect v-model="editor.draft.headerTemplateId" :items="templateOptions()" />
-          </label>
-          <label
+          >
+            Header template
+            <USelect
+              v-model="editor.draft.headerTemplateId"
+              :items="templateOptions()"
+              aria-label="Header template"
+            />
+          </div>
+          <div
             v-if="supportsHandshakeSettings(editor.draft)"
             class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >Authorization
+          >
+            Authorization
             <USelect
               v-model="editor.draft.authorizationTemplateId"
+              aria-label="Authorization"
               :items="authorizationOptions()"
             />
-          </label>
+          </div>
           <HeaderRowsEditor
             v-if="supportsHandshakeSettings(editor.draft)"
             v-model="editor.draft.customHeaders"
           />
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >{{ editor.draft.apiType === "WEBSOCKET" ? "Message" : "Request (JSON)" }}
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            {{ editor.draft.apiType === "WEBSOCKET" ? "Message" : "Request (JSON)" }}
             <UTextarea
               v-if="editor.draft.apiType === 'WEBSOCKET'"
               v-model="editor.draft.requestJson"
+              aria-label="Message"
               :rows="6"
               placeholder="Text message to send"
             />
@@ -723,19 +777,25 @@ watchEffect(() => {
                 @update:model-value="editor.draft.requestJson = $event"
               />
             </template>
-          </label>
-          <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
-            >Description<UInput v-model="editor.draft.description" placeholder="Optional note"
-          /></label>
-          <label
+          </div>
+          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            Description<UInput
+              v-model="editor.draft.description"
+              aria-label="Description"
+              placeholder="Optional note"
+            />
+          </div>
+          <div
             class="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium"
-            >Active
+          >
+            Active
             <USwitch
               v-model="editor.draft.active"
+              aria-label="Active"
               size="sm"
               :disabled="!editor.draft.targetEndpointId"
             />
-          </label>
+          </div>
         </template>
         <p v-if="editorError" role="alert" class="text-xs text-[var(--danger)]">
           {{ editorError }}

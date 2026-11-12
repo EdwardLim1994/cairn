@@ -111,8 +111,7 @@ function messageConnectionObserved(
       .toLowerCase();
     if (
       normalizeServiceName(span.serviceName, services) !== serviceName ||
-      !destinationName ||
-      destinationName.trim() !== destination.name
+      destinationName?.trim() !== destination.name
     )
       return false;
     if (spanSystem && spanSystem !== system) return false;

@@ -175,12 +175,10 @@ export function serviceInput(value: unknown): ServiceInput {
     });
   const apiType =
     input.apiType === "GRPC" || input.apiType === "WEBSOCKET" ? input.apiType : "REST";
-  const baseUrl =
-    apiType === "REST"
-      ? httpUrl(input.baseUrl, "Base URL")
-      : apiType === "WEBSOCKET"
-        ? webSocketUrl(input.baseUrl, "WebSocket base URL")
-        : requiredText(input.baseUrl, "gRPC target", 2048);
+  let baseUrl: string;
+  if (apiType === "REST") baseUrl = httpUrl(input.baseUrl, "Base URL");
+  else if (apiType === "WEBSOCKET") baseUrl = webSocketUrl(input.baseUrl, "WebSocket base URL");
+  else baseUrl = requiredText(input.baseUrl, "gRPC target", 2048);
   if (apiType === "GRPC" && !/^(?:\[[^\]]+\]|[^:/?#\s]+):\d{1,5}$/.test(baseUrl))
     throw createError({
       statusCode: 400,

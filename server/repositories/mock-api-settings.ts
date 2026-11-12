@@ -135,7 +135,7 @@ export async function saveMockApiSettings(
         (api) =>
           api.targetEndpointId &&
           endpointTypes.get(api.targetEndpointId) !==
-            (api.apiType === "GRPC" ? "GRPC" : api.apiType === "WEBSOCKET" ? "WEBSOCKET" : "REST"),
+            { GRPC: "GRPC", WEBSOCKET: "WEBSOCKET", HTTP: "REST" }[api.apiType],
       )
     )
       throw new Error("Mock API type must match service API type");

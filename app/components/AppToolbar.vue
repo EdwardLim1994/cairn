@@ -58,7 +58,8 @@ const emit = defineEmits<{
       class="ml-auto flex min-w-0 items-center max-[720px]:overflow-x-auto"
       aria-label="Workspace"
     >
-      <div class="app__toolbar-group" role="group" aria-label="Nodes">
+      <fieldset class="app__toolbar-group m-0 min-w-0 border-0">
+        <legend class="sr-only">Nodes</legend>
         <UButton
           type="button"
           color="neutral"
@@ -83,8 +84,9 @@ const emit = defineEmits<{
         >
           <UIcon name="i-lucide-play" class="size-4" aria-hidden="true" />
         </UButton>
-      </div>
-      <div class="app__toolbar-group" role="group" aria-label="Observe">
+      </fieldset>
+      <fieldset class="app__toolbar-group m-0 min-w-0 border-0">
+        <legend class="sr-only">Observe</legend>
         <UButton
           type="button"
           color="neutral"
@@ -109,8 +111,9 @@ const emit = defineEmits<{
         >
           <UIcon name="i-lucide-list" class="size-4" aria-hidden="true" />
         </UButton>
-      </div>
-      <div class="app__toolbar-group" role="group" aria-label="Code">
+      </fieldset>
+      <fieldset class="app__toolbar-group m-0 min-w-0 border-0">
+        <legend class="sr-only">Code</legend>
         <UButton
           type="button"
           color="neutral"
@@ -123,8 +126,9 @@ const emit = defineEmits<{
         >
           <UIcon name="i-lucide-braces" class="size-4" aria-hidden="true" />
         </UButton>
-      </div>
-      <div class="app__toolbar-group" role="group" aria-label="Settings">
+      </fieldset>
+      <fieldset class="app__toolbar-group m-0 min-w-0 border-0">
+        <legend class="sr-only">Settings</legend>
         <UButton
           type="button"
           color="neutral"
@@ -151,8 +155,9 @@ const emit = defineEmits<{
             aria-hidden="true"
           />
         </UButton>
-      </div>
-      <div class="app__toolbar-group app__toolbar-group--account" role="group" aria-label="Account">
+      </fieldset>
+      <fieldset class="app__toolbar-group app__toolbar-group--account m-0 min-w-0 border-0">
+        <legend class="sr-only">Account</legend>
         <UButton
           type="button"
           color="neutral"
@@ -164,7 +169,7 @@ const emit = defineEmits<{
         >
           <UIcon name="i-lucide-log-out" class="size-4" aria-hidden="true" />
         </UButton>
-      </div>
+      </fieldset>
     </nav>
   </header>
 </template>

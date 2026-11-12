@@ -129,20 +129,20 @@ function close() {
       </UButton>
     </template>
     <template #body>
-      <label class="flex flex-col gap-1">
+      <div class="flex flex-col gap-1">
         <span class="text-[12px] font-medium text-[var(--muted)]">Topic or exchange name</span>
         <UInput v-model="name" aria-label="Topic or exchange name" required />
-      </label>
-      <label class="flex flex-col gap-1">
+      </div>
+      <div class="flex flex-col gap-1">
         <span class="text-[12px] font-medium text-[var(--muted)]">Stable code key</span>
         <UInput v-model="codeKey" aria-label="Stable code key" required />
-      </label>
+      </div>
       <div class="flex gap-2.5 max-[720px]:flex-col">
-        <label class="min-w-0 flex flex-1 flex-col gap-1">
+        <div class="min-w-0 flex flex-1 flex-col gap-1">
           <span class="text-[12px] font-medium text-[var(--muted)]">Broker type</span>
           <USelect v-model="broker" :items="brokerOptions" aria-label="Broker type" />
-        </label>
-        <label class="min-w-0 flex flex-1 flex-col gap-1">
+        </div>
+        <div class="min-w-0 flex flex-1 flex-col gap-1">
           <span class="text-[12px] font-medium text-[var(--muted)]">Connection URL</span>
           <UInput
             v-model="url"
@@ -150,7 +150,7 @@ function close() {
             :placeholder="broker === 'kafka' ? 'localhost:9092' : 'amqp://localhost:5672/'"
             required
           />
-        </label>
+        </div>
       </div>
     </template>
     <template #footer>

@@ -64,11 +64,10 @@ export class WebSocketSessionRegistry {
     session.socket = socket;
     socket.on("message", (data, isBinary) => {
       if (isBinary) return;
-      const text = Buffer.isBuffer(data)
-        ? data.toString("utf8")
-        : Array.isArray(data)
-          ? Buffer.concat(data).toString("utf8")
-          : Buffer.from(data as ArrayBuffer).toString("utf8");
+      let text: string;
+      if (Buffer.isBuffer(data)) text = data.toString("utf8");
+      else if (Array.isArray(data)) text = Buffer.concat(data).toString("utf8");
+      else text = Buffer.from(data as ArrayBuffer).toString("utf8");
       const message = {
         id: session.nextMessageId++,
         data: text,
@@ -97,7 +96,7 @@ export class WebSocketSessionRegistry {
 
   close(projectId: string, endpointId: string, mockApiId: string) {
     const session = this.get(projectId, endpointId);
-    if (!session || session.mockApiId !== mockApiId) return undefined;
+    if (session?.mockApiId !== mockApiId) return undefined;
     session.socket?.close(1000, "Disconnected by user");
     session.socket?.terminate();
     session.events.emit("state", { state: "disconnected" });

@@ -23,8 +23,9 @@ export function createUpdateMockApiUseCase(dependencies: {
       throw new MockApiEndpointError("Selected endpoint is not in this project");
     if (!endpoint && input.active)
       throw new MockApiEndpointError("An API without an endpoint must be inactive");
-    const expectedServiceType =
-      input.apiType === "HTTP" ? "REST" : input.apiType === "WEBSOCKET" ? "WEBSOCKET" : "GRPC";
+    const expectedServiceType = { HTTP: "REST", WEBSOCKET: "WEBSOCKET", GRPC: "GRPC" }[
+      input.apiType
+    ];
     if (endpoint && endpoint.serviceApiType !== expectedServiceType)
       throw new MockApiEndpointError("Mock API type must match the selected service endpoint");
     if (input.apiType === "HTTP" && endpoint?.url)

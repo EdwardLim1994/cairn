@@ -306,11 +306,9 @@ function buildAppendedPositions(
           .filter(({ queueId }) => queueId === old.queueId)
           .findIndex(({ id }) => id === old.id)
       : 0;
-    const point = direct
-      ? { x: direct.positionX, y: direct.positionY }
-      : legacy
-        ? { x: legacy.positionX, y: legacy.positionY + siblingIndex * 193 }
-        : { x, y: y + index * 193 };
+    let point = { x, y: y + index * 193 };
+    if (direct) point = { x: direct.positionX, y: direct.positionY };
+    else if (legacy) point = { x: legacy.positionX, y: legacy.positionY + siblingIndex * 193 };
     add("message_destination", destination.id, point);
   }
 }

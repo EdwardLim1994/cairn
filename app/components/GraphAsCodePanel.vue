@@ -173,9 +173,9 @@ function downloadCode() {
       >
         <p v-for="message in errors" :key="message">{{ message }}</p>
       </div>
-      <p v-if="copyError" class="text-xs text-[var(--danger)]" role="status">
+      <output v-if="copyError" class="text-xs text-[var(--danger)]">
         {{ copyError }}
-      </p>
+      </output>
     </template>
     <template #footer>
       <UButton type="button" :disabled="applying" @click="apply">

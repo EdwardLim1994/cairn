@@ -398,8 +398,7 @@ function addQueueFromManager() {
 }
 
 function editDestinationFromManager(destinationId: string) {
-  const destination = graphStore.messageDestinations.find(({ id }) => id === destinationId);
-  if (destination) {
+  if (graphStore.messageDestinations.some(({ id }) => id === destinationId)) {
     manageNodesOpen.value = false;
     openMessageQueuePanel(destinationId);
   }
@@ -762,7 +761,7 @@ onUnmounted(() => {
       v-if="activeObservedTrace"
       class="app__surface absolute left-3 top-[82px] z-20 flex min-h-12 max-w-[calc(100vw-24px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3.5 py-1.5 text-[12px] shadow-[var(--shadow)] max-[720px]:left-2 max-[720px]:top-[66px]"
       aria-label="Active observed trace"
-      role="status"
+      aria-live="polite"
     >
       <span class="text-[11px] font-medium text-[var(--muted)]">Active observed trace</span>
       <span class="max-w-48 truncate font-mono font-medium" :title="activeObservedTrace.traceId">

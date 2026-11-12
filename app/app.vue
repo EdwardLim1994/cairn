@@ -90,6 +90,7 @@ body {
 }
 
 .app {
+  --ui-primary: var(--accent);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.4;
@@ -216,12 +217,12 @@ body {
 }
 
 .vue-flow__edge-text {
-  fill: var(--timing-label-text) !important;
+  fill: var(--timing-label-text);
   font-size: 10px;
 }
 
 .vue-flow__edge-textbg {
-  fill: var(--timing-label-bg) !important;
+  fill: var(--timing-label-bg);
 }
 
 .app__graph-node--service {
@@ -273,8 +274,8 @@ body {
 }
 
 .app__graph-legend-panel {
-  bottom: 12px !important;
-  left: 58px !important;
+  bottom: 12px;
+  left: 58px;
   z-index: 12;
 }
 
@@ -320,39 +321,35 @@ body {
 }
 
 .app__workspace-drawer-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 70 !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  align-items: flex-start !important;
-  padding: 0 !important;
-  background: transparent !important;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 0;
+  background: transparent;
 }
 
 .app__workspace-drawer-content {
-  position: absolute !important;
-  z-index: 71 !important;
-  inset: 76px 12px 12px auto !important;
-  width: 33.333vw !important;
-  max-width: calc(100vw - 24px) !important;
-  max-height: none !important;
-  height: auto !important;
-  overflow: hidden !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  background: var(--panel) !important;
-  box-shadow: var(--shadow-lg) !important;
-  color: var(--text) !important;
-}
-
-.app {
-  --ui-primary: var(--accent);
+  position: absolute;
+  z-index: 71;
+  inset: 76px 12px 12px auto;
+  width: 33.333vw;
+  max-width: calc(100vw - 24px);
+  max-height: none;
+  height: auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
 }
 
 .app__workspace-drawer-header {
   min-height: 58px;
-  padding: 12px 8px 12px 16px !important;
+  padding: 12px 8px 12px 16px;
 }
 
 .app__workspace-drawer-header [data-slot="wrapper"] {
@@ -375,12 +372,12 @@ body {
 }
 
 .app__workspace-drawer-body {
-  padding: 14px 16px 18px !important;
-  gap: 16px !important;
+  padding: 14px 16px 18px;
+  gap: 16px;
 }
 
 .app__workspace-drawer-footer {
-  padding: 10px 16px !important;
+  padding: 10px 16px;
 }
 
 .app__workspace-drawer-content .app__workspace-drawer-header h2 {
@@ -496,17 +493,17 @@ body {
 
 .app.app--dark .app__trigger-protocol--http {
   color: #8db8ff;
-  background: rgba(141, 184, 255, 0.13);
+  background: #26344a;
 }
 
 .app.app--dark .app__trigger-protocol--grpc {
   color: #6ed8c6;
-  background: rgba(110, 216, 198, 0.13);
+  background: #213b38;
 }
 
 .app.app--dark .app__trigger-protocol--websocket {
   color: #bca4ff;
-  background: rgba(188, 164, 255, 0.13);
+  background: #332d4a;
 }
 
 .app__trigger-last-chip--completed {
@@ -523,10 +520,10 @@ body {
 
 @media (max-width: 899px) {
   .app__workspace-drawer-content {
-    inset: 124px 12px 12px !important;
-    width: auto !important;
-    max-width: none !important;
-    border-radius: 12px !important;
+    inset: 124px 12px 12px;
+    width: auto;
+    max-width: none;
+    border-radius: 12px;
   }
 
   .app__graph-legend-panel {

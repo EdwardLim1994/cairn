@@ -354,7 +354,7 @@ function selectApiType(value: string) {
   draft.value.endpoints = draft.value.endpoints.map((endpoint) => ({
     ...endpoint,
     method: endpoint.method ?? "GET",
-    url: endpoint.url && endpoint.url.startsWith("/") ? endpoint.url : "/",
+    url: endpoint.url?.startsWith("/") ? endpoint.url : "/",
     rpcMethod: null,
   }));
 }

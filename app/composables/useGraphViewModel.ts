@@ -100,20 +100,23 @@ export function useGraphViewModel({
   }
 
   function serviceEndpointOptions() {
-    return store.services.flatMap((service) =>
-      service.endpoints.map((endpoint) => ({
-        id: endpoint.id!,
-        serviceId: service.id,
-        apiType:
-          service.apiType === "WEBSOCKET"
-            ? "WEBSOCKET"
-            : (service.apiType ?? "REST") === "REST"
-              ? "HTTP"
-              : "GRPC",
-        method: endpoint.method,
-        label: `${service.name}  |  ${endpoint.name} (${service.apiType === "WEBSOCKET" ? "WebSocket" : (service.apiType ?? "REST") === "REST" ? endpoint.method : "gRPC"})`,
-      })),
-    );
+    return store.services.flatMap((service) => {
+      let apiType = "HTTP";
+      if (service.apiType === "WEBSOCKET") apiType = "WEBSOCKET";
+      else if (service.apiType === "GRPC") apiType = "GRPC";
+      return service.endpoints.map((endpoint) => {
+        let methodLabel = endpoint.method;
+        if (apiType === "WEBSOCKET") methodLabel = "WebSocket";
+        else if (apiType === "GRPC") methodLabel = "gRPC";
+        return {
+          id: endpoint.id!,
+          serviceId: service.id,
+          apiType,
+          method: endpoint.method,
+          label: `${service.name}  |  ${endpoint.name} (${methodLabel})`,
+        };
+      });
+    });
   }
 
   function serviceNode(service: GraphService): Node {
@@ -134,20 +137,17 @@ export function useGraphViewModel({
       const targetEndpoint = targetService?.endpoints.find(
         (endpoint) => endpoint.id === edge.targetEndpointId,
       );
-      const methodTag =
-        targetService?.apiType === "GRPC"
-          ? "gRPC"
-          : targetService?.apiType === "WEBSOCKET"
-            ? "WS"
-            : (targetEndpoint?.method ?? "API");
-      const endpointLabel =
-        targetService?.apiType === "GRPC"
-          ? (targetEndpoint?.rpcMethod ?? targetEndpoint?.name)
-          : targetService?.apiType === "WEBSOCKET"
-            ? (targetEndpoint?.url ?? targetEndpoint?.name)
-            : [targetEndpoint?.method, targetEndpoint?.url ?? targetEndpoint?.name]
-                .filter(Boolean)
-                .join(" ");
+      let methodTag = targetEndpoint?.method ?? "API";
+      let endpointLabel = [targetEndpoint?.method, targetEndpoint?.url ?? targetEndpoint?.name]
+        .filter(Boolean)
+        .join(" ");
+      if (targetService?.apiType === "GRPC") {
+        methodTag = "gRPC";
+        endpointLabel = targetEndpoint?.rpcMethod ?? targetEndpoint?.name ?? "";
+      } else if (targetService?.apiType === "WEBSOCKET") {
+        methodTag = "WS";
+        endpointLabel = targetEndpoint?.url ?? targetEndpoint?.name ?? "";
+      }
       return {
         targetServiceId: targetService?.id,
         targetServiceName: targetService?.name,
@@ -242,13 +242,11 @@ export function useGraphViewModel({
             (connection) => connection.type === "subscribe" && connection.serviceId === service.id,
           ).length,
         outboundCount: new Set(
-          outboundCalls.map((call) =>
-            call.targetServiceId
-              ? `service:${call.targetServiceId}`
-              : call.destinationId
-                ? `destination:${call.destinationId}`
-                : `call:${call.id}`,
-          ),
+          outboundCalls.map((call) => {
+            if (call.targetServiceId) return `service:${call.targetServiceId}`;
+            if (call.destinationId) return `destination:${call.destinationId}`;
+            return `call:${call.id}`;
+          }),
         ).size,
         hasMessagePublisher:
           !service.endpoints.length &&

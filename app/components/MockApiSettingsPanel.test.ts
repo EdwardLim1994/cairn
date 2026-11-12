@@ -179,10 +179,7 @@ function mountPanel(overrides: Record<string, unknown> = {}) {
 }
 
 function labelControl(wrapper: ReturnType<typeof mountPanel>, label: string, tag: string) {
-  return wrapper
-    .findAll("label")
-    .find((item) => item.text().includes(label))!
-    .get(tag);
+  return wrapper.get(`${tag}[aria-label="${label}"]`);
 }
 
 describe("MockApiSettingsPanel", () => {
@@ -302,12 +299,12 @@ describe("MockApiSettingsPanel", () => {
       ["OAuth", "Client ID"],
     ]) {
       await wrapper.get('[aria-label="Edit ' + name + '"]').trigger("click");
-      expect(wrapper.findAll("label").some((item) => item.text().includes(field!))).toBe(true);
+      expect(wrapper.find(`[aria-label="${field}"]`).exists()).toBe(true);
       await wrapper.get('[aria-label="Back to Mock APIs"]').trigger("click");
     }
     await wrapper.get('[aria-label="Edit Bearer"]').trigger("click");
     await labelControl(wrapper, "Authorization type", "select").setValue("basic");
-    expect(wrapper.findAll("label").some((item) => item.text().includes("Password"))).toBe(true);
+    expect(wrapper.find('[aria-label="Password"]').exists()).toBe(true);
   });
 
   it("opens new variable and authorization pages, with Save and Discard only there", async () => {

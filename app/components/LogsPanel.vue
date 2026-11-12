@@ -30,14 +30,18 @@ const severityPresets = [
   { value: "warn", label: "Warn+" },
 ] as const;
 
+function severityPresetLevels(preset: "all" | "info" | "warn") {
+  if (preset === "all") return [];
+  if (preset === "info") return ["INFO", "WARN", "ERROR"];
+  return ["WARN", "ERROR"];
+}
+
 function selectSeverityPreset(preset: "all" | "info" | "warn") {
-  severityFilter.value =
-    preset === "all" ? [] : preset === "info" ? ["INFO", "WARN", "ERROR"] : ["WARN", "ERROR"];
+  severityFilter.value = severityPresetLevels(preset);
 }
 
 function isSeverityPresetActive(preset: "all" | "info" | "warn") {
-  const expected =
-    preset === "all" ? [] : preset === "info" ? ["INFO", "WARN", "ERROR"] : ["WARN", "ERROR"];
+  const expected = severityPresetLevels(preset);
   return (
     expected.length === severityFilter.value.length &&
     expected.every((item) => severityFilter.value.includes(item))
@@ -89,11 +93,11 @@ function isSeverityPresetActive(preset: "all" | "info" | "warn") {
         :title="activeTraceId"
         >{{ activeTraceId.slice(0, 12) }}â€¦</span
       >
-      <div
-        class="inline-flex gap-0.5 rounded-lg bg-[var(--panel2)] p-0.5"
-        role="group"
+      <fieldset
         aria-label="Log level"
+        class="m-0 inline-flex min-w-0 gap-0.5 rounded-lg border-0 bg-[var(--panel2)] p-0.5"
       >
+        <legend class="sr-only">Log level</legend>
         <button
           v-for="preset in severityPresets"
           :key="preset.value"
@@ -109,7 +113,7 @@ function isSeverityPresetActive(preset: "all" | "info" | "warn") {
         >
           {{ preset.label }}
         </button>
-      </div>
+      </fieldset>
       <span class="flex-1" aria-hidden="true"></span>
       <UInput
         v-model="search"

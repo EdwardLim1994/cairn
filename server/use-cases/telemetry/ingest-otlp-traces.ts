@@ -20,7 +20,9 @@ function spanStatus(code: unknown) {
 
 function spanKind(value: unknown) {
   const kinds = ["UNSPECIFIED", "INTERNAL", "SERVER", "CLIENT", "PRODUCER", "CONSUMER"];
-  const kind = typeof value === "number" ? kinds[value] : typeof value === "string" ? value : null;
+  let kind: string | null = null;
+  if (typeof value === "number") kind = kinds[value] ?? null;
+  else if (typeof value === "string") kind = value;
   const normalized = kind?.trim().toUpperCase();
   return normalized && kinds.includes(normalized) ? normalized : undefined;
 }

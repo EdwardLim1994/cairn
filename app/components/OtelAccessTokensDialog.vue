@@ -101,7 +101,7 @@ watch(
         class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
         @submit.prevent="generate"
       >
-        <label class="flex min-w-0 flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+        <div class="flex min-w-0 flex-col gap-1 text-xs font-medium text-[var(--muted)]">
           Token name
           <UInput
             v-model="name"
@@ -110,11 +110,11 @@ watch(
             required
             maxlength="255"
           />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+        </div>
+        <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
           Expires after
           <USelect v-model="expiryDays" :items="expiryOptions" aria-label="Expires after" />
-        </label>
+        </div>
         <UButton type="submit" :disabled="!name.trim()">Generate</UButton>
       </form>
       <p v-if="error" role="alert" class="mt-3 text-sm text-[var(--danger)]">{{ error }}</p>

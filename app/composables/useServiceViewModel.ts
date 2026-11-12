@@ -107,13 +107,10 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
 
   function addEndpoint() {
     const apiType = options.draft.value.apiType;
-    options.draft.value.endpoints.push(
-      apiType === "GRPC"
-        ? { name: "", rpcMethod: "" }
-        : apiType === "WEBSOCKET"
-          ? { name: "", url: options.draft.value.baseUrl }
-          : { name: "", method: "GET", url: "/" },
-    );
+    if (apiType === "GRPC") options.draft.value.endpoints.push({ name: "", rpcMethod: "" });
+    else if (apiType === "WEBSOCKET")
+      options.draft.value.endpoints.push({ name: "", url: options.draft.value.baseUrl });
+    else options.draft.value.endpoints.push({ name: "", method: "GET", url: "/" });
   }
 
   function removeEndpoint(index: number) {

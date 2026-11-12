@@ -66,28 +66,28 @@ function validateService(service: z.infer<typeof serviceFieldsSchema>, context: 
       message: "Expected a ws:// or wss:// WebSocket URL",
     });
   for (const [index, endpoint] of service.endpoints.entries()) {
-    if (service.apiType === "REST" && (!endpoint.method || !endpoint.url || endpoint.rpcMethod))
-      context.addIssue({
-        code: "custom",
-        path: ["endpoints", index],
-        message: "REST endpoints need method and URL",
-      });
-    if (service.apiType === "GRPC" && (!endpoint.rpcMethod || endpoint.method || endpoint.url))
-      context.addIssue({
-        code: "custom",
-        path: ["endpoints", index],
-        message: "gRPC endpoints need an RPC method",
-      });
-    if (
-      service.apiType === "WEBSOCKET" &&
-      (!endpoint.url || !validWebSocketUrl(endpoint.url) || endpoint.method || endpoint.rpcMethod)
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["endpoints", index],
-        message: "WebSocket endpoints need a ws:// or wss:// URL",
-      });
+    validateEndpoint(service.apiType, endpoint, index, context);
   }
+}
+
+function validateEndpoint(
+  apiType: z.infer<typeof serviceFieldsSchema>["apiType"],
+  endpoint: z.infer<typeof endpointInputSchema>,
+  index: number,
+  context: z.RefinementCtx,
+) {
+  const invalid =
+    (apiType === "REST" && (!endpoint.method || !endpoint.url || endpoint.rpcMethod)) ||
+    (apiType === "GRPC" && (!endpoint.rpcMethod || endpoint.method || endpoint.url)) ||
+    (apiType === "WEBSOCKET" &&
+      (!endpoint.url || !validWebSocketUrl(endpoint.url) || endpoint.method || endpoint.rpcMethod));
+  if (!invalid) return;
+  const message = {
+    REST: "REST endpoints need method and URL",
+    GRPC: "gRPC endpoints need an RPC method",
+    WEBSOCKET: "WebSocket endpoints need a ws:// or wss:// URL",
+  }[apiType];
+  context.addIssue({ code: "custom", path: ["endpoints", index], message });
 }
 
 function validWebSocketUrl(value: string) {

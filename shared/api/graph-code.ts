@@ -360,7 +360,7 @@ export const graphCodeManifestSchema = z
         mockApiKeys.add(api.key);
         const service = serviceByKey.get(api.serviceKey);
         const endpoint = service?.endpoints.find(({ key }) => key === api.endpointKey);
-        if (!service || service.apiType !== "WEBSOCKET" || !endpoint)
+        if (service?.apiType !== "WEBSOCKET" || !endpoint)
           context.addIssue({
             code: "custom",
             path: ["mockApis", index],

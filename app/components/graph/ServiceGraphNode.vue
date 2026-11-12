@@ -53,11 +53,9 @@ const data = computed(() => props.data);
 const outboundCallRows = computed(() => {
   const groups = new Map<string, { calls: OutboundCall[]; label: string; title: string }>();
   for (const call of data.value.outboundCalls) {
-    const key = call.targetServiceId
-      ? `service:${call.targetServiceId}`
-      : call.destinationId
-        ? `destination:${call.destinationId}`
-        : `call:${call.id}`;
+    let key = `call:${call.id}`;
+    if (call.targetServiceId) key = `service:${call.targetServiceId}`;
+    else if (call.destinationId) key = `destination:${call.destinationId}`;
     const group = groups.get(key) ?? { calls: [], label: call.label ?? call.id, title: "" };
     group.calls.push(call);
     const endpointLabels = [
@@ -69,9 +67,10 @@ const outboundCallRows = computed(() => {
     const origins = [
       ...new Set(group.calls.map(({ sourceEndpointName }) => sourceEndpointName).filter(Boolean)),
     ];
+    const originDescription = origins.length ? ` from ${origins.join(", ")}` : "";
     group.title =
       group.calls.length > 1
-        ? `${group.calls.length} configured calls${origins.length ? ` from ${origins.join(", ")}` : ""}`
+        ? `${group.calls.length} configured calls${originDescription}`
         : (call.label ?? call.id);
     groups.set(key, group);
   }
@@ -151,6 +150,7 @@ const emit = defineEmits<{
   toggleEndpoints: [serviceId: string];
   openEndpoint: [endpointId: string | undefined];
 }>();
+const serviceOutHandle = "service-out";
 </script>
 
 <template>
@@ -208,7 +208,7 @@ const emit = defineEmits<{
       />
       <Handle
         v-if="data.hasMessagePublisher && !data.outboundCalls.length"
-        id="service-out"
+        :id="serviceOutHandle"
         type="source"
         :position="Position.Right"
         :connectable="false"
@@ -469,7 +469,7 @@ const emit = defineEmits<{
         class="relative flex h-[30px] items-center gap-2 border-t border-dashed border-[var(--border)] px-3"
       >
         <Handle
-          id="service-out"
+          :id="serviceOutHandle"
           type="source"
           :position="Position.Right"
           class="app__endpoint-source app__endpoint-source--authoring"

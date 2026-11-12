@@ -62,7 +62,8 @@ function endpointPath(endpoint?: GraphEndpoint) {
 function responseLabel(data: MockApiTriggerNodeData) {
   if (data.entry.apiType === "WEBSOCKET") {
     const count = data.messages?.length ?? 0;
-    return count ? `${count} message${count === 1 ? "" : "s"}` : "Response";
+    if (!count) return "Response";
+    return `${count} message${count === 1 ? "" : "s"}`;
   }
 
   const response = data.latestResponse;
@@ -128,10 +129,9 @@ function responseLabel(data: MockApiTriggerNodeData) {
           >· Not ready</span
         >
       </div>
-      <div
+      <output
         v-if="data.entry.apiType === 'WEBSOCKET'"
         class="flex items-center gap-1.5 text-[11px] text-[var(--muted)]"
-        role="status"
       >
         <span
           class="size-2 shrink-0 rounded-full"
@@ -149,7 +149,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
               ? "Connecting…"
               : "Disconnected"
         }}
-      </div>
+      </output>
       <div class="flex flex-nowrap items-center gap-1.5">
         <button
           v-if="data.entry.apiType === 'WEBSOCKET'"

@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!target.targetEndpointId)
     throw createError({ statusCode: 409, statusMessage: "WebSocket endpoint is unavailable" });
   const session = webSocketSessionRegistry.get(projectId, target.targetEndpointId);
-  if (!session || session.mockApiId !== mockApiId)
+  if (session?.mockApiId !== mockApiId)
     throw createError({ statusCode: 409, statusMessage: "WebSocket session is not connected" });
 
   const response = event.node.res;
