@@ -419,26 +419,24 @@ function handleOpenChange(open: boolean) {
     }"
     @update:open="handleOpenChange"
   >
-    <template #title>
-      <div class="flex min-w-0 items-center gap-2">
-        <UButton
-          v-if="props.returnToManageNodes"
-          type="button"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="shrink-0 gap-1 px-1.5 text-[12px]"
-          aria-label="Back to Manage Nodes"
-          @click="emit('backToManageNodes')"
-        >
-          <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
-          Back
-        </UButton>
-        <span class="truncate">{{
-          props.editingServiceId ? "Service settings" : "Add service node"
-        }}</span>
-      </div>
+    <template #back>
+      <UButton
+        v-if="props.returnToManageNodes"
+        type="button"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="grid size-8 shrink-0 place-items-center p-0"
+        aria-label="Back to Manage Nodes"
+        title="Back to Manage Nodes"
+        @click="emit('backToManageNodes')"
+      >
+        <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
+      </UButton>
     </template>
+    <template #title>{{
+      props.editingServiceId ? "Service settings" : "Add service node"
+    }}</template>
     <template #description>Configure the service and its endpoints</template>
     <template #actions>
       <UButton

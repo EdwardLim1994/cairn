@@ -485,24 +485,22 @@ watchEffect(() => {
     }"
     @update:open="handleOpenChange"
   >
-    <template #title>
-      <div class="flex min-w-0 items-center gap-2">
-        <UButton
-          v-if="editor"
-          type="button"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="shrink-0 gap-1 px-1.5 text-[12px]"
-          aria-label="Back to Mock APIs"
-          @click="discardEditor"
-        >
-          <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
-          Back
-        </UButton>
-        <span class="truncate">{{ editorTitle }}</span>
-      </div>
+    <template #back>
+      <UButton
+        v-if="editor"
+        type="button"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        class="grid size-8 shrink-0 place-items-center p-0"
+        aria-label="Back to Mock APIs"
+        title="Back to Mock APIs"
+        @click="discardEditor"
+      >
+        <UIcon name="i-lucide-arrow-left" class="size-4" aria-hidden="true" />
+      </UButton>
     </template>
+    <template #title>{{ editorTitle }}</template>
     <template #description>{{ editorDescription }}</template>
     <template #actions>
       <UButton
@@ -750,7 +748,9 @@ watchEffect(() => {
               <strong>Shareable header templates</strong>
               <UButton
                 type="button"
-                class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
+                color="neutral"
+                variant="outline"
+                size="sm"
                 @click="beginCreate('header')"
                 >New template</UButton
               >
@@ -829,7 +829,9 @@ watchEffect(() => {
               <strong>Shareable authorization templates</strong>
               <UButton
                 type="button"
-                class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
+                color="neutral"
+                variant="outline"
+                size="sm"
                 @click="beginCreate('authorization')"
                 >New template</UButton
               >
@@ -1407,43 +1409,23 @@ watchEffect(() => {
         </div>
       </template>
     </template>
-    <template #footer>
-      <template v-if="editor">
-        <UButton
-          type="button"
-          color="neutral"
-          variant="outline"
-          :disabled="deletingEditor"
-          @click="discardEditor"
-          >Discard</UButton
-        >
-        <UButton
-          type="submit"
-          form="mock-api-entity-editor"
-          :loading="savingEditor"
-          :disabled="savingEditor || deletingEditor || !editor.draft.name.trim()"
-        >
-          Save
-        </UButton>
-      </template>
-      <template v-else>
-        <UButton
-          type="button"
-          color="neutral"
-          variant="outline"
-          class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel2)]"
-          @click="emit('discard')"
-          >Discard</UButton
-        >
-        <UButton
-          type="button"
-          class="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-xs font-medium text-[var(--accent-ink)] disabled:opacity-60"
-          :disabled="props.environmentVariablesLoading"
-          @click="emit('save')"
-        >
-          Save
-        </UButton>
-      </template>
+    <template v-if="editor" #footer>
+      <UButton
+        type="button"
+        color="neutral"
+        variant="outline"
+        :disabled="deletingEditor"
+        @click="discardEditor"
+        >Discard</UButton
+      >
+      <UButton
+        type="submit"
+        form="mock-api-entity-editor"
+        :loading="savingEditor"
+        :disabled="savingEditor || deletingEditor || !editor.draft.name.trim()"
+      >
+        Save
+      </UButton>
     </template>
   </WorkspaceDrawer>
 </template>

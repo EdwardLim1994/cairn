@@ -5,28 +5,32 @@
     side="right"
     :portal="false"
     :close="false"
+    :modal="false"
     :ui="drawerUi"
     class="w-1/3"
     @update:open="emit('update:open', $event)"
   >
-    <template #title>
-      <slot name="title" />
-    </template>
-    <template #description>
-      <slot name="description" />
-    </template>
-    <template #actions>
-      <slot name="actions" />
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        class="grid size-8 place-items-center rounded-md p-0 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-        aria-label="Close panel"
-        @click="emit('update:open', false)"
-      >
-        <UIcon name="i-lucide-x" class="size-4" aria-hidden="true" />
-      </UButton>
+    <template #header>
+      <div :class="drawerUi.header" class="flex w-full items-center justify-between gap-2">
+        <slot name="back" />
+        <div class="flex min-w-0 flex-1 flex-col" data-slot="wrapper">
+          <DialogTitle data-slot="title" class="truncate"><slot name="title" /></DialogTitle>
+          <DialogDescription data-slot="description"><slot name="description" /></DialogDescription>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <slot name="actions" />
+          <UButton
+            type="button"
+            color="neutral"
+            variant="ghost"
+            class="grid size-8 place-items-center rounded-md p-0 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+            aria-label="Close panel"
+            @click="emit('update:open', false)"
+          >
+            <UIcon name="i-lucide-x" class="size-4" aria-hidden="true" />
+          </UButton>
+        </div>
+      </div>
     </template>
     <template #body>
       <slot name="body" />
@@ -39,6 +43,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { DialogDescription, DialogTitle } from "reka-ui";
 
 const props = withDefaults(
   defineProps<{

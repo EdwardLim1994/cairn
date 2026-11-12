@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 <template>
   <header
-    class="app__surface absolute left-3 right-3 top-3 z-30 flex h-14 items-center gap-3 rounded-xl px-3 max-[720px]:left-2 max-[720px]:right-2 max-[720px]:top-2 max-[720px]:h-12 max-[720px]:gap-2 max-[720px]:px-2"
+    class="app__surface absolute left-3 right-3 top-3 z-[80] flex h-14 items-center gap-3 rounded-xl px-3 max-[720px]:left-2 max-[720px]:right-2 max-[720px]:top-2 max-[720px]:h-12 max-[720px]:gap-2 max-[720px]:px-2"
   >
     <div class="app__toolbar-brand flex min-w-0 shrink-0 items-center gap-2.5">
       <svg

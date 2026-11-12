@@ -38,7 +38,9 @@ function frameworkIcon(framework: string) {
       <section class="flex flex-col gap-2" aria-label="Services">
         <header class="flex items-center justify-between gap-2">
           <h3 class="text-[12.5px] font-semibold">Services</h3>
-          <UButton size="sm" @click="emit('add-service')">Register service</UButton>
+          <UButton color="neutral" variant="outline" size="sm" @click="emit('add-service')">
+            Register service
+          </UButton>
         </header>
         <div class="overflow-hidden rounded-[9px] border border-[var(--border)]">
           <button

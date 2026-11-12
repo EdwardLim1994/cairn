@@ -753,7 +753,7 @@ onUnmounted(() => {
       @open-manage-nodes="manageNodesOpen = !manageNodesOpen"
       @open-logs="logsOpen = !logsOpen"
       @open-graph-as-code="toggleGraphAsCode"
-      @open-access-tokens="accessTokensOpen = true"
+      @open-access-tokens="accessTokensOpen = !accessTokensOpen"
       @open-history="historyOpen = !historyOpen"
       @sign-out="signOut"
     />
