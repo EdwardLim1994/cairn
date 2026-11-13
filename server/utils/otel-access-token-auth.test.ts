@@ -10,7 +10,6 @@ vi.mock("../repositories/otel-access-tokens", () => ({
 const token = "a".repeat(43);
 
 beforeEach(() => {
-  vi.stubEnv("DATABASE_URL", "mysql://db/cairn");
   vi.stubEnv("OTEL_COLLECTOR_URL", "http://collector:4318");
   vi.stubEnv("PROJECT_ID", "project-1");
   vi.stubEnv("AUTH_USERNAME", "operator");

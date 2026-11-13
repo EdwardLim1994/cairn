@@ -1,6 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import * as schema from "../../db/schema";
+import { getDb } from "../../db";
 import {
   authorizationTemplates,
   environmentVariables,
@@ -14,7 +13,7 @@ import {
   type MockApiReadinessInput,
 } from "#shared/utils/mock-api-readiness";
 
-type Database = MySql2Database<typeof schema>;
+type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /** Persist deactivation when a saved dependency change makes an active API invalid. */

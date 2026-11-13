@@ -1,8 +1,6 @@
-import mysql from "mysql2/promise";
 import { eq } from "drizzle-orm";
-import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
-import * as schema from "../db/schema";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import { getDb } from "../db";
 import {
   environmentVariables,
   headerTemplates,
@@ -15,18 +13,15 @@ import {
 import { saveMockApiSettings } from "./mock-api-settings";
 import { listMockApis } from "./mock-apis/index";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("mock API settings save with MySQL", () => {
+integration("mock API settings save with SQLite", () => {
   const projectId = "mock-settings-project";
-  let pool: mysql.Pool;
-  let db: MySql2Database<typeof schema>;
+  let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
-    pool = mysql.createPool(connectionString!);
-    db = drizzle({ client: pool, schema, mode: "default" });
-    await pool.query("SELECT 1");
+    db = getDb();
   });
 
   beforeEach(async () => {
@@ -65,8 +60,6 @@ integration("mock API settings save with MySQL", () => {
     });
   });
 
-  afterAll(async () => pool?.end());
-
   it("saves new variables, a template, and a referencing API in one transaction", async () => {
     await saveMockApiSettings(
       projectId,
@@ -92,9 +85,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: {},
             pathParameters: {},
-            importMethod: null,
-            importUrl: null,
-            matchUrl: null,
           },
         ],
       },
@@ -135,9 +125,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: message,
             pathParameters: {},
-            importMethod: null,
-            importUrl: null,
-            matchUrl: null,
           },
         ],
       },
@@ -177,9 +164,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: {},
             pathParameters: {},
-            importMethod: null,
-            importUrl: null,
-            matchUrl: null,
           },
         ],
       },
@@ -237,9 +221,6 @@ integration("mock API settings save with MySQL", () => {
               description: "",
               requestJson: {},
               pathParameters: {},
-              importMethod: null,
-              importUrl: null,
-              matchUrl: null,
             },
           ],
         },
@@ -277,9 +258,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: {},
             pathParameters: {},
-            importMethod: null,
-            importUrl: null,
-            matchUrl: null,
           },
         ],
       },
@@ -305,9 +283,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: {},
             pathParameters: {},
-            importMethod: null,
-            importUrl: null,
-            matchUrl: null,
           },
         ],
       },
@@ -339,7 +314,7 @@ integration("mock API settings save with MySQL", () => {
             }),
           ),
         ),
-    } as unknown as MySql2Database<typeof schema>;
+    } as unknown as ReturnType<typeof getDb>;
 
     await expect(
       saveMockApiSettings(
@@ -360,9 +335,6 @@ integration("mock API settings save with MySQL", () => {
               description: "",
               requestJson: {},
               pathParameters: {},
-              importMethod: null,
-              importUrl: null,
-              matchUrl: null,
             },
           ],
         },
@@ -372,7 +344,7 @@ integration("mock API settings save with MySQL", () => {
     expect(await db.select().from(mockApis).where(eq(mockApis.projectId, projectId))).toEqual([]);
   });
 
-  it("persists unmatched import metadata and returns generated draft ID mappings", async () => {
+  it("persists an unmatched draft and returns generated ID mappings", async () => {
     const result = await saveMockApiSettings(
       projectId,
       {
@@ -383,7 +355,7 @@ integration("mock API settings save with MySQL", () => {
           {
             id: "draft-unmatched",
             apiType: "HTTP",
-            name: "Imported list",
+            name: "Manual draft",
             targetEndpointId: null,
             headerTemplateId: null,
             customHeaders: [],
@@ -391,9 +363,6 @@ integration("mock API settings save with MySQL", () => {
             description: "",
             requestJson: {},
             pathParameters: {},
-            importMethod: "GET",
-            importUrl: "{{base}}/missing",
-            matchUrl: "{{base}}/missing",
           },
         ],
       },
@@ -405,9 +374,6 @@ integration("mock API settings save with MySQL", () => {
     expect(api).toMatchObject({
       targetEndpointId: null,
       active: false,
-      importMethod: "GET",
-      importUrl: "{{base}}/missing",
-      matchUrl: "{{base}}/missing",
     });
   });
 });

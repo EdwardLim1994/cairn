@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: { alias: { "#shared": fileURLToPath(new URL("./shared", import.meta.url)) } },
   test: {
+    setupFiles: ["./server/db/test-setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

@@ -1,7 +1,7 @@
 import { asc, and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import * as schema from "../../db/schema";
+import { changedRows } from "../../db/changes";
+import { mockApiListResponseSchema } from "#shared/api/mock-apis";
 import {
   authorizationTemplates,
   environmentVariables,
@@ -17,7 +17,7 @@ import {
 } from "#shared/utils/mock-api-readiness";
 import { deactivateInvalidMockApis } from "./reconcile-readiness";
 
-type Database = MySql2Database<typeof schema>;
+type Database = ReturnType<typeof getDb>;
 
 export async function listHeaderTemplates(projectId: string, db: Database = getDb()) {
   const rows = await db
@@ -60,8 +60,8 @@ export async function updateHeaderTemplate(
       .update(headerTemplates)
       .set(input)
       .where(and(eq(headerTemplates.projectId, projectId), eq(headerTemplates.id, id)));
-    if (result[0]?.affectedRows) await deactivateInvalidMockApis(tx, projectId);
-    return Boolean(result[0]?.affectedRows);
+    if (changedRows(result)) await deactivateInvalidMockApis(tx, projectId);
+    return changedRows(result) > 0;
   });
 }
 
@@ -78,8 +78,8 @@ export async function deleteHeaderTemplate(projectId: string, id: string, db: Da
     const result = await tx
       .delete(headerTemplates)
       .where(and(eq(headerTemplates.projectId, projectId), eq(headerTemplates.id, id)));
-    if (result[0]?.affectedRows) await deactivateInvalidMockApis(tx, projectId);
-    return Boolean(result[0]?.affectedRows);
+    if (changedRows(result)) await deactivateInvalidMockApis(tx, projectId);
+    return changedRows(result) > 0;
   });
 }
 
@@ -128,60 +128,62 @@ export async function listMockApis(projectId: string, db: Database = getDb()) {
         .where(eq(environmentVariables.projectId, projectId)),
     ]);
     const variables = new Map(variableRows.map(({ name, value }) => [name, value]));
-    return Promise.all(
-      rows.map(
-        async ({
-          api,
-          endpointUrl,
-          endpointApiType,
-          templateId,
-          templateHeaders,
-          authorizationTemplateType,
-          authorizationTemplateConfig,
-          authorizationTemplateExists,
-        }) => {
-          const authorizationTemplate =
-            authorizationTemplateType && authorizationTemplateConfig
-              ? { type: authorizationTemplateType, config: authorizationTemplateConfig }
-              : null;
-          const readinessInput: MockApiReadinessInput = {
-            targetEndpointId: api.targetEndpointId,
-            apiType: api.apiType as MockApiReadinessInput["apiType"],
-            endpointApiType: endpointApiType as MockApiReadinessInput["endpointApiType"],
-            headerTemplateId: api.headerTemplateId,
-            headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
-            authorizationTemplateId: api.authorizationTemplateId,
-            authorizationTemplateExists:
-              !api.authorizationTemplateId || Boolean(authorizationTemplateExists),
-            authorizationTemplate,
-            pathParameters: api.pathParameters,
-            requestJson: api.requestJson,
-            customHeaders: api.customHeaders,
-            active: api.active,
-          };
-          let readiness = evaluateMockApiReadiness(
-            readinessInput,
+    return mockApiListResponseSchema.parse(
+      await Promise.all(
+        rows.map(
+          async ({
+            api,
             endpointUrl,
-            templateHeaders ?? [],
-            variables,
-          );
-          if (api.active && readiness.status === "draft") {
-            await tx.update(mockApis).set({ active: false }).where(eq(mockApis.id, api.id));
-            readiness = evaluateMockApiReadiness(
-              { ...readinessInput, active: false },
+            endpointApiType,
+            templateId,
+            templateHeaders,
+            authorizationTemplateType,
+            authorizationTemplateConfig,
+            authorizationTemplateExists,
+          }) => {
+            const authorizationTemplate =
+              authorizationTemplateType && authorizationTemplateConfig
+                ? { type: authorizationTemplateType, config: authorizationTemplateConfig }
+                : null;
+            const readinessInput: MockApiReadinessInput = {
+              targetEndpointId: api.targetEndpointId,
+              apiType: api.apiType as MockApiReadinessInput["apiType"],
+              endpointApiType: endpointApiType as MockApiReadinessInput["endpointApiType"],
+              headerTemplateId: api.headerTemplateId,
+              headerTemplateExists: !api.headerTemplateId || Boolean(templateId),
+              authorizationTemplateId: api.authorizationTemplateId,
+              authorizationTemplateExists:
+                !api.authorizationTemplateId || Boolean(authorizationTemplateExists),
+              authorizationTemplate,
+              pathParameters: api.pathParameters,
+              requestJson: api.requestJson,
+              customHeaders: api.customHeaders,
+              active: api.active,
+            };
+            let readiness = evaluateMockApiReadiness(
+              readinessInput,
               endpointUrl,
               templateHeaders ?? [],
               variables,
             );
-          }
-          return {
-            ...api,
-            active: api.active && readiness.status !== "draft",
-            status: readiness.status,
-            readinessReasons: readiness.reasons,
-            createdAt: api.createdAt.toISOString(),
-          };
-        },
+            if (api.active && readiness.status === "draft") {
+              await tx.update(mockApis).set({ active: false }).where(eq(mockApis.id, api.id));
+              readiness = evaluateMockApiReadiness(
+                { ...readinessInput, active: false },
+                endpointUrl,
+                templateHeaders ?? [],
+                variables,
+              );
+            }
+            return {
+              ...api,
+              active: api.active && readiness.status !== "draft",
+              status: readiness.status,
+              readinessReasons: readiness.reasons,
+              createdAt: api.createdAt.toISOString(),
+            };
+          },
+        ),
       ),
     );
   });
@@ -249,6 +251,6 @@ export async function deleteMockApi(projectId: string, id: string): Promise<bool
     const result = await tx
       .delete(mockApis)
       .where(and(eq(mockApis.id, id), eq(mockApis.projectId, projectId)));
-    return Boolean(result[0]?.affectedRows);
+    return changedRows(result) > 0;
   });
 }

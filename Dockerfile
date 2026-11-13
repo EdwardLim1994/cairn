@@ -6,20 +6,19 @@ RUN bun install --frozen-lockfile --ignore-scripts && bun run nuxt prepare
 
 COPY . .
 RUN bun run build
-RUN bun build scripts/migrate.mjs --target=node --format=cjs --outfile=/app/migrate.cjs
 
-FROM node:22-alpine AS runtime
+FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 
-ENV DATABASE_URL="" \
+ENV CAIRN_DATA_DIR="/app/data" \
     OTEL_COLLECTOR_URL="" \
     PROJECT_ID="" \
     PORT=3003 \
     HOST=0.0.0.0
 
 COPY --from=build /app/.output ./.output
-COPY --from=build /app/migrate.cjs ./migrate.cjs
-COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/server/db/migrations ./server/db/migrations
+COPY --from=build /app/drizzle-sqlite ./drizzle-sqlite
 
 EXPOSE 3003
-CMD ["sh", "-c", "node migrate.cjs && exec node .output/server/index.mjs"]
+CMD ["node", ".output/server/index.mjs"]

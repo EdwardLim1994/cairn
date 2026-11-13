@@ -14,10 +14,10 @@ import {
   services as servicesTable,
 } from "../db/schema";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("service REST controllers with MySQL", () => {
+integration("service REST controllers with embedded stores", () => {
   const projectId = "service-route-integration-project";
   const fetchStub = vi.fn().mockResolvedValue({ ok: true });
   let listRoute: (event: never) => Promise<unknown>;
@@ -29,7 +29,6 @@ integration("service REST controllers with MySQL", () => {
   let protoStorage: typeof import("../utils/proto-storage");
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     storageDirectory = await mkdtemp(join(tmpdir(), "cairn-service-protos-"));
@@ -77,14 +76,12 @@ integration("service REST controllers with MySQL", () => {
       context: {
         body: {
           name: "Orders",
-          codeKey: "orders-key",
           framework: "Spring Boot",
           baseUrl: "http://localhost:8081",
           positionX: 12,
           positionY: 13,
           endpoints: [
             {
-              codeKey: "list-orders",
               name: "List orders",
               method: "GET",
               url: "/orders",
@@ -95,14 +92,12 @@ integration("service REST controllers with MySQL", () => {
     } as never)) as { id: string };
     const initial = (await listRoute({} as never)) as Array<{
       id: string;
-      codeKey: string;
-      endpoints: Array<{ id: string; codeKey: string; name: string }>;
+      endpoints: Array<{ id: string; name: string }>;
     }>;
     const endpointId = initial[0]?.endpoints[0]?.id;
     expect(created.id).toBeTruthy();
-    expect(initial[0]).toMatchObject({ id: created.id, codeKey: "orders-key" });
+    expect(initial[0]).toMatchObject({ id: created.id });
     expect(initial[0]).not.toHaveProperty("positionX");
-    expect(initial[0]?.endpoints[0]?.codeKey).toBe("list-orders");
     await expect(
       getDb().select().from(graphNodePositions).where(eq(graphNodePositions.entityId, created.id)),
     ).resolves.toMatchObject([{ positionX: 12, positionY: 13 }]);
@@ -129,14 +124,12 @@ integration("service REST controllers with MySQL", () => {
       } as never),
     ).resolves.toEqual({ id: created.id });
     const updated = (await listRoute({} as never)) as Array<{
-      codeKey: string;
       name: string;
-      endpoints: Array<{ codeKey: string; name: string }>;
+      endpoints: Array<{ name: string }>;
     }>;
     expect(updated[0]).toMatchObject({
-      codeKey: "orders-key",
       name: "Orders updated",
-      endpoints: [{ codeKey: "list-orders", name: "List all orders" }],
+      endpoints: [{ name: "List all orders" }],
     });
   });
 
@@ -148,7 +141,7 @@ integration("service REST controllers with MySQL", () => {
           apiType: "WEBSOCKET",
           framework: "Other",
           baseUrl: "wss://example.test/socket",
-          endpoints: [{ codeKey: "events", name: "Events", url: "wss://example.test/events" }],
+          endpoints: [{ name: "Events", url: "wss://example.test/events" }],
         },
       },
     } as never)) as { id: string };
@@ -156,13 +149,13 @@ integration("service REST controllers with MySQL", () => {
     const initial = (await listRoute({} as never)) as Array<{
       id: string;
       apiType: string;
-      endpoints: Array<{ id: string; codeKey: string; url: string | null }>;
+      endpoints: Array<{ id: string; url: string | null }>;
     }>;
     const initialService = initial.find(({ id }) => id === created.id)!;
     const endpointId = initialService.endpoints[0]!.id;
     expect(initialService).toMatchObject({
       apiType: "WEBSOCKET",
-      endpoints: [{ codeKey: "events", url: "wss://example.test/events" }],
+      endpoints: [{ url: "wss://example.test/events" }],
     });
 
     await updateRoute({
@@ -176,7 +169,6 @@ integration("service REST controllers with MySQL", () => {
           endpoints: [
             {
               id: endpointId,
-              codeKey: "events",
               name: "Events updated",
               url: "wss://example.test/events",
             },
@@ -190,7 +182,7 @@ integration("service REST controllers with MySQL", () => {
       id: created.id,
       apiType: "WEBSOCKET",
       name: "Notifications updated",
-      endpoints: [{ id: endpointId, codeKey: "events", name: "Events updated" }],
+      endpoints: [{ id: endpointId, name: "Events updated" }],
     });
 
     await expect(
@@ -257,29 +249,6 @@ integration("service REST controllers with MySQL", () => {
       id: created.id,
     });
     expect(await protoStorage.getProtoFile(secondRow!.protoStorageKey!)).toBeNull();
-  });
-
-  it("rejects duplicate code keys", async () => {
-    const body = {
-      name: "Orders",
-      codeKey: "duplicate-key",
-      framework: "Spring Boot",
-      baseUrl: "http://localhost:8081",
-      endpoints: [{ codeKey: "list", name: "List", method: "GET", url: "/" }],
-    };
-    await createRoute({ context: { body } } as never);
-    await expect(createRoute({ context: { body } } as never)).rejects.toThrow();
-    await expect(
-      createRoute({
-        context: {
-          body: {
-            ...body,
-            codeKey: "endpoint-key-check",
-            endpoints: [body.endpoints[0], { ...body.endpoints[0], name: "Duplicate" }],
-          },
-        },
-      } as never),
-    ).rejects.toThrow();
   });
 
   it("rejects endpoint ids owned by a different service", async () => {

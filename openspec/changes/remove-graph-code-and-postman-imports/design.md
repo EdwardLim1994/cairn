@@ -26,9 +26,9 @@ Alternative: retain Postman parsing as an internal utility. Rejected because it 
 
 ### Coordinate the fresh schema with the storage change
 
-Implement this removal with or after `sqlite-duckdb-storage-migration`, but define the new SQLite schema without `codeKey` or Postman import columns. Because the planned database starts empty, no MySQL column migration or data backfill is required. Do not migrate the now-deleted Graph as Code repository to SQLite. Update the pending backend modular monolith plan after both changes are settled so it does not assign a module to removed code.
+The current nonproduction MySQL schema drops `codeKey` and Postman import columns in migration `0024_chief_angel.sql`. The new SQLite schema must also omit those columns. No MySQL data backfill is required. Do not migrate the now-deleted Graph as Code repository to SQLite. Update the pending backend modular monolith plan after both changes are settled so it does not assign a module to removed code.
 
-Alternative: first drop columns from MySQL, then drop them again in SQLite. Rejected as duplicate migration work for data the user has agreed to discard.
+The original plan deferred physical column removal until SQLite. The user confirmed Cairn is not in production and authorized necessary changes, so the MySQL migration keeps the current schema consistent while SQLite migration proceeds.
 
 ## Risks / Trade-offs
 

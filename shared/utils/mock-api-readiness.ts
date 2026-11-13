@@ -20,8 +20,6 @@ export type MockApiReadinessInput = {
   requestJson: unknown;
   customHeaders: HeaderRow[];
   active: boolean;
-  importUrl?: string | null;
-  matchUrl?: string | null;
 };
 
 function addMissingVariables(
@@ -233,8 +231,6 @@ export function evaluateMockApiReadiness(
   } else if (api.apiType === "GRAPHQL") {
     addGraphqlReasons(api, variables, reasons);
   } else addMissingVariables(api.requestJson, "Request body", variables, reasons);
-  if (!api.targetEndpointId && (api.matchUrl || api.importUrl))
-    addMissingVariables(api.matchUrl ?? api.importUrl, "Imported URL", variables, reasons);
   addHeaderReasons(templateHeaders, api.customHeaders, variables, reasons);
 
   return { status: readinessStatus(reasons, api.active), reasons };

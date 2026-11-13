@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { closeDb, getDb } from "../../db";
-import { logs, otelAccessTokens, projects, runs, services, spans } from "../../db/schema";
+import { getEmbeddedStores } from "../../db/embedded";
+import { readLogs, readSpans, writeLogs } from "../../db/telemetry";
+import { otelAccessTokens, projects, runs, services } from "../../db/schema";
 import { digestAccessToken } from "../../use-cases/otel-access-tokens/token";
 
 vi.mock("../../utils/otlp", async (importOriginal) => ({
@@ -10,10 +12,10 @@ vi.mock("../../utils/otlp", async (importOriginal) => ({
   readOtlpBody: async (event: { context: { body?: unknown } }) => event.context.body,
 }));
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("log query and OTLP controllers with MySQL", () => {
+integration("log query and OTLP controllers with embedded stores", () => {
   const projectId = "telemetry-route-integration-project";
   const bearerToken = "a".repeat(43);
   const auth = { authorization: `Bearer ${bearerToken}` };
@@ -22,7 +24,6 @@ integration("log query and OTLP controllers with MySQL", () => {
   let ingestTracesRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     process.env.AUTH_ENABLED = "true";
@@ -45,6 +46,8 @@ integration("log query and OTLP controllers with MySQL", () => {
   });
 
   beforeEach(async () => {
+    await getEmbeddedStores().telemetry.run("DELETE FROM logs WHERE project_id = ?", [projectId]);
+    await getEmbeddedStores().telemetry.run("DELETE FROM spans WHERE project_id = ?", [projectId]);
     await getDb().delete(projects).where(eq(projects.id, projectId));
     const db = getDb();
     await db.insert(projects).values({ id: projectId });
@@ -70,8 +73,7 @@ integration("log query and OTLP controllers with MySQL", () => {
   });
 
   it("filters logs by severity, service, and search", async () => {
-    const db = getDb();
-    await db.insert(logs).values([
+    await writeLogs([
       {
         projectId,
         traceId: null,
@@ -129,8 +131,9 @@ integration("log query and OTLP controllers with MySQL", () => {
       ingestLogsRoute({ context: { body }, node: { req: { headers: auth } } } as never),
     ).resolves.toEqual({ accepted: 1 });
     await expect(
-      getDb().select().from(logs).where(eq(logs.projectId, projectId)),
-    ).resolves.toMatchObject([
+      ingestLogsRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+    ).resolves.toEqual({ accepted: 1 });
+    await expect(readLogs(projectId, {})).resolves.toMatchObject([
       {
         serviceName: "Order Service",
         severity: "INFO",
@@ -187,12 +190,54 @@ integration("log query and OTLP controllers with MySQL", () => {
     ).resolves.toEqual({
       accepted: 1,
     });
-    await expect(
-      getDb().select().from(spans).where(eq(spans.projectId, projectId)),
-    ).resolves.toHaveLength(1);
+    await expect(readSpans(projectId, traceId)).resolves.toHaveLength(1);
     await expect(
       getDb().select().from(runs).where(eq(runs.projectId, projectId)),
     ).resolves.toMatchObject([{ id: "telemetry-run", lastTelemetryAt: expect.any(Date) }]);
+  });
+
+  it("retries SQLite run metadata after DuckDB committed the span", async () => {
+    const traceId = "d".repeat(32);
+    await getDb().insert(runs).values({ id: "retry-run", projectId, traceId });
+    const body = {
+      resourceSpans: [
+        {
+          resource: { attributes: [{ key: "project.id", value: { stringValue: projectId } }] },
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  traceId,
+                  spanId: "e".repeat(16),
+                  name: "retry",
+                  startTimeUnixNano: "1000000",
+                  endTimeUnixNano: "2000000",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const sqlite = getEmbeddedStores().sqlite;
+    sqlite.exec(
+      "CREATE TRIGGER fail_run_metadata BEFORE UPDATE ON runs BEGIN SELECT RAISE(ABORT, 'metadata failure'); END",
+    );
+    try {
+      await expect(
+        ingestTracesRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+      ).rejects.toThrow();
+      expect(await readSpans(projectId, traceId)).toHaveLength(1);
+    } finally {
+      sqlite.exec("DROP TRIGGER fail_run_metadata");
+    }
+    await expect(
+      ingestTracesRoute({ context: { body }, node: { req: { headers: auth } } } as never),
+    ).resolves.toEqual({ accepted: 1 });
+    expect(await readSpans(projectId, traceId)).toHaveLength(1);
+    expect(
+      (await getDb().select().from(runs).where(eq(runs.id, "retry-run")))[0]?.lastTelemetryAt,
+    ).toBeInstanceOf(Date);
   });
 
   it("rejects malformed OTLP contracts", async () => {
@@ -219,12 +264,8 @@ integration("log query and OTLP controllers with MySQL", () => {
         node: { req: { headers: {} } },
       } as never),
     ).rejects.toMatchObject({ statusCode: 401 });
-    await expect(
-      getDb().select().from(logs).where(eq(logs.projectId, projectId)),
-    ).resolves.toHaveLength(0);
-    await expect(
-      getDb().select().from(spans).where(eq(spans.projectId, projectId)),
-    ).resolves.toHaveLength(0);
+    await expect(readLogs(projectId, {})).resolves.toHaveLength(0);
+    await expect(readSpans(projectId, "b".repeat(32))).resolves.toHaveLength(0);
   });
 
   it("keeps OTLP bearer authentication active when application authentication is disabled", async () => {

@@ -1,14 +1,27 @@
 // @vitest-environment happy-dom
 import { defineComponent, h, ref } from "vue";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { createApiClient, type ApiTransportOptions } from "../models/api-client";
+import { createApiClient, type ApiTransportOptions } from "../shared/api";
 import { useServiceViewModel, type ServiceDraft } from "./useServiceViewModel";
 import { createPinia, setActivePinia } from "pinia";
 import { useGraphStore } from "../stores/graph";
 import { mount } from "@vue/test-utils";
-import ServiceSettingsPanel from "../components/ServiceSettingsPanel.vue";
+import { ServiceSettingsPanel } from "../features/service-editor";
 
 const nuxtUiStubs = {
+  ConfirmDialog: defineComponent({
+    props: { open: Boolean, confirmLabel: String },
+    emits: ["confirm", "cancel"],
+    setup(props, { emit }) {
+      return () =>
+        props.open
+          ? h("div", { role: "alertdialog" }, [
+              h("button", { onClick: () => emit("cancel") }, "Cancel"),
+              h("button", { onClick: () => emit("confirm") }, props.confirmLabel),
+            ])
+          : null;
+    },
+  }),
   USlideover: defineComponent({
     props: { ui: Object, content: Object },
     setup(props, { slots }) {
@@ -99,7 +112,6 @@ const nuxtUiStubs = {
 
 const service = {
   id: "service-1",
-  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   apiType: "REST" as const,
@@ -117,7 +129,6 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
-      codeKey: "list-orders",
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
@@ -132,7 +143,7 @@ const service = {
 describe("service view model", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  function setup() {
+  function setup(refreshSucceeds = true) {
     const calls: { url: string; options: ApiTransportOptions }[] = [];
     let protoParseResponse: {
       methods: Array<{ name: string; rpcMethod: string }>;
@@ -173,6 +184,7 @@ describe("service view model", () => {
     const events: string[] = [];
     const errors: string[] = [];
     const warningBatches: string[][] = [];
+    const successes: string[] = [];
     const options = {
       apiClient,
       draft,
@@ -182,13 +194,17 @@ describe("service view model", () => {
       addPosition,
       services: () => [service],
       saveCanvas: async () => void events.push("save-canvas"),
-      loadCanvas: async () => void events.push("load-canvas"),
+      loadCanvas: async () => {
+        events.push("load-canvas");
+        return refreshSucceeds;
+      },
       closeSettings: () => events.push("close"),
       frameworkLabel: (framework: string) => (framework.includes(".net") ? ".NET" : framework),
       onError: (message: string) => {
         if (message) errors.push(message);
       },
       onImportWarnings: (warnings: string[]) => warningBatches.push(warnings),
+      onSuccess: (action: "created" | "updated" | "deleted") => successes.push(action),
     };
     return {
       vm: useServiceViewModel(options),
@@ -197,6 +213,7 @@ describe("service view model", () => {
       events,
       errors,
       warningBatches,
+      successes,
       setProtoParseResponse: (response: typeof protoParseResponse) =>
         (protoParseResponse = response),
     };
@@ -300,7 +317,8 @@ describe("service view model", () => {
       url: "/api/services",
       options: { method: "POST", body: { positionX: 50, positionY: 60 } },
     });
-    expect(context.events).toEqual(["save-canvas", "close", "load-canvas", "save-canvas"]);
+    expect(context.events).toEqual(["save-canvas", "load-canvas", "save-canvas", "close"]);
+    expect(context.successes).toEqual(["created"]);
 
     context.events.length = 0;
     context.vm.editService("service-1");
@@ -312,16 +330,28 @@ describe("service view model", () => {
       healthCheckHeaderTemplateId: "template-1",
       healthCheckCustomHeaders: [{ name: "X-Key", value: "{{apiKey}}" }],
     });
-    expect(context.events).toEqual(["save-canvas", "close", "load-canvas", "save-canvas"]);
+    expect(context.events).toEqual(["save-canvas", "load-canvas", "save-canvas", "close"]);
+    expect(context.successes).toEqual(["created", "updated"]);
   });
 
-  it("deletes only after confirmation and reports API errors", async () => {
+  it("deletes one service after editor confirmation", async () => {
     const context = setup();
-    await context.vm.deleteService("service-1", () => false);
-    expect(context.calls).toHaveLength(0);
-    await context.vm.deleteService("service-1", () => true);
+    await context.vm.deleteService("service-1");
     expect(context.calls[0]?.options.method).toBe("DELETE");
     expect(context.events).toEqual(["save-canvas", "load-canvas", "save-canvas"]);
+    expect(context.successes).toEqual(["deleted"]);
+  });
+
+  it("retains the service editor and withholds success when refresh fails", async () => {
+    const context = setup(false);
+    context.vm.editService("service-1");
+    await context.vm.saveService();
+
+    expect(context.calls[0]?.options.method).toBe("PUT");
+    expect(context.events).toEqual(["save-canvas", "load-canvas"]);
+    expect(context.errors.at(-1)).toContain("workspace refresh failed");
+    expect(context.successes).toEqual([]);
+    expect(context.dialogOpen.value).toBe(true);
   });
 
   it("integrates service form edits with the graph store and service API", async () => {
@@ -347,11 +377,11 @@ describe("service view model", () => {
         headerTemplates: [],
         authorizationTemplates: [],
       },
-      global: { components: nuxtUiStubs },
+      global: { components: nuxtUiStubs, stubs: { ConfirmDialog: nuxtUiStubs.ConfirmDialog } },
     });
     await wrapper
       .findAll("footer button")
-      .find((button) => button.text() === "Save")!
+      .find((button) => button.text() === "Update")!
       .trigger("click");
     context.draft.value.name = "Updated Orders";
     await context.vm.saveService();
@@ -374,7 +404,7 @@ describe("service view model", () => {
         authorizationTemplates: [],
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
-      global: { components: nuxtUiStubs },
+      global: { components: nuxtUiStubs, stubs: { ConfirmDialog: nuxtUiStubs.ConfirmDialog } },
     });
     const file = new File(
       [
@@ -425,7 +455,7 @@ describe("service view model", () => {
         authorizationTemplates: [],
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
       },
-      global: { components: nuxtUiStubs },
+      global: { components: nuxtUiStubs, stubs: { ConfirmDialog: nuxtUiStubs.ConfirmDialog } },
     });
     const file = new File(["not valid OpenAPI"], "invalid.yaml", { type: "text/yaml" });
     const input = wrapper.get('[aria-label="Upload OpenAPI schema"]');
@@ -516,7 +546,7 @@ describe("service view model", () => {
         onImportOpenApi: (file: File) => (importPromise = context.vm.importOpenApiFile(file)),
         onDiscard: () => context.closeSettings(),
       },
-      global: { components: nuxtUiStubs },
+      global: { components: nuxtUiStubs, stubs: { ConfirmDialog: nuxtUiStubs.ConfirmDialog } },
     });
     const file = new File(
       [
@@ -538,6 +568,7 @@ describe("service view model", () => {
       .findAll("footer button")
       .find((button) => button.text() === "Discard")!
       .trigger("click");
+    await wrapper.get('[role="alertdialog"] button:last-child').trigger("click");
     expect(context.events).toContain("close");
     expect(context.calls).toEqual([]);
     expect(context.vm.editService("service-1")).toBe(true);

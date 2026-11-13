@@ -1,0 +1,117 @@
+{
+  "engine": "mysql",
+  "workload": {
+    "recordsPerRequest": 10,
+    "cases": [
+      {
+        "kind": "traces",
+        "gzip": false,
+        "count": 8,
+        "concurrency": 1,
+        "batch": 1
+      },
+      {
+        "kind": "logs",
+        "gzip": false,
+        "count": 8,
+        "concurrency": 1,
+        "batch": 100
+      },
+      {
+        "kind": "traces",
+        "gzip": true,
+        "count": 8,
+        "concurrency": 4,
+        "batch": 200
+      },
+      {
+        "kind": "logs",
+        "gzip": true,
+        "count": 8,
+        "concurrency": 4,
+        "batch": 300
+      },
+      {
+        "kind": "traces",
+        "gzip": false,
+        "count": 2,
+        "concurrency": 1,
+        "batch": 1
+      },
+      {
+        "kind": "logs",
+        "gzip": false,
+        "count": 2,
+        "concurrency": 1,
+        "batch": 100
+      }
+    ],
+    "sizes": {
+      "traces-plain": {
+        "jsonBytes": 2379,
+        "sentBytes": 2379
+      },
+      "logs-plain": {
+        "jsonBytes": 1842,
+        "sentBytes": 1842
+      },
+      "traces-gzip": {
+        "jsonBytes": 2379,
+        "sentBytes": 259
+      },
+      "logs-gzip": {
+        "jsonBytes": 1842,
+        "sentBytes": 252
+      }
+    }
+  },
+  "results": {
+    "requests": 36,
+    "accepted": 360,
+    "errors": [],
+    "elapsedSeconds": 0.2534868999999999,
+    "acceptedPerSecond": 1420.1917337740142,
+    "latencyMs": {
+      "p50": 9.552200000000084,
+      "p95": 17.519199999999955
+    },
+    "peakRssBytes": 247345152,
+    "cpuSeconds": 0.171875,
+    "phasesMs": {
+      "traces": {
+        "parse": {
+          "samples": 18,
+          "p50": 0.11200000000008004,
+          "p95": 1.455600000000004
+        },
+        "normalize": {
+          "samples": 18,
+          "p50": 0.07179999999993925,
+          "p95": 0.4758999999999105
+        },
+        "write": {
+          "samples": 18,
+          "p50": 8.834299999999985,
+          "p95": 10.192800000000034
+        }
+      },
+      "logs": {
+        "parse": {
+          "samples": 18,
+          "p50": 0.08410000000003492,
+          "p95": 0.34999999999990905
+        },
+        "normalize": {
+          "samples": 18,
+          "p50": 0.06680000000005748,
+          "p95": 0.3387000000000171
+        },
+        "write": {
+          "samples": 18,
+          "p50": 1.1445999999998548,
+          "p95": 2.046500000000151
+        }
+      }
+    }
+  }
+}

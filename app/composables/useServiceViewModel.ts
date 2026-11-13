@@ -1,5 +1,5 @@
 import type { Ref } from "vue";
-import type { createApiClient } from "../models/api-client";
+import type { createApiClient } from "../shared/api";
 import type { GraphService } from "../models/graph";
 import { parseOpenApiEndpoints, type ServiceEndpointDraft } from "../utils/openapi-import";
 
@@ -30,12 +30,13 @@ type ServiceViewModelOptions = {
   frameworkMenuOpen: Ref<boolean>;
   addPosition: Ref<Position>;
   services: () => GraphService[];
-  saveCanvas: () => Promise<void>;
-  loadCanvas: () => Promise<void>;
+  saveCanvas: () => Promise<boolean | void>;
+  loadCanvas: () => Promise<boolean | void>;
   closeSettings: () => void;
   frameworkLabel: (framework: string) => string;
   onError: (message: string) => void;
   onImportWarnings: (warnings: string[]) => void;
+  onSuccess?: (action: "created" | "updated" | "deleted") => void;
 };
 
 function newServiceDraft(): ServiceDraft {
@@ -213,7 +214,7 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
 
     options.onError("");
     try {
-      await options.saveCanvas();
+      if ((await options.saveCanvas()) === false) return;
       const body = options.editingServiceId.value
         ? options.draft.value
         : {
@@ -221,24 +222,32 @@ export function useServiceViewModel(options: ServiceViewModelOptions) {
             positionX: options.addPosition.value.x,
             positionY: options.addPosition.value.y,
           };
+      const updating = Boolean(options.editingServiceId.value);
       if (options.editingServiceId.value)
         await options.apiClient.updateService(options.editingServiceId.value, body);
       else await options.apiClient.createService(body);
+      if ((await options.loadCanvas()) === false) {
+        options.onError("Service saved, but workspace refresh failed");
+        return;
+      }
+      if ((await options.saveCanvas()) === false) return;
       options.closeSettings();
-      await options.loadCanvas();
-      await options.saveCanvas();
+      options.onSuccess?.(updating ? "updated" : "created");
     } catch (cause) {
       options.onError(cause instanceof Error ? cause.message : "Could not save service");
     }
   }
 
-  async function deleteService(id: string, confirmDelete: () => boolean) {
-    if (!confirmDelete()) return false;
+  async function deleteService(id: string) {
     try {
-      await options.saveCanvas();
+      if ((await options.saveCanvas()) === false) return false;
       await options.apiClient.deleteService(id);
-      await options.loadCanvas();
-      await options.saveCanvas();
+      if ((await options.loadCanvas()) === false) {
+        options.onError("Service deleted, but workspace refresh failed");
+        return false;
+      }
+      if ((await options.saveCanvas()) === false) return false;
+      options.onSuccess?.("deleted");
       return true;
     } catch (cause) {
       options.onError(cause instanceof Error ? cause.message : "Could not remove service");

@@ -1,17 +1,8 @@
-import "dotenv/config";
 import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const databaseUrl = process.env.CAIRN_TEST_DATABASE_URL;
-if (!databaseUrl) {
-  console.error(
-    "CAIRN_TEST_DATABASE_URL is required. Start the disposable MySQL service with docker-compose.test.yml first.",
-  );
-  process.exit(1);
-}
-
-const env = { ...process.env, DATABASE_URL: databaseUrl };
+const env = { ...process.env, CAIRN_RUN_INTEGRATION: "1", AUTH_ENABLED: "false" };
 const command = process.platform === "win32" ? "vp.exe" : "vp";
 
 function findIntegrationTests(directory) {
@@ -31,7 +22,6 @@ function run(args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-run(["run", "db:migrate"]);
 const integrationTests = findIntegrationTests("server").map((path) =>
   relative(process.cwd(), path).split(sep).join("/"),
 );

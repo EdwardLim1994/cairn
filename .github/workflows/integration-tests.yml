@@ -10,21 +10,6 @@ permissions:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_DATABASE: cairn_test
-          MYSQL_USER: cairn_test
-          MYSQL_PASSWORD: cairn_test_only
-          MYSQL_ROOT_PASSWORD: cairn_test_root_only
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ucairn_test -pcairn_test_only"
-          --health-interval=5s
-          --health-timeout=2s
-          --health-retries=20
     steps:
       - uses: actions/checkout@v4
 
@@ -34,10 +19,8 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: MySQL integration tests
+      - name: Embedded database integration tests
         env:
-          DATABASE_URL: mysql://cairn_test:cairn_test_only@127.0.0.1:3306/cairn_test
-          CAIRN_TEST_DATABASE_URL: mysql://cairn_test:cairn_test_only@127.0.0.1:3306/cairn_test
           OTEL_COLLECTOR_URL: http://localhost:4318
           PROJECT_ID: cairn-integration-tests
           AUTH_USERNAME: integration-test

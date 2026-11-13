@@ -15,9 +15,6 @@ const mockInput = {
   headerTemplateId: null,
   customHeaders: [],
   active: true,
-  importMethod: null,
-  importUrl: null,
-  matchUrl: null,
 };
 
 describe("mock API endpoint use cases", () => {

@@ -15,7 +15,7 @@ export function createListLogsUseCase(dependencies: {
     filters: { severities?: string[]; search?: string },
   ) => Promise<{
     records: Array<{
-      id: number;
+      id: string | number;
       projectId: string;
       traceId: string | null;
       serviceName: string;

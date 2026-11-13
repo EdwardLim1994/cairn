@@ -47,12 +47,6 @@ function isCustomHeaderList(value: unknown): value is { name: string; value: str
   );
 }
 
-function validateImportFields(input: Record<string, unknown>) {
-  for (const key of ["importMethod", "importUrl", "matchUrl"] as const)
-    if (input[key] != null && typeof input[key] !== "string")
-      throw createError({ statusCode: 400, statusMessage: `${key} must be text` });
-}
-
 export function mockApiInput(value: unknown) {
   const input = record(value, "Mock API");
   const requestedApiType = input.apiType === undefined ? "HTTP" : input.apiType;
@@ -90,7 +84,6 @@ export function mockApiInput(value: unknown) {
     throw createError({ statusCode: 400, statusMessage: "Active must be a boolean" });
   if (input.headerTemplateId != null && typeof input.headerTemplateId !== "string")
     throw createError({ statusCode: 400, statusMessage: "Header template ID must be text" });
-  validateImportFields(input);
   return {
     name: input.name.trim(),
     apiType,
@@ -101,8 +94,5 @@ export function mockApiInput(value: unknown) {
     headerTemplateId: input.headerTemplateId ?? null,
     customHeaders: input.customHeaders ?? [],
     active: input.active ?? targetEndpointId !== null,
-    importMethod: input.importMethod ?? null,
-    importUrl: input.importUrl ?? null,
-    matchUrl: input.matchUrl ?? null,
   };
 }

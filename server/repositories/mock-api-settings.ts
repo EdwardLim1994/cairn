@@ -2,8 +2,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { MockApiSettingsSaveRequest } from "#shared/api/mock-apis";
 import { getDb } from "../db";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import * as schema from "../db/schema";
 import {
   authorizationTemplates,
   environmentVariables,
@@ -16,7 +14,7 @@ import {
 import { evaluateMockApiReadiness } from "#shared/utils/mock-api-readiness";
 import { validateHeaderRows } from "#shared/utils/headers";
 
-type Database = MySql2Database<typeof schema>;
+type Database = ReturnType<typeof getDb>;
 const draftId = (id: string | undefined) => Boolean(id?.startsWith("draft-"));
 
 function validateVariables(
@@ -208,9 +206,6 @@ export async function saveMockApiSettings(
           pathParameters: api.pathParameters,
           requestJson: api.requestJson,
           description: api.description,
-          importMethod: api.importMethod,
-          importUrl: api.importUrl,
-          matchUrl: api.matchUrl,
         };
         if (oldApiIds.has(id)) await tx.update(mockApis).set(row).where(eq(mockApis.id, id));
         else await tx.insert(mockApis).values({ id, projectId, ...row });

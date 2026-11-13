@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Codemirror } from "vue-codemirror";
 import { graphql } from "cm6-graphql";
 import { EditorView } from "@codemirror/view";
-import RequestJsonEditor from "./RequestJsonEditor.vue";
+import RequestJsonEditor from "../features/mock-api-editor/ui/RequestJsonEditor.vue";
 
 type GraphqlRequest = { query: string; variables: unknown; operationName?: string };
 const props = defineProps<{ modelValue: string; variables: Array<{ name: string }> }>();

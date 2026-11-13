@@ -1,4 +1,5 @@
 import type { OtlpTracesRequest } from "#shared/api/observability";
+import { recordOtlpBenchmark } from "../../utils/otlp-benchmark";
 import {
   otlpArray,
   otlpAttributes,
@@ -91,8 +92,12 @@ export function createIngestOtlpTracesUseCase(dependencies: {
 }) {
   return async (body: OtlpTracesRequest) => {
     const projectId = await dependencies.ensureProject();
+    const normalizeStarted = performance.now();
     const records = normalizeSpans(body, projectId, dependencies.configuredProjectId());
+    recordOtlpBenchmark("traces", "normalize", performance.now() - normalizeStarted);
+    const writeStarted = performance.now();
     await dependencies.insertSpans(records);
+    recordOtlpBenchmark("traces", "write", performance.now() - writeStarted);
     return { accepted: records.length };
   };
 }

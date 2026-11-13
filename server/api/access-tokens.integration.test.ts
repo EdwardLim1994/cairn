@@ -6,17 +6,16 @@ import { projects } from "../db/schema";
 import { digestAccessToken } from "../use-cases/otel-access-tokens/token";
 import { hasValidOtelAccessToken } from "../repositories/otel-access-tokens";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("OpenTelemetry access-token APIs with MySQL", () => {
+integration("OpenTelemetry access-token APIs with embedded stores", () => {
   const projectId = "access-token-api-integration-project";
   let listRoute: () => Promise<unknown>;
   let createRoute: (event: never) => Promise<{ id: string; token: string }>;
   let deleteRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     const runtime = globalThis as unknown as {

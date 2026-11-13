@@ -43,16 +43,8 @@ Environment variable Update remains an immediate `PUT /api/environment-variables
 
 An API can reference one live header template and add custom rows. Header names merge case-insensitively; a custom row overrides the template row with the same name, including when its value is empty. `{{name}}` values resolve from project environment variables at run time. Cairn owns `traceparent`; imported or custom values cannot override it. Header values are not copied into warnings or readiness diagnostics.
 
-Mock APIs derive `Draft`, `Inactive`, or `Ready` from endpoint selection, matching REST/GraphQL types, path values, variables, headers, GraphQL syntax, and the saved Active setting. Drafts can be saved without a matched endpoint, but only Ready APIs can run. A dependency repair does not turn Active back on. Imported APIs start inactive.
+Mock APIs derive `Draft`, `Inactive`, or `Ready` from endpoint selection, matching REST/GraphQL types, path values, variables, headers, GraphQL syntax, and the saved Active setting. Drafts can be saved without a matched endpoint, but only Ready APIs can run. A dependency repair does not turn Active back on.
 
 ## GraphQL
 
 GraphQL services have exactly one endpoint and use HTTP POST. GraphQL mock API requests store `{ query, variables, operationName? }` in `requestJson`. The editor checks syntax only; it does not validate fields against a service schema or provide schema-aware autocomplete. Successful HTTP responses remain completed runs even when the GraphQL JSON response contains an `errors` array.
-
-## Postman imports
-
-Import APIs and Import environment are separate actions. Collection variables are used only as URL matching fallbacks and never create Cairn variable cards. Cairn's saved and staged variables take precedence for URL matching. Enabled explicit request headers are copied to that API's custom rows; disabled headers are omitted, and no header template is created implicitly. Unsupported authorization and scripts produce request warnings and are not executed.
-
-Environment JSON accepts enabled string, number, and boolean entries; values become strings, including empty strings. Invalid names, unsupported values, and duplicate names are skipped with warnings. Existing and staged variable values are never overwritten. Invalid environment JSON changes no drafts.
-
-Collection requests that cannot match a registered REST method and full URL are kept as inactive drafts with their source method/URL. Import warnings identify unsupported data or the mismatch without exposing header values. Missing URL, body, path, or header variables appear as readiness reasons. Importing the missing variable or changing an endpoint can retry an unresolved automatic match; manually selected endpoints are preserved. Importing APIs before or after environment variables both works. Save persists staged edits atomically; Discard restores saved cards and drafts. Per-header enable/disable checkboxes remain a future TODO.

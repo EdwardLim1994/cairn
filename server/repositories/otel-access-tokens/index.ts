@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "../../db";
 import { otelAccessTokens } from "../../db/schema";
+import { changedRows } from "../../db/changes";
 
 export async function listOtelAccessTokens(projectId: string) {
   return getDb()
@@ -24,7 +25,7 @@ export async function deleteOtelAccessToken(projectId: string, id: string) {
   const result = await getDb()
     .delete(otelAccessTokens)
     .where(and(eq(otelAccessTokens.projectId, projectId), eq(otelAccessTokens.id, id)));
-  return result[0].affectedRows > 0;
+  return changedRows(result) > 0;
 }
 
 export async function hasValidOtelAccessToken(projectId: string, digest: string, now = new Date()) {

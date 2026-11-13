@@ -4,6 +4,70 @@ import { createGetRunFlowUseCase } from "./get-run-flow";
 import { createGetRunUseCase } from "./get-run";
 
 describe("run endpoint use cases", () => {
+  it("distinguishes expired, partial, and never-observed telemetry in saved runs", async () => {
+    const now = Date.parse("2026-11-13T00:00:00.000Z");
+    const run = {
+      id: "old-run",
+      projectId: "project-1",
+      mockApiId: null,
+      traceId: "trace-1",
+      status: "completed" as const,
+      responseStatus: 200,
+      grpcStatus: null,
+      grpcStatusName: null,
+      responseHeaders: null,
+      responseBody: "saved response",
+      error: null,
+      startedAt: new Date(now - 400 * 86_400_000),
+      finishedAt: new Date(now - 400 * 86_400_000),
+      firstTelemetryAt: new Date(now - 400 * 86_400_000),
+      lastTelemetryAt: new Date(now - 400 * 86_400_000),
+    };
+    const data = {
+      run,
+      spans: [],
+      registeredServices: [],
+      destinations: [],
+      messageConnections: [],
+      endpoints: [],
+      failedTargetService: undefined,
+    };
+    const getRunFlowData = vi.fn().mockResolvedValue(data);
+    const useCase = createGetRunFlowUseCase({
+      ensureProject: async () => "project-1",
+      getRunFlowData,
+      telemetryQuietMs: () => 1000,
+      telemetryMaxWaitMs: () => 1000,
+      telemetryRetentionDays: () => 365,
+      now: () => now,
+    });
+    expect((await useCase("old-run")).telemetryState).toBe("expired");
+    getRunFlowData.mockResolvedValue({
+      ...data,
+      run: { ...run, firstTelemetryAt: null, lastTelemetryAt: null },
+    });
+    expect((await useCase("old-run")).telemetryState).toBe("unavailable");
+    getRunFlowData.mockResolvedValue({
+      ...data,
+      spans: [
+        {
+          id: "span",
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span",
+          parentSpanId: null,
+          serviceName: "orders",
+          operationName: "GET /orders",
+          startTime: new Date(now - 1000),
+          endTime: new Date(now),
+          statusCode: "OK",
+          attributes: {},
+          receivedAt: new Date(now),
+        },
+      ],
+    });
+    expect((await useCase("old-run")).telemetryState).toBe("partial");
+  });
   it("returns run details and reports missing runs", async () => {
     const now = new Date("2026-10-30T12:00:00.000Z");
     const findRun = vi.fn().mockResolvedValue({

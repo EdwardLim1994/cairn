@@ -3,13 +3,23 @@ import { defineStore } from "pinia";
 import type { Edge, Node } from "@vue-flow/core";
 import type { CanvasGetResponse } from "#shared/api/canvas";
 import type { GraphViewport, ObservedServiceEdge } from "../models/graph";
+import { useServiceStore } from "../entities/service";
+import { useMessageDestinationStore } from "../entities/message-destination";
 
 export const useGraphStore = defineStore("graph", () => {
+  const serviceStore = useServiceStore();
+  const messageDestinationStore = useMessageDestinationStore();
   const nodes = ref<Node[]>([]);
   const edges = ref<Edge[]>([]);
-  const services = ref<CanvasGetResponse["services"]>([]);
+  const services = computed({
+    get: () => serviceStore.services,
+    set: serviceStore.setServices,
+  });
   const serviceEdges = ref<CanvasGetResponse["edges"]>([]);
-  const messageDestinations = ref<CanvasGetResponse["messageDestinations"]>([]);
+  const messageDestinations = computed({
+    get: () => messageDestinationStore.messageDestinations,
+    set: messageDestinationStore.setMessageDestinations,
+  });
   const messageConnections = ref<CanvasGetResponse["messageConnections"]>([]);
   const collapsedServiceEndpoints = ref<Record<string, boolean>>({});
   const serviceHealth = ref<Record<string, boolean | null>>({});
@@ -28,14 +38,14 @@ export const useGraphStore = defineStore("graph", () => {
     );
   });
 
-  function applyCanvas(canvas: CanvasGetResponse) {
-    services.value = canvas.services;
+  function applyCanvas(canvas: CanvasGetResponse, options: { preserveViewState?: boolean } = {}) {
+    serviceStore.setServices(canvas.services);
     serviceEdges.value = canvas.edges;
-    messageDestinations.value = canvas.messageDestinations ?? [];
+    messageDestinationStore.setMessageDestinations(canvas.messageDestinations ?? []);
     messageConnections.value = canvas.messageConnections ?? [];
-    viewport.value = canvas.viewport;
+    if (!options.preserveViewState) viewport.value = canvas.viewport;
     nodesLocked.value = canvas.nodesLocked;
-    selectedNodeId.value = null;
+    if (!options.preserveViewState) selectedNodeId.value = null;
   }
   function setNodes(value: Node[]) {
     nodes.value = value;
@@ -59,7 +69,7 @@ export const useGraphStore = defineStore("graph", () => {
     messageConnections.value = value;
   }
   function setMessageDestinations(value: CanvasGetResponse["messageDestinations"]) {
-    messageDestinations.value = value;
+    messageDestinationStore.setMessageDestinations(value);
   }
   function toggleServiceEndpoints(serviceId: string) {
     collapsedServiceEndpoints.value = {

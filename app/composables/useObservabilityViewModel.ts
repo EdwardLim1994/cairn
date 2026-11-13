@@ -1,4 +1,4 @@
-import type { createApiClient } from "../models/api-client";
+import type { createApiClient } from "../shared/api";
 import type { useObservabilityStore } from "../stores/observability";
 
 type Store = ReturnType<typeof useObservabilityStore>;

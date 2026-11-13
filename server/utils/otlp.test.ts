@@ -1,4 +1,5 @@
 import { gzipSync } from "node:zlib";
+import { Readable } from "node:stream";
 import { createEvent, getHeader } from "h3";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, describe, expect, it } from "vite-plus/test";
@@ -14,11 +15,9 @@ import {
 } from "./otlp";
 
 function eventFor(body: Buffer, encoding?: string) {
-  const request = {
-    method: "POST",
-    headers: encoding ? { "content-encoding": encoding } : {},
-    rawBody: body,
-  } as unknown as IncomingMessage;
+  const request = Readable.from([body]) as IncomingMessage;
+  request.method = "POST";
+  request.headers = encoding ? { "content-encoding": encoding } : {};
   return createEvent(request, {} as ServerResponse);
 }
 

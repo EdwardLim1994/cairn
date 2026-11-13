@@ -15,11 +15,8 @@ export function createSaveCanvasUseCase(dependencies: {
       messageConnections: parsed.data.messageConnections ?? [],
     };
     const destinationIds = canvas.messageDestinations.map(({ id }) => id);
-    const destinationKeys = canvas.messageDestinations.map(({ codeKey }) => codeKey);
     if (new Set(destinationIds).size !== destinationIds.length)
       throw new CanvasConstraintError("Canvas contains duplicate message destinations");
-    if (new Set(destinationKeys).size !== destinationKeys.length)
-      throw new CanvasConstraintError("Canvas contains duplicate message destination keys");
     const messageConnectionKeys = canvas.messageConnections.map((connection) =>
       connection.type === "publish"
         ? `publish:${connection.endpointId ?? connection.serviceId}:${connection.destinationId}`

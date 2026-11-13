@@ -13,7 +13,6 @@ describe("operator authentication endpoints", () => {
   let origin: string;
 
   beforeAll(async () => {
-    vi.stubEnv("DATABASE_URL", "mysql://db/cairn");
     vi.stubEnv("OTEL_COLLECTOR_URL", "http://collector:4318");
     vi.stubEnv("PROJECT_ID", "auth-test");
     vi.stubEnv("AUTH_ENABLED", "true");

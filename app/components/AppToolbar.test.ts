@@ -25,13 +25,12 @@ describe("AppToolbar", () => {
     expect(wrapper.get('[aria-label="Manage nodes"]').classes()).toContain("app__toolbar-button");
     expect(wrapper.text()).not.toContain("services");
     expect(wrapper.find('[class*="bg-[#15966f]"]').exists()).toBe(false);
-    await wrapper.get('[aria-label="Graph as code"]').trigger("click");
+    expect(wrapper.find('[aria-label="Graph as code"]').exists()).toBe(false);
     await wrapper.get('[aria-label="Use light theme"]').trigger("click");
     await wrapper.get('[aria-label="Mock APIs"]').trigger("click");
     await wrapper.get('[aria-label="Manage nodes"]').trigger("click");
     await wrapper.get('[aria-label="Manage access tokens"]').trigger("click");
     await wrapper.get('[aria-label="Run history"]').trigger("click");
-    expect(wrapper.emitted("openGraphAsCode")).toEqual([[]]);
     expect(wrapper.find('[aria-label="Lock node positions"]').exists()).toBe(false);
     expect(wrapper.emitted("toggleTheme")).toEqual([[]]);
     expect(wrapper.emitted("openMockApis")).toEqual([[]]);

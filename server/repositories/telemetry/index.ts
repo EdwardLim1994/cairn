@@ -1,6 +1,13 @@
-import { and, desc, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../../db";
-import { logs, runs, services, spans } from "../../db/schema";
+import {
+  readLogs,
+  writeLogs,
+  writeSpans,
+  type LogRecord,
+  type SpanRecord,
+} from "../../db/telemetry";
+import { runs, services } from "../../db/schema";
 
 export async function addMockRunFailureLog(input: {
   projectId: string;
@@ -14,9 +21,8 @@ export async function addMockRunFailureLog(input: {
   responseStatus: number | null;
   message: string;
 }) {
-  await getDb()
-    .insert(logs)
-    .values({
+  await writeLogs([
+    {
       projectId: input.projectId,
       traceId: input.traceId,
       serviceName: input.serviceName,
@@ -30,25 +36,17 @@ export async function addMockRunFailureLog(input: {
         url: input.url,
         responseStatus: input.responseStatus,
       },
-    });
+    },
+  ]);
 }
 
 export async function queryLogs(
   projectId: string,
   filters: { severities?: string[]; search?: string },
 ) {
-  const conditions = [eq(logs.projectId, projectId)];
-  if (filters.severities?.length) conditions.push(inArray(logs.severity, filters.severities));
-  if (filters.search) conditions.push(like(logs.message, `%${filters.search}%`));
-  const db = getDb();
   const [records, registeredServices] = await Promise.all([
-    db
-      .select()
-      .from(logs)
-      .where(and(...conditions))
-      .orderBy(desc(logs.timestamp), desc(logs.id))
-      .limit(500),
-    db.select({ name: services.name }).from(services).where(eq(services.projectId, projectId)),
+    readLogs(projectId, filters),
+    getDb().select({ name: services.name }).from(services).where(eq(services.projectId, projectId)),
   ]);
   return { records, registeredServices };
 }
@@ -60,36 +58,20 @@ export function listTelemetryServiceNames(projectId: string) {
     .where(eq(services.projectId, projectId));
 }
 
-export async function insertOtlpLogs(records: (typeof logs.$inferInsert)[]) {
-  if (records.length) await getDb().insert(logs).values(records);
+export async function insertOtlpLogs(records: LogRecord[]) {
+  await writeLogs(records);
 }
 
-export async function insertOtlpSpans(records: (typeof spans.$inferInsert)[]) {
+export async function insertOtlpSpans(records: SpanRecord[]) {
   if (!records.length) return;
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    await records.reduce<Promise<unknown>>(
-      (pending, span) =>
-        pending.then(() =>
-          tx
-            .insert(spans)
-            .values(span)
-            .onDuplicateKeyUpdate({
-              set: {
-                serviceName: span.serviceName,
-                operationName: span.operationName,
-                endTime: span.endTime,
-                statusCode: span.statusCode,
-                attributes: span.attributes,
-              },
-            }),
-        ),
-      Promise.resolve(),
-    );
-  });
+  await writeSpans(records);
   const traceIds = [...new Set(records.map((span) => span.traceId))];
-  await db
+  const acceptedAt = new Date();
+  await getDb()
     .update(runs)
-    .set({ lastTelemetryAt: new Date() })
+    .set({
+      lastTelemetryAt: acceptedAt,
+      firstTelemetryAt: sql`coalesce(${runs.firstTelemetryAt}, ${acceptedAt.getTime()})`,
+    })
     .where(and(eq(runs.projectId, records[0]!.projectId), inArray(runs.traceId, traceIds)));
 }

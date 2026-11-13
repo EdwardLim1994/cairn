@@ -1,15 +1,40 @@
 import { gunzipSync } from "node:zlib";
-import { createError, readRawBody, type H3Event } from "h3";
+import { createError, getHeader, type H3Event } from "h3";
 import { record } from "./graph-validation";
+import { getOtlpBodyLimits } from "./config";
 
 export async function readOtlpBody(event: H3Event, label: string) {
-  let body = await readRawBody(event, false);
-  if (!body) throw createError({ statusCode: 400, statusMessage: `${label} is required` });
+  const limits = getOtlpBodyLimits();
+  const chunks: Buffer[] = [];
+  let compressedBytes = 0;
+  for await (const chunk of event.node.req) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    compressedBytes += bytes.length;
+    if (compressedBytes > limits.compressed)
+      throw createError({
+        statusCode: 413,
+        statusMessage: `${label} compressed body is too large`,
+      });
+    chunks.push(bytes);
+  }
+  if (!compressedBytes)
+    throw createError({ statusCode: 400, statusMessage: `${label} is required` });
   try {
-    if (getHeader(event, "content-encoding")?.toLowerCase() === "gzip") body = gunzipSync(body);
+    let body = Buffer.concat(chunks);
+    if (getHeader(event, "content-encoding")?.toLowerCase() === "gzip")
+      body = gunzipSync(body, { maxOutputLength: limits.decompressed });
+    else if (body.length > limits.decompressed)
+      throw createError({ statusCode: 413, statusMessage: `${label} body is too large` });
     return otlpObject(JSON.parse(body.toString("utf8")), label);
   } catch (cause) {
     if (cause && typeof cause === "object" && "statusCode" in cause) throw cause;
+    if (
+      cause &&
+      typeof cause === "object" &&
+      "code" in cause &&
+      cause.code === "ERR_BUFFER_TOO_LARGE"
+    )
+      throw createError({ statusCode: 413, statusMessage: `${label} body is too large` });
     throw createError({ statusCode: 400, statusMessage: `${label} must be valid OTLP JSON` });
   }
 }

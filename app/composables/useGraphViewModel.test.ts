@@ -6,7 +6,6 @@ import type { CanvasGetResponse } from "#shared/api/canvas";
 
 const service = {
   id: "service-1",
-  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   apiType: "REST" as const,
@@ -24,7 +23,6 @@ const service = {
   endpoints: [
     {
       id: "endpoint-1",
-      codeKey: "list-orders",
       projectId: "project-1",
       serviceId: "service-1",
       name: "List orders",
@@ -47,9 +45,6 @@ const mockApi: CanvasGetResponse["mockApis"][number] = {
   active: true,
   status: "ready",
   readinessReasons: [],
-  importMethod: null,
-  importUrl: null,
-  matchUrl: null,
   pathParameters: {},
   requestJson: {},
   description: "",
@@ -273,12 +268,10 @@ describe("graph view model", () => {
     const payments = {
       ...service,
       id: "service-2",
-      codeKey: "payments",
       name: "Payments",
       endpoints: service.endpoints.map((endpoint) => ({
         ...endpoint,
         id: "endpoint-2",
-        codeKey: "get-payment",
         serviceId: "service-2",
       })),
     };
@@ -323,7 +316,6 @@ describe("graph view model", () => {
       {
         id: "orders-topic",
         projectId: "project-1",
-        codeKey: "orders",
         broker: "kafka",
         name: "Orders",
         connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
@@ -373,7 +365,6 @@ describe("graph view model", () => {
       {
         id: "review-topic",
         projectId: "project-1",
-        codeKey: "review-added",
         broker: "kafka",
         name: "Review added",
         connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
@@ -421,7 +412,6 @@ describe("graph view model", () => {
         id: "orders-topic",
         queueId: "shared-broker",
         projectId: "project-1",
-        codeKey: "orders",
         broker: "kafka",
         name: "Orders",
         connection: { brokers: "kafka-orders:9092", securityProtocol: "PLAINTEXT" },
@@ -432,7 +422,6 @@ describe("graph view model", () => {
         id: "payments-topic",
         queueId: "shared-broker",
         projectId: "project-1",
-        codeKey: "payments",
         broker: "rabbitmq",
         name: "Payments",
         connection: { host: "rabbit-payments", port: 5672, virtualHost: "/", tls: false },
@@ -558,7 +547,6 @@ describe("graph view model", () => {
       {
         id: "destination-1",
         projectId: "project-1",
-        codeKey: "orders",
         broker: "kafka",
         name: "orders",
         connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },

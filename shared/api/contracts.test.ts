@@ -29,7 +29,6 @@ const date = "2026-10-30T10:00:00.000Z";
 
 const validService = {
   id: "service-1",
-  codeKey: "orders",
   projectId: "project-1",
   name: "Orders",
   apiType: "REST" as const,
@@ -56,9 +55,6 @@ const validMockApi = {
   active: true,
   status: "ready",
   readinessReasons: [],
-  importMethod: null,
-  importUrl: null,
-  matchUrl: null,
   pathParameters: {},
   requestJson: {},
   description: "",
@@ -328,7 +324,6 @@ describe("shared API contracts", () => {
       messageDestinations: [
         {
           id: "destination-1",
-          codeKey: "payments",
           broker: "kafka" as const,
           name: "Payments",
           connection: { brokers: "localhost:9092" },
@@ -369,7 +364,6 @@ describe("shared API contracts", () => {
         services: [
           {
             id: "service-1",
-            codeKey: "orders",
             projectId: "project-1",
             name: "Orders",
             apiType: "REST",
@@ -439,7 +433,6 @@ describe("shared API contracts", () => {
     ).toBe(false);
     const service = {
       id: "service-1",
-      codeKey: "orders",
       projectId: "project-1",
       name: "Orders",
       apiType: "REST",

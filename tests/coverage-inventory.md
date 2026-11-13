@@ -77,7 +77,7 @@ This inventory tracks current production code that the `layered-app-architecture
 
 ### Server utilities
 
-- [x] `ensureProject`, `getDb` (MySQL controller and repository integration tests)
+- [x] `ensureProject`, `getDb` (SQLite and DuckDB controller and repository integration tests)
 - [x] `closeDb` test connection cleanup (`server/api/canvas.integration.test.ts`)
 - [x] `required`, `positiveInteger`, `getAppConfig` (`utils/config.test.ts`)
 - [x] `getOutboundUrl`, `resolveEndpointPath` (`utils/outbound-url.test.ts`, `utils/environment-variables.test.ts`)
@@ -89,17 +89,17 @@ This inventory tracks current production code that the `layered-app-architecture
 ### Backend architecture foundation
 
 - [x] Canvas repository operations and injected endpoint-specific use cases (`server/repositories/canvas/index.ts`, `server/use-cases/canvas/*.test.ts`)
-- [x] Canvas reads and transactional writes; canvas GET/PUT controllers and use cases with MySQL (`server/api/canvas.integration.test.ts`, `server/repositories/canvas/canvas.integration.test.ts`)
-- [x] Service endpoint use cases and MySQL-backed controller flows (`server/use-cases/services/services.test.ts`, `server/api/services.integration.test.ts`)
-- [x] Mock API endpoint use cases and MySQL-backed CRUD/ownership controller flows (`server/use-cases/mock-apis/mock-apis.test.ts`, `server/api/mock-apis.integration.test.ts`)
-- [x] Environment-variable endpoint use cases and MySQL-backed CRUD/validation controller flows (`server/use-cases/environment-variables/environment-variables.test.ts`, `server/api/environment-variables.integration.test.ts`)
-- [x] Mock API execution use case and MySQL-backed success, HTTP failure, timeout, and failure-log controller flows (`server/use-cases/mock-apis/run-mock-api.test.ts`, `server/api/mock-api-run.integration.test.ts`)
-- [x] Run detail and trace-flow use cases, with MySQL-backed endpoint tests for dates, service aliases, downstream edges, errors, pending state, and not-found responses (`server/use-cases/runs/runs.test.ts`, `server/api/runs.integration.test.ts`)
-- [x] Log query and OTLP log/trace ingestion use cases, with MySQL-backed query, normalization, filtering, duplicate-span, and run-correlation tests (`server/use-cases/telemetry/telemetry.test.ts`, `server/routes/v1/telemetry.integration.test.ts`)
+- [x] Canvas reads and transactional writes; canvas GET/PUT controllers and use cases with SQLite and DuckDB (`server/api/canvas.integration.test.ts`, `server/repositories/canvas/canvas.integration.test.ts`)
+- [x] Service endpoint use cases and embedded-database controller flows (`server/use-cases/services/services.test.ts`, `server/api/services.integration.test.ts`)
+- [x] Mock API endpoint use cases and embedded-database CRUD/ownership controller flows (`server/use-cases/mock-apis/mock-apis.test.ts`, `server/api/mock-apis.integration.test.ts`)
+- [x] Environment-variable endpoint use cases and embedded-database CRUD/validation controller flows (`server/use-cases/environment-variables/environment-variables.test.ts`, `server/api/environment-variables.integration.test.ts`)
+- [x] Mock API execution use case and embedded-database success, HTTP failure, timeout, and failure-log controller flows (`server/use-cases/mock-apis/run-mock-api.test.ts`, `server/api/mock-api-run.integration.test.ts`)
+- [x] Run detail and trace-flow use cases, with embedded-database endpoint tests for dates, service aliases, downstream edges, errors, pending state, and not-found responses (`server/use-cases/runs/runs.test.ts`, `server/api/runs.integration.test.ts`)
+- [x] Log query and OTLP log/trace ingestion use cases, with embedded-database query, normalization, filtering, duplicate-span, and run-correlation tests (`server/use-cases/telemetry/telemetry.test.ts`, `server/routes/v1/telemetry.integration.test.ts`)
 
 ## Backend endpoint integration coverage
 
-Each route is covered through its controller, endpoint-specific use case, and domain repository using the disposable MySQL service in `docker-compose.test.yml`. Outbound HTTP targets are deterministic test servers/stubs.
+Each route is covered through its controller, endpoint-specific use case, and domain repository using the disposable SQLite and DuckDB files. Outbound HTTP targets are deterministic test servers/stubs.
 
 - [x] `GET /api/canvas`
 - [x] `PUT /api/canvas`

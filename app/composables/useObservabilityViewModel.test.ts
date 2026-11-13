@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { createPinia, setActivePinia } from "pinia";
-import { createApiClient, type ApiTransportOptions } from "../models/api-client";
+import { createApiClient, type ApiTransportOptions } from "../shared/api";
 import { useObservabilityStore } from "../stores/observability";
 import { useObservabilityViewModel } from "./useObservabilityViewModel";
 

@@ -32,7 +32,7 @@ release. Add a tool name to select part of the graph. For example, run
 
 ## Cairn project context
 
-Cairn is a Nuxt 4 single-page app backed by Nitro server routes, Drizzle ORM, and MySQL. Users register Spring Boot, .NET, or custom services, connect service endpoints and message destinations in a Vue Flow graph, and run REST, GraphQL, unary gRPC, or raw WebSocket mock APIs. Cairn correlates OpenTelemetry traces and logs to a run; graph highlighting and call timing must come from observed telemetry, not configured edges alone. The graph, mock APIs, shared variables, templates, access tokens, and telemetry are scoped to `PROJECT_ID`.
+Cairn is a Nuxt 4 single-page app backed by Nitro server routes, Drizzle ORM, SQLite application data, and DuckDB telemetry. Users register Spring Boot, .NET, or custom services, connect service endpoints and message destinations in a Vue Flow graph, and run REST, GraphQL, unary gRPC, or raw WebSocket mock APIs. Cairn correlates OpenTelemetry traces and logs to a run; graph highlighting and call timing must come from observed telemetry, not configured edges alone. The graph, mock APIs, shared variables, templates, access tokens, and telemetry are scoped to `PROJECT_ID`.
 
 Prefer Tailwind CSS v4 utilities in component templates for visual properties such as layout, spacing, typography, sizing, borders, and states, keeping those choices next to the elements they affect. Keep shared theme tokens, global resets, and custom or third-party integration styles in `app/app.vue` where utility classes are not a good fit. Use app-specific BEM classes (`app__element`, `app__element--modifier`) only when needed for semantic or state hooks, custom selectors, pseudo-elements, or integrations; leave third-party Vue Flow/CodeMirror classes intact. Tailwind CSS v4 is not configured for Sass preprocessing.
 
@@ -47,13 +47,11 @@ Prefer Tailwind CSS v4 utilities in component templates for visual properties su
 ### Mock APIs and shared variables
 
 - Mock API entries target registered service endpoints. Endpoint route templates may contain `{name}`, `{name:constraint}`, or `:name` parameters; mock API path values are URL-encoded before outbound calls.
-- Postman collection import accepts requests that match a registered REST endpoint by full URL and method. Mismatches are skipped and reported individually.
 - Supported mock API types are REST, GraphQL, unary gRPC, and raw WebSocket. GraphQL subscriptions and SSE APIs are future work; do not imply that WebSocket support covers them.
 - WebSocket mock APIs send saved text messages. Connect opens the session, Trigger sends a message only while connected, and Disconnect closes it. Only one mock API session may use a registered endpoint at a time, but different endpoints can stay connected concurrently. Incoming text messages are retained in a bounded client-side buffer while the response panel is closed; runtime sessions are in memory and are not coordinated across Cairn replicas.
 - Service health checks use GET. Spring Boot and .NET have framework defaults; `Other` and WebSocket services need an explicit URL. Custom health-check headers can be combined with a shared header template.
 - Environment variables are project-scoped strings. References use `{{name}}` in JSON string values or path parameter values. Do not treat environment values as typed JSON.
-- Shared header templates and authorization templates can be applied to mock APIs and custom health checks. Authorization supports Bearer, Basic, API key, and OAuth 2.0 Client Credentials; Postman authorization import and provider-specific OAuth flows are not supported. Header-name conflicts between authorization and raw custom headers make an API not ready.
-- The Mock APIs panel imports Postman REST collection requests only when their full URL and method match registered endpoints. Import warnings should identify skipped requests individually.
+- Shared header templates and authorization templates can be applied to mock APIs and custom health checks. Authorization supports Bearer, Basic, API key, and OAuth 2.0 Client Credentials; provider-specific OAuth flows are not supported. Header-name conflicts between authorization and raw custom headers make an API not ready.
 - In the Mock APIs panel, **New variable** adds a blank card in edit mode. The panel's **Save** persists new variables, staged deletions, and mock API changes together. Existing variable cards have Edit/Delete icon actions; **Update** saves a changed name or value immediately and skips the PUT when neither changed.
 - REST and gRPC request payloads use CodeMirror 6 with JSON language support; GraphQL requests use a GraphQL-aware editor. Chained mock calls are future work.
 
@@ -67,7 +65,7 @@ Prefer Tailwind CSS v4 utilities in component templates for visual properties su
 
 ### Runtime and validation
 
-- Use `vp run db:generate` and `vp run db:migrate` for Drizzle schema changes. Add migration SQL and metadata together; preserve existing data when changing column types.
+- Use `vp run db:generate` and `vp run db:migrate` for Drizzle SQLite schema changes. Add migration SQL and metadata together; preserve existing data when changing column types.
 - Use `vp run dev`, `vp run build`, `vp check <changed paths>`, and `vp test run <test paths>` for development and focused validation.
-- Docker Compose runs Cairn and MySQL on Cairn's network. `OUTBOUND_HOST_GATEWAY` rewrites container-side `localhost` targets to the host gateway so Cairn can call separately networked service projects through their published reverse proxies.
+- Docker Compose runs Cairn with a persistent `app_data` volume for SQLite and DuckDB. `OUTBOUND_HOST_GATEWAY` rewrites container-side `localhost` targets to the host gateway so Cairn can call separately networked service projects through their published reverse proxies.
 - Keep the relevant OpenSpec change artifacts in sync when implementation behavior changes. Validate the active change with `openspec validate <change-name> --strict`.

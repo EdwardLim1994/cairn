@@ -1,5 +1,7 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../db";
+import { changedRows } from "../../db/changes";
+import { readSpans } from "../../db/telemetry";
 import {
   headerTemplates,
   authorizationTemplates,
@@ -10,7 +12,6 @@ import {
   services,
   messageConnections,
   messageDestinations,
-  spans,
 } from "../../db/schema";
 import { listMockApis } from "../mock-apis";
 
@@ -163,11 +164,7 @@ export async function getRunFlowData(projectId: string, id: string) {
     .from(runs)
     .where(and(eq(runs.id, id), eq(runs.projectId, projectId)));
   if (!run) return undefined;
-  const records = await db
-    .select()
-    .from(spans)
-    .where(and(eq(spans.projectId, projectId), eq(spans.traceId, run.traceId)))
-    .orderBy(asc(spans.startTime));
+  const records = await readSpans(projectId, run.traceId);
   const registeredServices = await db
     .select({ id: services.id, name: services.name })
     .from(services)
@@ -228,12 +225,12 @@ export async function deleteMockApiCallHistory(projectId: string, id: string): P
   const result = await getDb()
     .delete(mockApiCallHistory)
     .where(and(eq(mockApiCallHistory.projectId, projectId), eq(mockApiCallHistory.id, id)));
-  return Boolean(result[0]?.affectedRows);
+  return changedRows(result) > 0;
 }
 
 export async function clearMockApiCallHistory(projectId: string): Promise<number> {
   const result = await getDb()
     .delete(mockApiCallHistory)
     .where(eq(mockApiCallHistory.projectId, projectId));
-  return result[0]?.affectedRows ?? 0;
+  return changedRows(result);
 }

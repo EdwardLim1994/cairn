@@ -5,6 +5,7 @@ import { ensureProject } from "../../utils/project";
 import { readOtlpBody } from "../../utils/otlp";
 import { createIngestOtlpTracesUseCase } from "../../use-cases/telemetry/ingest-otlp-traces";
 import { requireOtelAccessToken } from "../../utils/otel-access-token-auth";
+import { recordOtlpBenchmark } from "../../utils/otlp-benchmark";
 
 const ingestOtlpTracesUseCase = createIngestOtlpTracesUseCase({
   ensureProject,
@@ -14,7 +15,9 @@ const ingestOtlpTracesUseCase = createIngestOtlpTracesUseCase({
 
 export default defineEventHandler(async (event) => {
   await requireOtelAccessToken(event);
+  const parseStarted = performance.now();
   const parsed = otlpTracesRequestSchema.safeParse(await readOtlpBody(event, "Trace payload"));
+  recordOtlpBenchmark("traces", "parse", performance.now() - parseStarted);
   if (!parsed.success)
     throw createError({
       statusCode: 400,

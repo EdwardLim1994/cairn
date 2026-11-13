@@ -5,16 +5,15 @@ import { closeDb, getDb } from "../db";
 import { projects, serviceEndpoints, services } from "../db/schema";
 import { ensureProject } from "../utils/project";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("canvas REST controllers with MySQL", () => {
+integration("canvas REST controllers with embedded stores", () => {
   const projectId = "canvas-route-integration-project";
   let getCanvasRoute: (event: never) => Promise<unknown>;
   let putCanvasRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     const runtime = globalThis as unknown as {

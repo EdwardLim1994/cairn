@@ -4,9 +4,6 @@ import { getDb } from "../db";
 
 export async function ensureProject() {
   const projectId = getAppConfig().projectId;
-  await getDb()
-    .insert(projects)
-    .values({ id: projectId })
-    .onDuplicateKeyUpdate({ set: { id: projectId } });
+  await getDb().insert(projects).values({ id: projectId }).onConflictDoNothing();
   return projectId;
 }

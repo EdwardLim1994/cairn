@@ -1,8 +1,6 @@
-import mysql from "mysql2/promise";
 import { eq, inArray } from "drizzle-orm";
-import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
-import * as schema from "../../db/schema";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import { getDb } from "../../db";
 import {
   environmentVariables,
   headerTemplates,
@@ -21,26 +19,21 @@ import {
 import { deleteEnvironmentVariable, updateEnvironmentVariable } from "../environment-variables";
 import { updateService } from "../services";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("header template repository with MySQL", () => {
+integration("header template repository with SQLite", () => {
   const projectId = "header-template-project";
   const otherProjectId = "header-template-other-project";
-  let pool: mysql.Pool;
-  let db: MySql2Database<typeof schema>;
+  let db: ReturnType<typeof getDb>;
 
   beforeAll(async () => {
-    pool = mysql.createPool(connectionString!);
-    db = drizzle({ client: pool, schema, mode: "default" });
-    await pool.query("SELECT 1");
+    db = getDb();
   });
 
   beforeEach(async () => {
     await db.delete(projects).where(inArray(projects.id, [projectId, otherProjectId]));
   });
-
-  afterAll(async () => pool?.end());
 
   it("keeps template lookup scoped to its project", async () => {
     await db.insert(projects).values([{ id: projectId }, { id: otherProjectId }]);
@@ -133,7 +126,7 @@ integration("header template repository with MySQL", () => {
             }),
           ),
         ),
-    } as unknown as MySql2Database<typeof schema>;
+    } as unknown as ReturnType<typeof getDb>;
 
     await expect(deleteHeaderTemplate(projectId, "header-template-2", failingDb)).rejects.toThrow(
       "forced failure",

@@ -2,18 +2,18 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
-import { mockApis, projects, runs, serviceEndpoints, services, spans } from "../db/schema";
+import { writeSpans } from "../db/telemetry";
+import { mockApis, projects, runs, serviceEndpoints, services } from "../db/schema";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("run detail and flow controllers with MySQL", () => {
+integration("run detail and flow controllers with embedded stores", () => {
   const projectId = "run-route-integration-project";
   let getRunRoute: (event: never) => Promise<unknown>;
   let flowRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     process.env.TELEMETRY_QUIET_MS = "1000";
@@ -91,7 +91,7 @@ integration("run detail and flow controllers with MySQL", () => {
       finishedAt: now,
       lastTelemetryAt: new Date(now.getTime() - 2000),
     });
-    await db.insert(spans).values([
+    await writeSpans([
       {
         projectId,
         traceId: "a".repeat(32),

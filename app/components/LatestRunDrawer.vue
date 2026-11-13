@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MockApiRunResult } from "../models/mock-api";
+import type { MockApiRunResult } from "../entities/mock-api";
 
 defineProps<{ result?: MockApiRunResult; running: boolean }>();
 const emit = defineEmits<{ close: [] }>();

@@ -1,31 +1,13 @@
 services:
-  mysql:
-    image: mysql:8.4
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in .env}
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-    ports:
-      - "${MYSQL_PORT:-3309}:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
   app:
     build: .
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      mysql:
-        condition: service_healthy
       ca-init:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      CAIRN_DATA_DIR: /app/data
       OTEL_COLLECTOR_URL: ${OTEL_COLLECTOR_URL:?Set OTEL_COLLECTOR_URL in .env}
       PROJECT_ID: ${PROJECT_ID:?Set PROJECT_ID in .env}
       PORT: ${PORT:-3004}
@@ -37,6 +19,12 @@ services:
       OUTBOUND_REQUEST_TIMEOUT_MS: ${OUTBOUND_REQUEST_TIMEOUT_MS:-10000}
       TELEMETRY_QUIET_MS: ${TELEMETRY_QUIET_MS:-5000}
       TELEMETRY_MAX_WAIT_MS: ${TELEMETRY_MAX_WAIT_MS:-15000}
+      TELEMETRY_RETENTION_DAYS: ${TELEMETRY_RETENTION_DAYS:-365}
+      OTLP_MAX_COMPRESSED_BYTES: ${OTLP_MAX_COMPRESSED_BYTES:-4194304}
+      OTLP_MAX_DECOMPRESSED_BYTES: ${OTLP_MAX_DECOMPRESSED_BYTES:-16777216}
+      TELEMETRY_MAX_PENDING_RECORDS: ${TELEMETRY_MAX_PENDING_RECORDS:-10000}
+      TELEMETRY_MAX_PENDING_BYTES: ${TELEMETRY_MAX_PENDING_BYTES:-33554432}
+      TELEMETRY_BATCH_SIZE: ${TELEMETRY_BATCH_SIZE:-100}
       PROTO_STORAGE_DRIVER: ${PROTO_STORAGE_DRIVER:-fs}
       PROTO_STORAGE_FS_BASE: /app/data/protos
       PROTO_STORAGE_S3_ENDPOINT: ${PROTO_STORAGE_S3_ENDPOINT:-}
@@ -48,7 +36,7 @@ services:
     ports:
       - "${PORT:-3004}:${PORT:-3004}"
     volumes:
-      - proto_data:/app/data/protos
+      - app_data:/app/data
       - ca_data:/etc/cairn/ca:ro
 
   ca-init:
@@ -69,12 +57,6 @@ services:
         echo "$${CA_CERT_SHA256}  /certs/custom-ca.pem.tmp" | sha256sum -c -;
         mv /certs/custom-ca.pem.tmp /certs/custom-ca.pem
 
-  # adminer:
-  #   image: adminer:latest
-  #   ports:
-  #     - "${ADMINER_PORT:-8888}:8080"
-
 volumes:
-  mysql_data:
-  proto_data:
+  app_data:
   ca_data:

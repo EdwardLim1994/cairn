@@ -2,11 +2,9 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import type { EnvironmentVariableInput } from "#shared/api/environment-variables";
 import { getDb } from "../../db";
 import { environmentVariables } from "../../db/schema";
-import type { MySql2Database } from "drizzle-orm/mysql2";
-import * as schema from "../../db/schema";
 import { deactivateInvalidMockApis } from "../mock-apis/reconcile-readiness";
 
-type Database = MySql2Database<typeof schema>;
+type Database = ReturnType<typeof getDb>;
 
 export async function listEnvironmentVariables(projectId: string) {
   const rows = await getDb()

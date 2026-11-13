@@ -3,7 +3,6 @@ import { validateHeaderRows } from "#shared/utils/headers";
 
 export type EndpointInput = {
   id?: string;
-  codeKey?: string;
   name: string;
   method?: string | null;
   url?: string | null;
@@ -11,7 +10,6 @@ export type EndpointInput = {
 };
 
 export type ServiceInput = {
-  codeKey?: string;
   name: string;
   apiType: "REST" | "GRPC" | "WEBSOCKET";
   framework: string;
@@ -44,10 +42,6 @@ function requiredText(value: unknown, label: string, maxLength = 255): string {
     });
   }
   return value.trim();
-}
-
-function optionalKey(value: unknown, label: string): string | undefined {
-  return value === undefined ? undefined : requiredText(value, label, 128);
 }
 
 export function httpUrl(value: unknown, label: string): string {
@@ -103,7 +97,6 @@ function endpoint(value: unknown, apiType: "REST" | "GRPC" | "WEBSOCKET"): Endpo
   const input = record(value, "Endpoint");
   const common = {
     id: typeof input.id === "string" ? input.id : undefined,
-    codeKey: optionalKey(input.codeKey, "Endpoint key"),
     name: requiredText(input.name, "Endpoint name"),
   };
   if (apiType === "GRPC")
@@ -193,7 +186,6 @@ export function serviceInput(value: unknown): ServiceInput {
       statusMessage: "Health-check header template is invalid",
     });
   return {
-    codeKey: optionalKey(input.codeKey, "Service key"),
     name: requiredText(input.name, "Service name"),
     apiType,
     framework: requiredText(input.framework, "Framework", 100),

@@ -34,9 +34,6 @@ describe("mock API input validation", () => {
       headerTemplateId: null,
       customHeaders: [],
       active: true,
-      importMethod: null,
-      importUrl: null,
-      matchUrl: null,
     });
     expect(() => mockApiInput({ name: "", targetEndpointId: "endpoint-1" })).toThrow(
       /name is required/,
@@ -46,9 +43,6 @@ describe("mock API input validation", () => {
       active: false,
     });
     expect(() => mockApiInput({ name: "Unsafe draft", active: "yes" })).toThrow(/Active/);
-    expect(() => mockApiInput({ name: "Unsafe draft", importUrl: 42 })).toThrow(
-      /importUrl must be text/,
-    );
     expect(() => mockApiInput({ name: "Unsafe draft", customHeaders: [{ name: "x" }] })).toThrow(
       /Custom headers/,
     );

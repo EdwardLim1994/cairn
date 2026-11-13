@@ -23,7 +23,6 @@ export const canvasGetResponseSchema = z.object({
   services: z.array(
     z.object({
       id: z.string(),
-      codeKey: z.string(),
       projectId: z.string(),
       name: z.string(),
       apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]).default("REST"),
@@ -41,7 +40,6 @@ export const canvasGetResponseSchema = z.object({
       endpoints: z.array(
         z.object({
           id: z.string(),
-          codeKey: z.string(),
           projectId: z.string(),
           serviceId: z.string(),
           name: z.string(),
@@ -90,9 +88,6 @@ export const canvasGetResponseSchema = z.object({
       positionY: z.number().nullable().optional(),
       status: z.enum(["draft", "inactive", "ready"]),
       readinessReasons: z.array(readinessReasonSchema),
-      importMethod: z.string().nullable(),
-      importUrl: z.string().nullable(),
-      matchUrl: z.string().nullable(),
       pathParameters: z.record(z.string(), z.string()),
       requestJson: z.unknown(),
       description: z.string(),

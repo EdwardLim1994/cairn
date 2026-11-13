@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
-import WorkspaceDrawer from "./WorkspaceDrawer.vue";
+import { WorkspaceDrawer } from "../shared/ui";
 
 defineProps<{
   open: boolean;

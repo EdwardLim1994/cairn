@@ -4,7 +4,7 @@ import type {
   OtelAccessTokenListItem,
 } from "#shared/api/otel-access-tokens";
 import { ref, watch } from "vue";
-import WorkspaceDrawer from "./WorkspaceDrawer.vue";
+import { WorkspaceDrawer } from "../shared/ui";
 
 const open = defineModel<boolean>("open", { required: true });
 const tokens = ref<OtelAccessTokenListItem[]>([]);

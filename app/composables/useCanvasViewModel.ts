@@ -1,9 +1,9 @@
 import type { Connection, EdgeChange } from "@vue-flow/core";
 import type { Ref } from "vue";
 import { nextTick } from "vue";
-import type { createApiClient } from "../models/api-client";
+import type { createApiClient } from "../shared/api";
 import type { useGraphStore } from "../stores/graph";
-import type { useMockApiStore } from "../stores/mockApis";
+import type { useMockApiStore } from "../entities/mock-api";
 import type { useGraphViewModel } from "./useGraphViewModel";
 
 type ApiClient = ReturnType<typeof createApiClient>;
@@ -45,6 +45,7 @@ export function useCanvasViewModel(options: {
   promptConnectionValue?: (message: string, defaultValue: string) => string | null;
   onError?: (message: string) => void;
 }) {
+  let hasLoadedCanvas = false;
   const reportError = (message: string) => {
     options.errorMessage.value = message;
     options.onError?.(message);
@@ -119,7 +120,7 @@ export function useCanvasViewModel(options: {
     options.loading.value = true;
     try {
       const canvas = await options.apiClient.getCanvas();
-      options.graphStore.applyCanvas(canvas);
+      options.graphStore.applyCanvas(canvas, { preserveViewState: hasLoadedCanvas });
       options.mockApiStore.setMockApis(canvas.mockApis);
       options.mockApiStore.setHeaderTemplates(canvas.headerTemplates);
       options.mockApiStore.setAuthorizationTemplates(canvas.authorizationTemplates);
@@ -132,8 +133,11 @@ export function useCanvasViewModel(options: {
         await options.graphCanvas.value?.setViewport(options.graphStore.viewport);
       await loadServiceHealth();
       await loadMessageDestinationHealth();
+      hasLoadedCanvas = true;
+      return true;
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : "Could not load the graph");
+      return false;
     } finally {
       options.loading.value = false;
     }

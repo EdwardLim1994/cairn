@@ -2,12 +2,13 @@ import { eq } from "drizzle-orm";
 import { createError } from "h3";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { closeDb, getDb } from "../db";
-import { logs, mockApiCallHistory, projects, runs, spans } from "../db/schema";
+import { readLogs, readSpans, writeLogs, writeSpans } from "../db/telemetry";
+import { mockApiCallHistory, projects, runs } from "../db/schema";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("mock API call history controllers with MySQL", () => {
+integration("mock API call history controllers with embedded stores", () => {
   const projectId = "mock-history-route-project";
   const otherProjectId = "mock-history-other-project";
   let listRoute: (event: never) => Promise<unknown>;
@@ -15,7 +16,6 @@ integration("mock API call history controllers with MySQL", () => {
   let clearRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     const runtime = globalThis as unknown as {
@@ -82,28 +82,31 @@ integration("mock API call history controllers with MySQL", () => {
         status: "completed",
         triggeredAt: input.timestamp,
       });
-    await getDb()
-      .insert(spans)
-      .values({
+    await writeSpans([
+      {
         projectId: input.projectId,
         traceId,
         spanId: "1".padStart(16, "0"),
+        parentSpanId: null,
         serviceName: "orders",
         operationName: "POST /orders",
         startTime: input.timestamp,
         endTime: input.timestamp,
         statusCode: "UNSET",
         attributes: {},
-      });
-    await getDb().insert(logs).values({
-      projectId: input.projectId,
-      traceId,
-      serviceName: "orders",
-      severity: "INFO",
-      timestamp: input.timestamp,
-      message: input.id,
-      attributes: {},
-    });
+      },
+    ]);
+    await writeLogs([
+      {
+        projectId: input.projectId,
+        traceId,
+        serviceName: "orders",
+        severity: "INFO",
+        timestamp: input.timestamp,
+        message: input.id,
+        attributes: {},
+      },
+    ]);
   }
 
   it("lists newest first within the current project and deletes history only", async () => {
@@ -131,8 +134,15 @@ integration("mock API call history controllers with MySQL", () => {
       await db.select().from(mockApiCallHistory).where(eq(mockApiCallHistory.id, "new-call")),
     ).toEqual([]);
     expect(await db.select().from(runs).where(eq(runs.id, "new-run"))).toHaveLength(1);
-    expect(await db.select().from(spans).where(eq(spans.projectId, projectId))).toHaveLength(2);
-    expect(await db.select().from(logs).where(eq(logs.projectId, projectId))).toHaveLength(2);
+    expect(
+      (
+        await Promise.all([
+          readSpans(projectId, "old-run".padEnd(32, "a")),
+          readSpans(projectId, "new-run".padEnd(32, "a")),
+        ])
+      ).flat(),
+    ).toHaveLength(2);
+    expect(await readLogs(projectId, {})).toHaveLength(2);
 
     await expect(clearRoute({} as never)).resolves.toEqual({ deleted: 1 });
     expect(

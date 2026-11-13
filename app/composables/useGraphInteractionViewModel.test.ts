@@ -7,7 +7,6 @@ import { useGraphInteractionViewModel } from "./useGraphInteractionViewModel";
 
 const service = {
   id: "service-1",
-  codeKey: "service-1",
   projectId: "project-1",
   name: "Orders",
   apiType: "REST" as const,

@@ -24,9 +24,6 @@ const mockApiInputFields = z.object({
   authorizationTemplateId: z.string().min(1).nullable().optional(),
   customHeaders: z.array(headerSchema).optional().default([]),
   active: z.boolean().optional().default(true),
-  importMethod: z.string().max(10).nullable().optional().default(null),
-  importUrl: z.string().nullable().optional().default(null),
-  matchUrl: z.string().nullable().optional().default(null),
 });
 const validateMockApiActivation = <T extends { targetEndpointId: string | null; active: boolean }>(
   schema: z.ZodType<T>,
@@ -57,9 +54,6 @@ export const mockApiListResponseSchema = z.array(
     active: z.boolean(),
     status: z.enum(["draft", "inactive", "ready"]),
     readinessReasons: z.array(readinessReasonSchema),
-    importMethod: z.string().nullable(),
-    importUrl: z.string().nullable(),
-    matchUrl: z.string().nullable(),
     pathParameters: z.record(z.string(), z.string()),
     requestJson: z.unknown(),
     description: z.string(),

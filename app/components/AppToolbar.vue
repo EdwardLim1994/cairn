@@ -7,13 +7,11 @@ withDefaults(
     manageNodesOpen?: boolean;
     mockApisOpen?: boolean;
     historyOpen?: boolean;
-    graphCodeOpen?: boolean;
   }>(),
   {
     manageNodesOpen: false,
     mockApisOpen: false,
     historyOpen: false,
-    graphCodeOpen: false,
   },
 );
 const emit = defineEmits<{
@@ -21,7 +19,6 @@ const emit = defineEmits<{
   openMockApis: [];
   openManageNodes: [];
   openLogs: [];
-  openGraphAsCode: [];
   openAccessTokens: [];
   openHistory: [];
   signOut: [];
@@ -110,21 +107,6 @@ const emit = defineEmits<{
           @click.stop="emit('openLogs')"
         >
           <UIcon name="i-lucide-list" class="size-4" aria-hidden="true" />
-        </UButton>
-      </fieldset>
-      <fieldset class="app__toolbar-group m-0 min-w-0 border-0">
-        <legend class="sr-only">Code</legend>
-        <UButton
-          type="button"
-          color="neutral"
-          variant="ghost"
-          class="app__toolbar-button"
-          :aria-pressed="graphCodeOpen"
-          aria-label="Graph as code"
-          title="Graph as code"
-          @click.stop="emit('openGraphAsCode')"
-        >
-          <UIcon name="i-lucide-braces" class="size-4" aria-hidden="true" />
         </UButton>
       </fieldset>
       <fieldset class="app__toolbar-group m-0 min-w-0 border-0">

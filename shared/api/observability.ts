@@ -13,7 +13,7 @@ export const logListRequestSchema = z.object({
 });
 export const logListResponseSchema = z.array(
   z.object({
-    id: z.number().int(),
+    id: z.union([z.number().int(), z.string()]),
     projectId: z.string(),
     traceId: z.string().nullable(),
     serviceName: z.string(),
@@ -47,9 +47,10 @@ export const runFlowResponseSchema = z.object({
   runStatus: z.enum(["running", "completed", "failed"]),
   status: z.enum(["pending", "complete"]),
   incomplete: z.boolean(),
+  telemetryState: z.enum(["available", "unavailable", "expired", "partial"]).default("unavailable"),
   spans: z.array(
     z.object({
-      id: z.number().int(),
+      id: z.union([z.number().int(), z.string()]),
       projectId: z.string(),
       traceId: z.string(),
       spanId: z.string(),

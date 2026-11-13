@@ -10,6 +10,7 @@ const getRunFlowUseCase = createGetRunFlowUseCase({
   getRunFlowData,
   telemetryQuietMs: () => getAppConfig().telemetryQuietMs,
   telemetryMaxWaitMs: () => getAppConfig().telemetryMaxWaitMs,
+  telemetryRetentionDays: () => getAppConfig().telemetryRetentionDays,
 });
 
 export default defineEventHandler(async (event) => {

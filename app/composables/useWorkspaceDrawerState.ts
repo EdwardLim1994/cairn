@@ -5,7 +5,6 @@ export type WorkspaceDrawerView =
   | "message-queue"
   | "mock-apis"
   | "history"
-  | "graph-code"
   | "access-tokens"
   | "manage-nodes"
   | null;

@@ -2,19 +2,19 @@
 
 ## 1. FSD foundation and workspace data
 
-- [ ] 1.1 Establish FSD layers, slice public APIs, and import boundaries after `frontend-theme-foundation`; verify moved files resolve with `vp check` and `vp run build`.
-- [ ] 1.2 Move shared service, message destination, and mock API data to one owning entity store each while retaining full canvas bootstrap; move related tests into each slice's `_test_` and verify focused store tests.
-- [ ] 1.3 Derive graph nodes and panel cards from canonical entity data and preserve viewport and observed-run state on refresh; verify graph and canvas tests under `_test_`.
+- [x] 1.1 Establish FSD layers, slice public APIs, and import boundaries after `frontend-theme-foundation`; verify moved files resolve with `vp check` and `vp run build`.
+- [x] 1.2 Move shared service, message destination, and mock API data to one owning entity store each while retaining full canvas bootstrap; move related tests into each slice's `_test_` and verify focused store tests.
+- [x] 1.3 Derive graph nodes and panel cards from canonical entity data and preserve viewport and observed-run state on refresh; verify graph and canvas tests under `_test_`.
 
 ## 2. Manage-node editors
 
-- [ ] 2.1 Move manage-nodes widget and service/queue editor features into FSD slices; make graph controls emit edit intents and verify focused component tests under `_test_`.
-- [ ] 2.2 Implement single-item Create, Update, Discard, Close, and Delete behavior for service and queue editors; verify untouched, changed, canceled, and confirmed paths with focused tests.
-- [ ] 2.3 Reload canvas after successful service/queue mutations, return to card list, and show automatically closing success toasts; verify refresh failure retains context and does not show full success.
+- [x] 2.1 Move manage-nodes widget and service/queue editor features into FSD slices; make graph controls emit edit intents and verify focused component tests under `_test_`.
+- [x] 2.2 Implement single-item Create, Update, Discard, Close, and Delete behavior for service and queue editors; verify untouched, changed, canceled, and confirmed paths with focused tests.
+- [x] 2.3 Reload canvas after successful service/queue mutations, return to card list, and show automatically closing success toasts; verify refresh failure retains context and does not show full success.
 
 ## 3. Graph and mock API slices
 
-- [ ] 3.1 Move graph canvas and all graph node types into a graph widget, including trigger-node response panel; verify observed timing, endpoint highlighting, response focus, and graph event tests in `_test_`.
+- [x] 3.1 Move graph canvas and all graph node types into a graph widget, including trigger-node response panel; verify observed timing, endpoint highlighting, response focus, and graph event tests in `_test_`.
 - [ ] 3.2 Move mock API cards, editors, execution, and WebSocket session handling into FSD slices; remove batch Save and verify single-item CRUD, run, and session tests in `_test_`.
 - [ ] 3.3 Make mock API updates refresh canonical canvas data and show success only after refresh; verify card and graph projections stay in sync with focused tests.
 

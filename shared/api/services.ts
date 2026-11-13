@@ -11,7 +11,6 @@ const methodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const headerRowSchema = z.object({ name: z.string(), value: z.string() });
 const endpointInputSchema = z.object({
   id: z.string().optional(),
-  codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
   method: methodSchema.nullable().optional(),
   url: z.string().trim().min(1).max(2048).nullable().optional(),
@@ -19,7 +18,6 @@ const endpointInputSchema = z.object({
 });
 const endpointResponseSchema = endpointInputSchema.extend({
   id: z.string(),
-  codeKey: z.string(),
   projectId: z.string(),
   serviceId: z.string(),
   method: methodSchema.nullable(),
@@ -29,7 +27,6 @@ const endpointResponseSchema = endpointInputSchema.extend({
 });
 
 const serviceFieldsSchema = z.object({
-  codeKey: z.string().trim().min(1).max(128).optional(),
   name: z.string().trim().min(1).max(255),
   apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]).default("REST"),
   framework: z.string().trim().min(1).max(100),
@@ -110,15 +107,11 @@ export const serviceCreateRequestSchema = serviceFieldsSchema
     positionY: z.number().optional(),
   })
   .superRefine(validateService);
-export const serviceUpdateRequestSchema = serviceFieldsSchema
-  .omit({ codeKey: true })
-  .extend({ endpoints: z.array(endpointInputSchema.omit({ codeKey: true })) })
-  .superRefine(validateService);
+export const serviceUpdateRequestSchema = serviceFieldsSchema.superRefine(validateService);
 export const serviceListRequestSchema = z.void();
 export const serviceListResponseSchema = z.array(
   z.object({
     id: z.string(),
-    codeKey: z.string(),
     projectId: z.string(),
     name: z.string(),
     apiType: z.enum(["REST", "GRPC", "WEBSOCKET"]),

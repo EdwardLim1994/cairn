@@ -151,6 +151,7 @@ export function createGetRunFlowUseCase(dependencies: {
   getRunFlowData: (projectId: string, id: string) => Promise<RunFlowData | undefined>;
   telemetryQuietMs: () => number;
   telemetryMaxWaitMs: () => number;
+  telemetryRetentionDays?: () => number;
   now?: () => number;
 }) {
   return async (id: string): Promise<RunFlowResponse> => {
@@ -158,6 +159,14 @@ export function createGetRunFlowUseCase(dependencies: {
     if (!data) throw new RunNotFoundError("Run not found");
     const { run, spans, registeredServices, destinations, failedTargetService } = data;
     const now = (dependencies.now ?? Date.now)();
+    const cutoff = now - (dependencies.telemetryRetentionDays?.() ?? 365) * 24 * 60 * 60 * 1000;
+    const telemetryState = spans.length
+      ? run.firstTelemetryAt && run.firstTelemetryAt.getTime() < cutoff
+        ? "partial"
+        : "available"
+      : run.lastTelemetryAt && run.lastTelemetryAt.getTime() < cutoff
+        ? "expired"
+        : "unavailable";
     const age = now - run.startedAt.getTime();
     const quiet = run.lastTelemetryAt
       ? now - run.lastTelemetryAt.getTime() >= dependencies.telemetryQuietMs()
@@ -176,6 +185,7 @@ export function createGetRunFlowUseCase(dependencies: {
       runStatus: run.status,
       status: !quiet && !timedOut ? "pending" : "complete",
       incomplete: timedOut && !quiet,
+      telemetryState,
       spans: spans.map((span) => ({
         ...span,
         startTime: span.startTime.toISOString(),

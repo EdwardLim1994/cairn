@@ -1,0 +1,121 @@
+{
+  "engine": "sqlite-duckdb",
+  "measuredAt": "2026-11-13T09:45:25.778Z",
+  "platform": "win32",
+  "nodeVersion": "v26.12.1",
+  "workload": {
+    "recordsPerRequest": 10,
+    "cases": [
+      {
+        "kind": "traces",
+        "gzip": false,
+        "count": 8,
+        "concurrency": 1,
+        "batch": 1
+      },
+      {
+        "kind": "logs",
+        "gzip": false,
+        "count": 8,
+        "concurrency": 1,
+        "batch": 100
+      },
+      {
+        "kind": "traces",
+        "gzip": true,
+        "count": 8,
+        "concurrency": 4,
+        "batch": 200
+      },
+      {
+        "kind": "logs",
+        "gzip": true,
+        "count": 8,
+        "concurrency": 4,
+        "batch": 300
+      },
+      {
+        "kind": "traces",
+        "gzip": false,
+        "count": 2,
+        "concurrency": 1,
+        "batch": 1
+      },
+      {
+        "kind": "logs",
+        "gzip": false,
+        "count": 2,
+        "concurrency": 1,
+        "batch": 100
+      }
+    ],
+    "sizes": {
+      "traces-plain": {
+        "jsonBytes": 2379,
+        "sentBytes": 2379
+      },
+      "logs-plain": {
+        "jsonBytes": 1842,
+        "sentBytes": 1842
+      },
+      "traces-gzip": {
+        "jsonBytes": 2379,
+        "sentBytes": 259
+      },
+      "logs-gzip": {
+        "jsonBytes": 1842,
+        "sentBytes": 252
+      }
+    }
+  },
+  "results": {
+    "requests": 36,
+    "accepted": 360,
+    "errors": [],
+    "elapsedSeconds": 0.7135724999999999,
+    "acceptedPerSecond": 504.5037469913709,
+    "latencyMs": {
+      "p50": 27.082599999999957,
+      "p95": 80.86369999999988
+    },
+    "peakRssBytes": 255565824,
+    "cpuSeconds": 1.828125,
+    "cpuPercentOfOneCore": 256.1933090190555,
+    "phasesMs": {
+      "traces": {
+        "parse": {
+          "samples": 18,
+          "p50": 0.1811999999999898,
+          "p95": 1.8156000000000176
+        },
+        "normalize": {
+          "samples": 18,
+          "p50": 0.06280000000015207,
+          "p95": 0.4773000000000138
+        },
+        "write": {
+          "samples": 18,
+          "p50": 27.014799999999923,
+          "p95": 83.02490000000012
+        }
+      },
+      "logs": {
+        "parse": {
+          "samples": 18,
+          "p50": 0.13220000000001164,
+          "p95": 0.47199999999998
+        },
+        "normalize": {
+          "samples": 18,
+          "p50": 0.05269999999995889,
+          "p95": 0.30379999999991014
+        },
+        "write": {
+          "samples": 18,
+          "p50": 13.631599999999935,
+          "p95": 42.23389999999995
+        }
+      }
+    }
+  }
+}

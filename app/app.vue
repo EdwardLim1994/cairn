@@ -1,5 +1,7 @@
 <template>
-  <NuxtPage />
+  <UApp>
+    <NuxtPage />
+  </UApp>
 </template>
 
 <style>
@@ -91,6 +93,21 @@ body {
 
 .app {
   --ui-primary: var(--accent);
+  --ui-success: var(--success);
+  --ui-warning: var(--warning);
+  --ui-error: var(--danger);
+  --ui-bg: var(--panel);
+  --ui-bg-muted: var(--panel2);
+  --ui-bg-elevated: var(--panel2);
+  --ui-bg-accented: var(--accent-soft);
+  --ui-text: var(--text);
+  --ui-text-highlighted: var(--text);
+  --ui-text-muted: var(--muted);
+  --ui-text-toned: var(--muted);
+  --ui-text-inverted: var(--accent-ink);
+  --ui-border: var(--border);
+  --ui-border-muted: var(--border);
+  --ui-border-accented: var(--border-strong);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.4;
@@ -320,72 +337,6 @@ body {
   background: var(--trace);
 }
 
-.app__workspace-drawer-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  padding: 0;
-  background: transparent;
-}
-
-.app__workspace-drawer-content {
-  position: absolute;
-  z-index: 71;
-  inset: 76px 12px 12px auto;
-  width: 33.333vw;
-  max-width: calc(100vw - 24px);
-  max-height: none;
-  height: auto;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-lg);
-  color: var(--text);
-}
-
-.app__workspace-drawer-header {
-  min-height: 58px;
-  padding: 12px 8px 12px 16px;
-}
-
-.app__workspace-drawer-header [data-slot="wrapper"] {
-  min-width: 0;
-  flex: 1;
-}
-
-.app__workspace-drawer-header [data-slot="title"] {
-  margin: 0;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.app__workspace-drawer-header [data-slot="description"] {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.app__workspace-drawer-body {
-  padding: 14px 16px 18px;
-  gap: 16px;
-}
-
-.app__workspace-drawer-footer {
-  padding: 10px 16px;
-}
-
-.app__workspace-drawer-content .app__workspace-drawer-header h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
 .app__edge-label-wrap {
   position: absolute;
   z-index: 3;
@@ -519,13 +470,6 @@ body {
 }
 
 @media (max-width: 899px) {
-  .app__workspace-drawer-content {
-    inset: 124px 12px 12px;
-    width: auto;
-    max-width: none;
-    border-radius: 12px;
-  }
-
   .app__graph-legend-panel {
     display: none;
   }

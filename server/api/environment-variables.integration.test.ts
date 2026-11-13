@@ -4,10 +4,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vite-plus
 import { closeDb, getDb } from "../db";
 import { projects } from "../db/schema";
 
-const connectionString = process.env.CAIRN_TEST_DATABASE_URL;
-const integration = describe.skipIf(!connectionString);
+const integrationEnabled = process.env.CAIRN_RUN_INTEGRATION;
+const integration = describe.skipIf(!integrationEnabled);
 
-integration("environment variable REST controllers with MySQL", () => {
+integration("environment variable REST controllers with embedded stores", () => {
   const projectId = "environment-variable-route-integration-project";
   let listRoute: (event: never) => Promise<unknown>;
   let createRoute: (event: never) => Promise<unknown>;
@@ -15,7 +15,6 @@ integration("environment variable REST controllers with MySQL", () => {
   let deleteRoute: (event: never) => Promise<unknown>;
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = connectionString;
     process.env.PROJECT_ID = projectId;
     process.env.OTEL_COLLECTOR_URL = "http://localhost:4318";
     const runtime = globalThis as unknown as {

@@ -1,4 +1,5 @@
 import type { OtlpLogsRequest } from "#shared/api/observability";
+import { recordOtlpBenchmark } from "../../utils/otlp-benchmark";
 import {
   normalizeSeverity,
   otlpArray,
@@ -96,13 +97,17 @@ export function createIngestOtlpLogsUseCase(dependencies: {
   return async (body: OtlpLogsRequest) => {
     const projectId = await dependencies.ensureProject();
     const registeredServices = await dependencies.listServiceNames(projectId);
+    const normalizeStarted = performance.now();
     const records = normalizeLogRecords(
       body,
       projectId,
       dependencies.configuredProjectId(),
       registeredServices,
     );
+    recordOtlpBenchmark("logs", "normalize", performance.now() - normalizeStarted);
+    const writeStarted = performance.now();
     await dependencies.insertLogs(records);
+    recordOtlpBenchmark("logs", "write", performance.now() - writeStarted);
     return { accepted: records.length };
   };
 }

@@ -4,37 +4,38 @@
 [![Integration tests](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/integration-tests.yml)
 [![SonarCloud Scan](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/EdwardLim1994/cairn/actions/workflows/sonarcloud.yml)
 
-A Nuxt single page app for editing a microservice graph, triggering registered REST, GraphQL, and unary gRPC mock APIs, managing raw WebSocket sessions, and inspecting correlated OpenTelemetry traces and logs. The graph and telemetry are scoped to `PROJECT_ID` and stored in MySQL.
+A Nuxt single page app for editing a microservice graph, triggering registered REST, GraphQL, and unary gRPC mock APIs, managing raw WebSocket sessions, and inspecting correlated OpenTelemetry traces and logs. Application data is stored in SQLite and telemetry in DuckDB; both are scoped to `PROJECT_ID`.
 
-GitHub Actions reports unit/component tests and MySQL-backed integration tests in separate workflows, so their README badges show independent status. The unit workflow also checks formatting, lint, and types. The SonarCloud workflow runs unit and component tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
+GitHub Actions reports unit/component tests and embedded database integration tests in separate workflows, so their README badges show independent status. The unit workflow also checks formatting, lint, and types. The SonarCloud workflow runs tests with V8 coverage before scanning and reads `coverage/lcov.info`. SonarCloud analysis runs on pushes and pull requests after configuring the repository with a `SONAR_TOKEN` secret and `SONAR_PROJECT_KEY` and `SONAR_ORGANIZATION` repository variables. The scan badge stays inactive until the project variables are set.
 
 ## Run with Docker Compose
 
-1. Copy `.env.example` to `.env`. Replace database and operator passwords, then generate a session secret with `openssl rand -hex 32`.
+1. Copy `.env.example` to `.env`. Set operator credentials and generate a session secret with `openssl rand -hex 32`.
 2. Build and start the stack:
 
    ```sh
    docker compose up -d --build
    ```
 
-After MySQL is healthy, the app container applies pending Drizzle migrations before starting Cairn. A fresh database receives all migrations; subsequent starts skip recorded migrations. Migration failures stop the container before the web server starts. Generate new migrations with `vp run db:generate`, commit the SQL and metadata, then rebuild the image. Run one app container during migration; concurrent migration runners are not supported.
+The app creates `cairn.sqlite` and `telemetry.duckdb` in `CAIRN_DATA_DIR` on first startup and applies pending versioned schemas before serving requests. Later starts retain records. A storage initialization failure stops startup. Run one app container because the embedded files are owned by one process.
 
-Open `http://localhost:3004`. The app container reaches MySQL at `mysql:3306`; host-run Drizzle commands use the `localhost:3309` URL in `.env`. MySQL data persists in the `mysql_data` named volume. `docker compose down` stops the services and keeps that volume. To remove the database volume as well, use `docker compose down --volumes`.
+For SQLite schema changes, run `vp run db:generate` and commit the generated SQL and metadata in `drizzle-sqlite/`. Startup applies new journal entries. DuckDB schema changes use versioned SQL in `server/db/migrations/duckdb/`.
 
-Register microservices in Cairn with the same `http://localhost:<port>` base URLs used by Postman. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
+Open `http://localhost:3004`. The `app_data` volume contains both database files and uploaded proto files. `docker compose down` keeps the volume; `docker compose down --volumes` removes it. Back up the two database files together.
 
-The production image contains the Nuxt `.output` bundle, a bundled migration runner, and Drizzle migration files. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
+Register microservices in Cairn with their `http://localhost:<port>` base URLs. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
+
+The production image contains the Nuxt `.output` bundle and embedded schema files. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
 
 ## Environment
 
 | Variable                         | Purpose                                                                                                                                                      |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                   | MySQL URL. Use `localhost:3309` for host-run commands; Compose sets the app URL to the `mysql` service on port `3306`.                                       |
-| `MYSQL_PORT`                     | Host port for the Compose MySQL instance (default `3309`). The container still listens on port `3306`.                                                       |
+| `CAIRN_DATA_DIR`                 | Persistent directory for `cairn.sqlite` and `telemetry.duckdb` (default `data`; Compose uses `/app/data`).                                                   |
 | `OTEL_COLLECTOR_URL`             | HTTP(S) Collector receiver URL for this deployment. The app validates it at startup; service telemetry forwarding is configured in the Collector file below. |
 | `PROJECT_ID`                     | Namespace shared by the graph and the OpenTelemetry `project.id` resource attribute.                                                                         |
 | `PORT`                           | Nuxt server port (default `3004`).                                                                                                                           |
-| `PROTO_STORAGE_DRIVER`           | Proto file storage driver: `fs` (default, persisted in the `proto_data` Compose volume) or `s3`.                                                             |
+| `PROTO_STORAGE_DRIVER`           | Proto file storage driver: `fs` (default, persisted in the `app_data` Compose volume) or `s3`.                                                               |
 | `PROTO_STORAGE_FS_BASE`          | Filesystem proto storage directory; Compose sets `/app/data/protos`.                                                                                         |
 | `PROTO_STORAGE_S3_*`             | S3-compatible endpoint, region, bucket, and credentials used when `PROTO_STORAGE_DRIVER=s3`.                                                                 |
 | `CA_CERT_URL` / `CA_CERT_SHA256` | Optional custom CA download URL and required SHA-256 checksum, verified by the Compose init service.                                                         |
@@ -46,6 +47,12 @@ The production image contains the Nuxt `.output` bundle, a bundled migration run
 | `OUTBOUND_HOST_GATEWAY`          | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
 | `TELEMETRY_QUIET_MS`             | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
 | `TELEMETRY_MAX_WAIT_MS`          | Maximum time to wait for trace data before returning an incomplete flow (default `10000`).                                                                   |
+| `TELEMETRY_RETENTION_DAYS`       | Days to keep received spans and logs (default `365`); run and call history remain in SQLite.                                                                 |
+| `OTLP_MAX_COMPRESSED_BYTES`      | Maximum compressed OTLP request bytes (default `4194304`).                                                                                                   |
+| `OTLP_MAX_DECOMPRESSED_BYTES`    | Maximum inflated OTLP body bytes (default `16777216`).                                                                                                       |
+| `TELEMETRY_MAX_PENDING_RECORDS`  | Maximum queued telemetry records (default `10000`).                                                                                                          |
+| `TELEMETRY_MAX_PENDING_BYTES`    | Maximum queued telemetry bytes (default `33554432`).                                                                                                         |
+| `TELEMETRY_BATCH_SIZE`           | Maximum rows per DuckDB write statement (default `100`).                                                                                                     |
 
 Keep real values in the ignored `.env` file or your deployment secret store. `.env.example` contains placeholders only.
 
@@ -74,6 +81,8 @@ Cairn animates service connections and highlights the corresponding source and t
 
 After a mock API run finishes, Cairn opens the response panel beside its trigger node and centers and zooms the graph on that panel. Only one response panel is open at a time. The panel shows the result, trace ID when available, and total trace duration from the earliest span start to the latest span end. When no trace spans are available, Cairn shows the duration as unavailable.
 
+Telemetry expires after `TELEMETRY_RETENTION_DAYS` based on receive time. Saved run and call history remain in SQLite. The run flow reports `expired` when prior telemetry has been removed, `partial` when older telemetry was removed but some spans remain, and `unavailable` when no telemetry was observed. The response panel labels expired and partial telemetry; partial trace timing is shown as unavailable.
+
 ## Services and health checks
 
 Cairn supports Spring Boot, .NET, and custom (`Other`) service frameworks. Spring Boot and .NET use their framework health-check defaults. For `Other`, provide a health-check URL; Cairn calls it with `GET`. Custom health-check headers and shared header templates are available for endpoints that require authentication. WebSocket mock APIs also need a health-check URL because Cairn cannot infer one from a WebSocket endpoint.
@@ -96,16 +105,14 @@ Live sessions and their bounded message buffers are held in process memory. They
 
 ## Local development
 
-For host-run development, start MySQL and apply migrations before starting Nuxt:
+For host-run development, install dependencies and start Nuxt. Startup initializes the embedded files:
 
 ```sh
-docker compose up -d mysql
 vp install
-vp run db:migrate
 vp run dev
 ```
 
-For local development, `.env` must use `DATABASE_URL=mysql://<user>:<password>@localhost:3309/<database>`. Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
+Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run db:migrate` to initialize the files without serving requests and `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
 
@@ -113,7 +120,7 @@ Run the unit and component tests with LCOV coverage locally using:
 vp run test:coverage
 ```
 
-This excludes the MySQL integration tests, which run separately through `vp run test:integration` with `CAIRN_TEST_DATABASE_URL` set. The coverage report is written to the ignored `coverage/lcov.info` path. The SonarCloud workflow creates a fresh report before analysis, so no artifact upload between workflows is needed.
+This excludes the embedded integration tests, which run separately through `vp run test:integration` with disposable database files. The coverage report is written to the ignored `coverage/lcov.info` path. The SonarCloud workflow creates a fresh report before analysis, so no artifact upload between workflows is needed.
 
 ## API overview
 
@@ -131,12 +138,12 @@ This excludes the MySQL integration tests, which run separately through `vp run 
 
 Mock APIs call a registered service endpoint and store a JSON request body. Endpoint URLs may include route parameters such as `/orders/{orderId}`; each mock API stores values for those parameters and URL-encodes them when making the request.
 
-The Mock APIs panel can import Postman collection JSON. Cairn imports only REST requests whose full URL and HTTP method match a registered endpoint, and shows a warning for each skipped request. Route parameter values are copied into the new mock API.
+Create mock APIs in the Mock APIs panel and select a registered service endpoint. Set route parameter values on each mock API.
 
 The panel also supports one shared set of string environment variables per project. Use `{{variableName}}` in request JSON string values or path parameter values. **New variable** adds an editable card; the panel's **Save** button persists new variables, deletions, and mock API changes together. Editing an existing card uses **Update** to save its name or value immediately; unchanged values do not issue an update request. GraphQL mocks use the GraphQL request editor, while gRPC mocks call unary RPC methods from the target service's uploaded proto file.
 
 The **Shareable authorization templates** section supports **Bearer token**, **Basic Auth**, **API key**, and **OAuth 2.0 Client Credentials**. Create a template there, then choose it in a mock API's **Authorization** accordion; APIs without a selection use **No Auth**. Credential fields accept project variable references. OAuth uses a server-side form-encoded Client Credentials request with `client_secret_basic`, token URL, client ID, client secret, and optional scope. Cairn caches tokens in memory until shortly before their `expires_in` time. Authorization Code and provider-specific token parameters are not supported.
 
-Bearer, Basic, and OAuth send an `Authorization` header; API key sends the configured key as a request header. A raw header template or custom header with the same name, ignoring case, makes that API not ready until the conflict is removed. Authorization secrets are masked while editing and are stored with project settings in MySQL; this does not encrypt them or restrict access from trusted Cairn operators. Postman collection authorization is not imported and remains reported as an unsupported feature.
+Bearer, Basic, and OAuth send an `Authorization` header; API key sends the configured key as a request header. A raw header template or custom header with the same name, ignoring case, makes that API not ready until the conflict is removed. Authorization secrets are masked while editing and are stored with project settings in SQLite; this does not encrypt them or restrict access from trusted Cairn operators.
 
 REST and gRPC mock payloads use a JSON-aware CodeMirror editor with formatting, syntax diagnostics, placeholder highlighting, and shared-variable autocomplete. GraphQL requests use a GraphQL-aware editor. SSE mock APIs and GraphQL subscriptions are not supported; raw WebSocket mock APIs are a separate API type. Chained API calls remain future work.
