@@ -7,11 +7,6 @@ type GraphCanvas = {
     x: number;
     y: number;
   }) => { x: number; y: number } | undefined;
-  fitView: (options: {
-    nodes: string[];
-    padding: number;
-    duration: number;
-  }) => Promise<void> | void;
 };
 
 export function useGraphInteractionViewModel(options: {
@@ -56,8 +51,13 @@ export function useGraphInteractionViewModel(options: {
     if (!options.store.services.some((service) => service.id === nodeId)) return;
     options.store.setSelection(nodeId);
     options.syncNodes();
-    void options.graphCanvas.value?.fitView({ nodes: [nodeId], padding: 0.45, duration: 300 });
   }
 
-  return { handleCanvasContextMenu, onNodeClick };
+  function clearSelection() {
+    if (options.store.selectedNodeId === null) return;
+    options.store.setSelection(null);
+    options.syncNodes();
+  }
+
+  return { handleCanvasContextMenu, onNodeClick, clearSelection };
 }

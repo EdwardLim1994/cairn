@@ -43,6 +43,8 @@ const VueFlowStub = defineComponent({
     "connect",
     "edge-double-click",
     "node-click",
+    "pane-click",
+    "keydown",
     "move-end",
     "node-drag-stop",
   ],
@@ -53,6 +55,9 @@ const VueFlowStub = defineComponent({
       <button data-testid="connect" @click="$emit('connect', { source: 'service-1', target: 'service-2' })" />
       <button data-testid="edge-double-click" @click="$emit('edge-double-click', { edge: { id: 'edge-1' } })" />
       <button data-testid="node-click" @click="$emit('node-click', { node: { id: 'service-1' } })" />
+      <button data-testid="pane-click" @click="$emit('pane-click', $event)" />
+      <button data-testid="escape" @keydown="$emit('keydown', $event)" />
+      <div data-testid="editor" contenteditable="true" @keydown="$emit('keydown', $event)" />
       <button data-testid="move-end" @click="$emit('move-end', { event: {}, flowTransform: { x: 8, y: 9, zoom: 1.5 } })" />
       <button data-testid="drag-stop" @click="$emit('node-drag-stop')" />
     </div>
@@ -146,5 +151,71 @@ describe("GraphCanvas", () => {
     expect(wrapper.getComponent(VueFlowStub).props("snapGrid")).toEqual([22, 22]);
     expect(wrapper.emitted("moveEnd")).toEqual([[{ x: 8, y: 9, zoom: 1.5 }]]);
     expect(wrapper.emitted("nodeDragStop")).toEqual([[]]);
+  });
+
+  it("preserves relationship emphasis classes on nodes and configured edges", () => {
+    const nodes = [
+      {
+        id: "service-1",
+        type: "service",
+        position: { x: 0, y: 0 },
+        class: "app__flow-node app__flow-node--relationship-1",
+        data: {},
+      },
+      {
+        id: "service-2",
+        type: "service",
+        position: { x: 100, y: 0 },
+        class: "app__flow-node app__flow-node--relationship-1",
+        data: {},
+      },
+    ] as Node[];
+    const edges = [
+      {
+        id: "edge-1",
+        source: "service-1",
+        target: "service-2",
+        class: "app__flow-edge app__flow-edge--relationship-1",
+      },
+    ] as Edge[];
+    const wrapper = mount(GraphCanvas, {
+      props: { nodes, edges, dark: false },
+      global: {
+        stubs: {
+          VueFlow: VueFlowStub,
+          Background: true,
+          MiniMap: true,
+          Controls: true,
+          ServiceGraphNode: ServiceNodeStub,
+          MockApiTriggerNode: MockTriggerNodeStub,
+        },
+      },
+    });
+
+    expect(wrapper.getComponent(VueFlowStub).props("nodes")).toEqual(nodes);
+    expect(wrapper.getComponent(VueFlowStub).props("edges")).toEqual(edges);
+  });
+
+  it("clears on a blank-pane click or Escape outside editable content", async () => {
+    const wrapper = mount(GraphCanvas, {
+      props: { nodes: [] as Node[], edges: [] as Edge[], dark: false },
+      global: {
+        stubs: {
+          VueFlow: VueFlowStub,
+          Background: true,
+          MiniMap: true,
+          Controls: true,
+          ServiceGraphNode: ServiceNodeStub,
+          MockApiTriggerNode: MockTriggerNodeStub,
+        },
+      },
+    });
+
+    await wrapper.get('[data-testid="pane-click"]').trigger("click");
+    await wrapper.get('[data-testid="escape"]').trigger("keydown", { key: "Escape" });
+    await wrapper.get('[data-testid="editor"]').trigger("keydown", { key: "Escape" });
+
+    expect(wrapper.emitted("paneClick")).toHaveLength(1);
+    expect(wrapper.emitted("escape")).toHaveLength(1);
   });
 });

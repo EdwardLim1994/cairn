@@ -633,4 +633,70 @@ body {
 .app .app__flow-edge--message .vue-flow__edge-path {
   stroke-dasharray: 5 3;
 }
+
+.vue-flow__node.app__flow-node--relationship-1 {
+  opacity: 1;
+}
+
+.vue-flow__node.app__flow-node--relationship-1 .app__graph-node--service {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    var(--shadow);
+}
+
+.vue-flow__node.app__flow-node--relationship-2 {
+  opacity: 0.9;
+}
+
+.vue-flow__node.app__flow-node--relationship-2 .app__graph-node--service {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--panel));
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-soft) 58%, transparent),
+    var(--shadow);
+}
+
+.vue-flow__node.app__flow-node--relationship-dimmed {
+  opacity: 0.18;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-1 .vue-flow__edge-path {
+  opacity: 0.92;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-3 .vue-flow__edge-path {
+  opacity: 0.75;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-dimmed .vue-flow__edge-path {
+  opacity: 0.12;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-1:not(.app__flow-edge--observed):not(
+    .app__flow-edge--running
+  )
+  .vue-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-2:not(.app__flow-edge--observed):not(
+    .app__flow-edge--running
+  )
+  .vue-flow__edge-path {
+  stroke: color-mix(in srgb, var(--accent) 58%, var(--panel));
+  stroke-width: 2.5;
+}
+
+.vue-flow__edge.app__flow-edge--relationship-3:not(.app__flow-edge--observed):not(
+    .app__flow-edge--running
+  )
+  .vue-flow__edge-path {
+  stroke: color-mix(in srgb, var(--accent) 38%, var(--panel));
+  stroke-width: 2.5;
+}
 </style>

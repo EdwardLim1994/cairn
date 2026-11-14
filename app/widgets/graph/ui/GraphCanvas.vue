@@ -30,6 +30,18 @@ const props = withDefaults(
   { allNodesCollapsed: false },
 );
 const edgeTypes = { default: SquareEdge };
+function handleCanvasKeydown(event: KeyboardEvent) {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"]',
+    )
+  )
+    return;
+  emit("escape");
+}
 const emit = defineEmits<{
   "update:nodes": [nodes: Node[]];
   "update:edges": [edges: Edge[]];
@@ -38,6 +50,8 @@ const emit = defineEmits<{
   edgeUpdate: [event: EdgeUpdateEvent];
   edgesChange: [changes: EdgeChange[]];
   nodeClick: [event: { node: { id: string } }];
+  paneClick: [event: MouseEvent];
+  escape: [];
   paneContextMenu: [event: MouseEvent];
   moveEnd: [viewport: { x: number; y: number; zoom: number }];
   nodeDragStop: [];
@@ -176,6 +190,8 @@ defineExpose({
     @edge-update="emit('edgeUpdate', $event)"
     @edges-change="emit('edgesChange', $event)"
     @node-click="emit('nodeClick', $event)"
+    @pane-click="emit('paneClick', $event)"
+    @keydown="handleCanvasKeydown"
     @pane-context-menu="emit('paneContextMenu', $event)"
     @move-end="emit('moveEnd', $event.flowTransform)"
     @node-drag-stop="emit('nodeDragStop')"

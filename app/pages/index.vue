@@ -463,6 +463,7 @@ const graphInteractionViewModel = useGraphInteractionViewModel({
   editMockApi: (id) => openMockPanel(id),
 });
 const handleCanvasContextMenu = graphInteractionViewModel.handleCanvasContextMenu;
+const clearGraphSelection = graphInteractionViewModel.clearSelection;
 
 function editService(id: string, focusEndpointId?: string) {
   manageNodesOpen.value = false;
@@ -770,6 +771,8 @@ onUnmounted(() => {
           @edge-update="onEdgeUpdate"
           @edges-change="onEdgesChange"
           @node-click="onNodeClick"
+          @pane-click="clearGraphSelection"
+          @escape="clearGraphSelection"
           @pane-context-menu="handleCanvasContextMenu"
           @move-end="onMoveEnd"
           @node-drag-stop="saveCanvas"

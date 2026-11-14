@@ -127,6 +127,226 @@ describe("graph view model", () => {
     });
   });
 
+  it("traverses configured calls, message queues, and mock targets without following observed-only edges", () => {
+    const { store } = createModel([]);
+    const services = [
+      service,
+      ...[2, 3, 4, 5, 6, 7].map((index) => ({
+        ...service,
+        id: `service-${index}`,
+        name: `Service ${index}`,
+        positionX: index * 100,
+        endpoints: [
+          {
+            ...service.endpoints[0],
+            id: `endpoint-${index}`,
+            serviceId: `service-${index}`,
+          },
+        ],
+      })),
+      {
+        ...service,
+        id: "isolated",
+        name: "Isolated",
+        endpoints: [
+          {
+            ...service.endpoints[0],
+            id: "endpoint-isolated",
+            serviceId: "isolated",
+          },
+        ],
+      },
+    ];
+    store.services = services as CanvasGetResponse["services"];
+    store.setServiceEdges([
+      {
+        id: "call-1",
+        sourceServiceId: "service-1",
+        sourceEndpointId: "endpoint-1",
+        targetEndpointId: "endpoint-2",
+      },
+      {
+        id: "call-2",
+        sourceServiceId: "service-2",
+        sourceEndpointId: "endpoint-2",
+        targetEndpointId: "endpoint-3",
+      },
+      {
+        id: "call-3",
+        sourceServiceId: "service-3",
+        sourceEndpointId: "endpoint-3",
+        targetEndpointId: "endpoint-4",
+      },
+      {
+        id: "cycle-1",
+        sourceServiceId: "service-2",
+        sourceEndpointId: "endpoint-2",
+        targetEndpointId: "endpoint-6",
+      },
+      {
+        id: "cycle-2",
+        sourceServiceId: "service-6",
+        sourceEndpointId: "endpoint-6",
+        targetEndpointId: "endpoint-7",
+      },
+      {
+        id: "cycle-3",
+        sourceServiceId: "service-7",
+        sourceEndpointId: "endpoint-7",
+        targetEndpointId: "endpoint-2",
+      },
+      {
+        id: "isolated-call",
+        sourceServiceId: "isolated",
+        sourceEndpointId: "endpoint-isolated",
+        targetEndpointId: "endpoint-isolated",
+      },
+    ]);
+    store.setMessageDestinations([
+      {
+        id: "queue-1",
+        projectId: "project-1",
+        broker: "kafka",
+        name: "events",
+        connection: { brokers: "localhost:9092", securityProtocol: "PLAINTEXT" },
+        x: 600,
+        y: 100,
+      },
+    ]);
+    store.setMessageConnections([
+      {
+        id: "publish-1",
+        type: "publish",
+        destinationId: "queue-1",
+        endpointId: "endpoint-2",
+      },
+      {
+        id: "subscribe-1",
+        type: "subscribe",
+        destinationId: "queue-1",
+        serviceId: "service-5",
+        consumerGroup: "events",
+      },
+    ]);
+    const trigger = { ...mockApi, id: "trigger-1", targetEndpointId: "endpoint-1" };
+    const triggers = [trigger] as unknown as CanvasGetResponse["mockApis"];
+    const modelWithTrigger = useGraphViewModel({
+      store,
+      mockApis: () => triggers,
+      runningMockId: () => null,
+    });
+    store.setObservations({
+      services: ["Orders", "Service 2"],
+      errorServices: [],
+      edges: [
+        { sourceService: "Orders", targetService: "Service 2" },
+        { sourceService: "Orders", targetService: "Isolated" },
+      ],
+      messageConnectionIds: ["publish-1"],
+    });
+    store.setSelection("service-1");
+    modelWithTrigger.syncNodes();
+
+    const nodes = store.nodes as unknown as {
+      id: string;
+      class: string;
+      data?: { observedOutboundCallIds?: string[] };
+    }[];
+    const edges = store.edges as unknown as {
+      id: string;
+      class: string;
+      animated?: boolean;
+    }[];
+    const nodeClass = (id: string) => nodes.find((node) => node.id === id)?.class;
+    const edgeClass = (id: string) => edges.find((edge) => edge.id === id)?.class;
+
+    expect(nodeClass("service-1")).toContain("relationship-1");
+    expect(nodeClass("service-2")).toContain("relationship-2");
+    expect(nodeClass("service-3")).toContain("relationship-2");
+    expect(nodeClass("service-4")).toContain("relationship-dimmed");
+    expect(nodeClass("message-queue:queue-1")).toContain("relationship-2");
+    expect(nodeClass("service-5")).toContain("relationship-2");
+    expect(nodeClass("mock-api-trigger-1")).toContain("relationship-1");
+    expect(nodeClass("service-6")).toContain("relationship-2");
+    expect(nodeClass("service-7")).toContain("relationship-2");
+    expect(nodeClass("isolated")).toContain("relationship-dimmed");
+    expect(edgeClass("call-1")).toContain("relationship-2");
+    expect(edgeClass("call-1")).toContain("app__flow-edge--observed");
+    expect(edgeClass("call-2")).toContain("relationship-3");
+    expect(edgeClass("call-3")).toContain("relationship-dimmed");
+    expect(edgeClass("message-publish-1")).toContain("relationship-3");
+    expect(edgeClass("message-publish-1")).toContain("app__flow-edge--observed");
+    expect(edgeClass("message-subscribe-1")).toContain("relationship-3");
+    expect(edgeClass("mock-trigger-1")).toContain("relationship-1");
+    expect(edgeClass("isolated-call")).toContain("relationship-dimmed");
+    const observedOnlyEdge = edges.find(({ id }) => id.startsWith("observed-"));
+    expect(observedOnlyEdge?.class).not.toContain("relationship");
+    expect(edges.find(({ id }) => id === "call-1")?.animated).toBe(true);
+    expect(edges.find(({ id }) => id === "message-publish-1")?.animated).toBe(true);
+    expect(nodes.find(({ id }) => id === "service-1")?.data?.observedOutboundCallIds).toContain(
+      "call-1",
+    );
+
+    store.setSelection("service-2");
+    modelWithTrigger.syncNodes();
+    const updatedEdges = store.edges as unknown as {
+      id: string;
+      class?: string;
+      data?: { relationshipGradient?: { from: string; toLevel: number } };
+    }[];
+    const updatedNodes = store.nodes as unknown as { id: string; class: string }[];
+    const incomingCall = updatedEdges.find(({ id }) => id === "call-1");
+    const outgoingCall = updatedEdges.find(({ id }) => id === "call-2");
+    const queue = updatedNodes.find(({ id }) => id === "message-queue:queue-1");
+    const subscriber = updatedNodes.find(({ id }) => id === "service-5");
+    const subscriberEdge = updatedEdges.find(({ id }) => id === "message-subscribe-1");
+    expect(queue?.class).toContain("relationship-2");
+    expect(subscriber?.class).toContain("relationship-2");
+    expect(incomingCall?.data).toMatchObject({
+      relationshipGradient: { from: "target", toLevel: 2 },
+    });
+    expect(outgoingCall?.data).toMatchObject({
+      relationshipGradient: { from: "source", toLevel: 2 },
+    });
+    expect(subscriberEdge?.class).toContain("relationship-2");
+    expect(updatedEdges.find(({ id }) => id === "message-publish-1")?.data).toMatchObject({
+      relationshipGradient: { from: "source", toLevel: 2 },
+    });
+    const levelThreeCall = updatedEdges.find(({ id }) => id === "call-3");
+    expect(levelThreeCall?.data).toMatchObject({
+      relationshipGradient: { from: "source", toLevel: 3 },
+    });
+
+    store.setSelection(null);
+    modelWithTrigger.syncNodes();
+    const clearedEdges = store.edges as unknown as {
+      id: string;
+      class?: string;
+      data?: { relationshipGradient?: unknown };
+    }[];
+    const clearedCall = clearedEdges.find(({ id }) => id === "call-1");
+    expect(clearedCall?.class).not.toContain("relationship");
+    expect(clearedCall?.data?.relationshipGradient).toBeUndefined();
+    expect(clearedEdges.find(({ id }) => id === "call-2")?.data).toEqual({});
+  });
+
+  it("keeps relationship distances off when a non-service node is selected", () => {
+    const { store, model } = createModel();
+    store.setSelection("mock-api-mock-1");
+    model.syncNodes();
+
+    expect(
+      (store.nodes as unknown as { class?: string }[]).every(
+        (node) => !node.class?.includes("relationship"),
+      ),
+    ).toBe(true);
+    expect(
+      (store.edges as unknown as { class?: string }[]).every(
+        (edge) => !edge.class?.includes("relationship"),
+      ),
+    ).toBe(true);
+  });
+
   it("keeps response visibility exclusive while preserving per-endpoint session status", () => {
     const first = { ...mockApi, id: "ws-1", apiType: "WEBSOCKET" as const };
     const second = { ...mockApi, id: "ws-2", apiType: "WEBSOCKET" as const };

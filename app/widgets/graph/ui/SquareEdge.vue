@@ -21,7 +21,10 @@ const props = defineProps<{
   markerStart?: string;
   markerEnd?: string;
   interactionWidth?: number;
-  data?: { timing?: EdgeTiming };
+  data?: {
+    timing?: EdgeTiming;
+    relationshipGradient?: { from: "source" | "target"; toLevel: number };
+  };
 }>();
 
 const pathLayout = computed(() =>
@@ -34,6 +37,29 @@ const pathLayout = computed(() =>
     targetPosition: props.targetPosition,
     borderRadius: 0,
   }),
+);
+const relationshipGradient = computed(() => {
+  const gradient = props.data?.relationshipGradient;
+  if (!gradient) return null;
+  const fromSource = gradient.from === "source";
+  const fromLevel = gradient.toLevel - 1;
+  const accentColor = (level: number) => {
+    if (level <= 1) return "var(--accent)";
+    const accentPercent = level === 2 ? 58 : 38;
+    return `color-mix(in srgb, var(--accent) ${accentPercent}%, var(--panel))`;
+  };
+  return {
+    id: `relationship-gradient-${props.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
+    x1: fromSource ? props.sourceX : props.targetX,
+    y1: fromSource ? props.sourceY : props.targetY,
+    x2: fromSource ? props.targetX : props.sourceX,
+    y2: fromSource ? props.targetY : props.sourceY,
+    startColor: accentColor(fromLevel),
+    endColor: accentColor(gradient.toLevel),
+  };
+});
+const edgeStyle = computed(() =>
+  relationshipGradient.value ? { stroke: `url(#${relationshipGradient.value.id})` } : undefined,
 );
 const durationCount = computed(() => props.data?.timing?.callDurationsMs.length ?? 0);
 const labelPosition = computed(() => {
@@ -58,9 +84,24 @@ function formatDuration(durationMs: number) {
 </script>
 
 <template>
+  <defs v-if="relationshipGradient">
+    <linearGradient
+      :id="relationshipGradient.id"
+      data-relationship-gradient
+      gradientUnits="userSpaceOnUse"
+      :x1="relationshipGradient.x1"
+      :y1="relationshipGradient.y1"
+      :x2="relationshipGradient.x2"
+      :y2="relationshipGradient.y2"
+    >
+      <stop offset="0%" :stop-color="relationshipGradient.startColor" />
+      <stop offset="100%" :stop-color="relationshipGradient.endColor" />
+    </linearGradient>
+  </defs>
   <BaseEdge
     :id="id"
     :path="pathLayout[0]"
+    :style="edgeStyle"
     :marker-start="markerStart"
     :marker-end="markerEnd"
     :interaction-width="interactionWidth"

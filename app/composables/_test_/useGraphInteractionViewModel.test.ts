@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { useGraphStore } from "../../stores/graph";
 import { useGraphInteractionViewModel } from "../useGraphInteractionViewModel";
+import { useGraphViewModel } from "../useGraphViewModel";
 
 const service = {
   id: "service-1",
@@ -89,7 +90,12 @@ describe("graph interaction view model", () => {
   it("selects graph nodes without opening settings from body clicks", () => {
     const store = useGraphStore();
     store.services = [service];
-    const syncNodes = vi.fn();
+    const graphViewModel = useGraphViewModel({
+      store,
+      mockApis: () => [],
+      runningMockId: () => null,
+    });
+    const syncNodes = vi.fn(graphViewModel.syncNodes);
     const editService = vi.fn();
     const editMessageQueue = vi.fn();
     const fitView = vi.fn();
@@ -105,13 +111,36 @@ describe("graph interaction view model", () => {
     model.onNodeClick("service-1");
     expect(store.selectedNodeId).toBe("service-1");
     expect(syncNodes).toHaveBeenCalledOnce();
-    expect(fitView).toHaveBeenCalledWith({ nodes: ["service-1"], padding: 0.45, duration: 300 });
+    expect(store.nodes[0]?.class).toContain("relationship-1");
+    expect(fitView).not.toHaveBeenCalled();
     expect(editService).not.toHaveBeenCalled();
     model.onNodeClick("mock-api-mock-1");
     model.onNodeClick("message-queue");
     expect(syncNodes).toHaveBeenCalledTimes(3);
-    expect(fitView).toHaveBeenCalledOnce();
+    expect(fitView).not.toHaveBeenCalled();
     expect(editService).not.toHaveBeenCalled();
     expect(editMessageQueue).not.toHaveBeenCalled();
+  });
+
+  it("clears the selected node and rebuilds graph emphasis", () => {
+    const store = useGraphStore();
+    store.services = [service];
+    store.setSelection("service-1");
+    const syncNodes = vi.fn();
+    const model = useGraphInteractionViewModel({
+      store,
+      contextMenu: ref(null),
+      graphCanvas: ref(null),
+      syncNodes,
+      editService: vi.fn(),
+      editMessageDestination: vi.fn(),
+    });
+
+    model.clearSelection();
+
+    expect(store.selectedNodeId).toBeNull();
+    expect(syncNodes).toHaveBeenCalledOnce();
+    model.clearSelection();
+    expect(syncNodes).toHaveBeenCalledOnce();
   });
 });
