@@ -14,15 +14,14 @@ const emit = defineEmits<{ dismissError: []; dismissWarning: [id: number] }>();
       color="error"
       variant="soft"
       :close="{ 'aria-label': 'Dismiss error' }"
-      class="flex justify-between gap-3 rounded-lg bg-[var(--danger-soft)] p-3 text-xs text-[var(--danger)] shadow-[var(--shadow)]"
-      :ui="{ close: 'border-0 bg-transparent text-inherit text-[17px]' }"
+      class="flex justify-between gap-3 rounded-lg bg-[color-mix(in_srgb,_var(--ui-error)_10%,_transparent)] p-3 text-xs text-error shadow-md"
       role="alert"
       @update:open="(open) => !open && emit('dismissError')"
     />
     <output
       v-for="warning in warnings"
       :key="warning.id"
-      class="flex justify-between gap-3 rounded-lg bg-[var(--warning-soft)] p-3 text-xs text-[var(--warning)] shadow-[var(--shadow)]"
+      class="flex justify-between gap-3 rounded-lg bg-[color-mix(in_srgb,_var(--ui-warning)_10%,_transparent)] p-3 text-xs text-warning shadow-md"
       aria-live="polite"
     >
       <UAlert
@@ -31,7 +30,6 @@ const emit = defineEmits<{ dismissError: []; dismissWarning: [id: number] }>();
         variant="soft"
         :close="{ 'aria-label': 'Dismiss import warning' }"
         class="w-full"
-        :ui="{ close: 'border-0 bg-transparent text-inherit text-[17px]' }"
         @update:open="(open) => !open && emit('dismissWarning', warning.id)"
       />
     </output>

@@ -200,13 +200,13 @@ defineExpose({
     <MiniMap
       pannable
       zoomable
-      :node-color="dark ? '#343a40' : '#c5cbc9'"
-      :node-stroke-color="dark ? '#9ba2a9' : '#68706c'"
-      :mask-color="dark ? 'rgba(0, 0, 0, 0.58)' : 'rgba(240, 240, 240, 0.6)'"
-      :mask-stroke-color="dark ? '#2dd4bf' : '#0f766e'"
+      :node-color="'var(--ui-bg-accented)'"
+      :node-stroke-color="'var(--ui-text-muted)'"
+      :mask-color="`color-mix(in srgb, var(--ui-bg) ${dark ? 70 : 60}%, transparent)`"
+      :mask-stroke-color="'var(--ui-primary)'"
     />
     <Controls position="bottom-left">
-      <div class="mt-1 flex flex-col border-t border-[var(--border)] pt-1">
+      <div class="mt-1 flex flex-col border-t border-default pt-1">
         <ControlButton
           aria-label="Auto arrange"
           title="Auto arrange"

@@ -26,4 +26,4 @@ query and mutation.
 
 Existing route contract tests are under `server/api/*.integration.test.ts` and
 `server/routes/v1/*.integration.test.ts`. Existing repository, use-case, and database
-tests characterize query behavior before movement into each module's `_test_` directory.
+tests characterize query behavior before movement into each module's `__test__` directory.

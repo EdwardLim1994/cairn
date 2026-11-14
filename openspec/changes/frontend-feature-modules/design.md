@@ -50,7 +50,7 @@ Alternative: split the canvas API into summary and detail calls. Deferred to Cai
 
 ### Follow module test placement
 
-Move tests for each migrated slice into one `_test_` directory that mirrors production paths within that slice. Test public behavior and cross-widget paths, especially dirty discard, mutation refresh, graph events, and deferred panel loading. Retain focused tests for telemetry-derived graph states.
+Move tests for each migrated slice into one `__test__` directory that mirrors production paths within that slice. Test public behavior and cross-widget paths, especially dirty discard, mutation refresh, graph events, and deferred panel loading. Retain focused tests for telemetry-derived graph states.
 
 ## Risks / Trade-offs
 
@@ -62,7 +62,7 @@ Move tests for each migrated slice into one `_test_` directory that mirrors prod
 ## Migration Plan
 
 1. Apply `frontend-theme-foundation` first.
-2. Establish FSD directories, import rules, public APIs, and `_test_` placement in one vertical slice.
+2. Establish FSD directories, import rules, public APIs, and `__test__` placement in one vertical slice.
 3. Migrate manage-nodes service and queue editors with card navigation, confirmations, refresh, and toasts.
 4. Migrate graph-node and mock-API slices, preserving observed timing, response focus, and WebSocket behavior.
 5. Migrate remaining panels and defer their UI and panel-only fetches.

@@ -85,15 +85,7 @@ watch(
 </script>
 
 <template>
-  <WorkspaceDrawer
-    v-model:open="open"
-    :ui="{
-      content:
-        'z-[71] flex h-full w-[min(520px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
-      header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
-      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
-    }"
-  >
+  <WorkspaceDrawer v-model:open="open">
     <template #title>Manage access tokens</template>
     <template #description>Access tokens for OpenTelemetry ingestion</template>
     <template #body>
@@ -101,7 +93,7 @@ watch(
         class="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
         @submit.prevent="generate"
       >
-        <div class="flex min-w-0 flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+        <div class="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted">
           Token name
           <UInput
             v-model="name"
@@ -111,42 +103,40 @@ watch(
             maxlength="255"
           />
         </div>
-        <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+        <div class="flex flex-col gap-1 text-xs font-medium text-muted">
           Expires after
           <USelect v-model="expiryDays" :items="expiryOptions" aria-label="Expires after" />
         </div>
         <UButton type="submit" :disabled="!name.trim()">Generate</UButton>
       </form>
-      <p v-if="error" role="alert" class="mt-3 text-sm text-[var(--danger)]">{{ error }}</p>
+      <p v-if="error" role="alert" class="mt-3 text-sm text-error">{{ error }}</p>
       <section
         v-if="secret"
-        class="mt-4 rounded-lg border border-[var(--accent)] bg-[var(--accent-soft)] p-3"
+        class="mt-4 rounded-lg border border-primary bg-[color-mix(in_srgb,_var(--ui-primary)_10%,_transparent)] p-3"
       >
         <p class="text-sm font-semibold">Copy token now. It cannot be shown again.</p>
         <code class="mt-2 block break-all text-xs">{{ secret }}</code>
-        <UButton class="mt-2" type="button" color="neutral" variant="outline" @click="copySecret"
+        <UButton type="button" color="neutral" variant="outline" @click="copySecret"
           >Copy token</UButton
         >
       </section>
-      <p v-if="loading" class="mt-4 text-sm text-[var(--muted)]">Loading tokens…</p>
-      <p v-else-if="!tokens.length" class="mt-4 text-sm text-[var(--muted)]">No access tokens.</p>
+      <p v-if="loading" class="mt-4 text-sm text-muted">Loading tokens…</p>
+      <p v-else-if="!tokens.length" class="mt-4 text-sm text-muted">No access tokens.</p>
       <ul v-else class="mt-4 grid gap-2">
         <li
           v-for="token in tokens"
           :key="token.id"
-          class="flex min-h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-2 py-2.5 last:border-b-0"
+          class="flex min-h-14 items-center gap-3 border-b border-default bg-default px-2 py-2.5 last:border-b-0"
         >
           <div class="min-w-0 flex-1">
             <p class="truncate text-[12.5px] font-semibold">{{ token.name }}</p>
-            <p class="mt-0.5 font-mono text-[11.5px] text-[var(--muted)]">
+            <p class="mt-0.5 font-mono text-[11.5px] text-muted">
               Created {{ new Date(token.createdAt).toLocaleDateString() }} ·
             </p>
           </div>
           <span
             class="shrink-0 rounded-full px-2 py-1 text-[11px] font-medium"
-            :class="
-              token.expired ? 'app__run-state--failed' : 'bg-[var(--panel2)] text-[var(--muted)]'
-            "
+            :class="token.expired ? 'app__run-state--failed' : 'bg-elevated text-muted'"
             >{{
               token.expired
                 ? "Expired"
@@ -155,13 +145,7 @@ watch(
                   : "No expiry"
             }}</span
           >
-          <UButton
-            type="button"
-            color="error"
-            variant="ghost"
-            size="sm"
-            class="text-[11.5px]"
-            @click="revokeTarget = token"
+          <UButton type="button" color="error" variant="ghost" @click="revokeTarget = token"
             >Revoke</UButton
           >
         </li>
@@ -170,7 +154,7 @@ watch(
         v-if="revokeTarget"
         role="alertdialog"
         aria-label="Confirm revocation"
-        class="mt-4 rounded-lg border border-[var(--danger)] p-3"
+        class="mt-4 rounded-lg border border-error p-3"
       >
         <p class="text-sm">
           Revoke “{{ revokeTarget.name }}”? Collector requests using it will fail.

@@ -44,9 +44,9 @@ const relationshipGradient = computed(() => {
   const fromSource = gradient.from === "source";
   const fromLevel = gradient.toLevel - 1;
   const accentColor = (level: number) => {
-    if (level <= 1) return "var(--accent)";
+    if (level <= 1) return "var(--ui-primary)";
     const accentPercent = level === 2 ? 58 : 38;
-    return `color-mix(in srgb, var(--accent) ${accentPercent}%, var(--panel))`;
+    return `color-mix(in srgb, var(--ui-primary) ${accentPercent}%, var(--ui-bg))`;
   };
   return {
     id: `relationship-gradient-${props.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`,

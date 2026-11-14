@@ -38,21 +38,21 @@ function frameworkIcon(framework: string) {
       <section class="flex flex-col gap-2" aria-label="Services">
         <header class="flex items-center justify-between gap-2">
           <h3 class="text-[12.5px] font-semibold">Services</h3>
-          <UButton color="neutral" variant="outline" size="sm" @click="emit('add-service')">
+          <UButton color="neutral" variant="outline" @click="emit('add-service')">
             Register service
           </UButton>
         </header>
-        <div class="overflow-hidden rounded-[9px] border border-[var(--border)]">
+        <div class="overflow-hidden rounded-[9px] border border-default">
           <button
             v-for="service in services"
             :key="service.id"
             type="button"
-            class="flex w-full items-center gap-2.5 border-b border-[var(--border)] bg-[var(--panel)] px-2.5 py-2.5 text-left last:border-b-0 hover:bg-[var(--panel2)]"
+            class="flex w-full items-center gap-2.5 border-b border-default bg-default px-2.5 py-2.5 text-left last:border-b-0 hover:bg-elevated"
             :aria-label="`Edit ${service.name}`"
             @click="emit('edit-service', service.id)"
           >
             <span
-              class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+              class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated"
               :title="service.framework"
             >
               <img
@@ -71,17 +71,17 @@ function frameworkIcon(framework: string) {
             </span>
             <span class="flex min-w-0 flex-1 flex-col gap-0.5">
               <span class="truncate font-mono text-[12.5px] font-semibold">{{ service.name }}</span>
-              <span class="truncate text-[11.5px] text-[var(--muted)]">{{ service.baseUrl }}</span>
+              <span class="truncate text-[11.5px] text-muted">{{ service.baseUrl }}</span>
             </span>
-            <span class="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
+            <span class="flex shrink-0 items-center gap-1.5 text-[11px] text-muted">
               <span
                 class="size-[7px] rounded-full"
                 :class="
                   serviceHealth[service.id] === true
-                    ? 'bg-[var(--success)]'
+                    ? 'bg-success'
                     : serviceHealth[service.id] === false
-                      ? 'bg-[var(--warning)]'
-                      : 'bg-[var(--muted)]'
+                      ? 'bg-warning'
+                      : 'bg-[var(--ui-text-muted)]'
                 "
               />
               {{
@@ -92,31 +92,27 @@ function frameworkIcon(framework: string) {
                     : "Unknown"
               }}
             </span>
-            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-[var(--muted)]" />
+            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted" />
           </button>
-          <p v-if="!services.length" class="p-3 text-xs text-[var(--muted)]">
-            No services registered.
-          </p>
+          <p v-if="!services.length" class="p-3 text-xs text-muted">No services registered.</p>
         </div>
       </section>
       <section class="flex flex-col gap-2" aria-label="Message queues">
         <header class="flex items-center justify-between gap-2">
           <h3 class="text-[12.5px] font-semibold">Message queues</h3>
-          <UButton size="sm" color="neutral" variant="outline" @click="emit('add-queue')"
-            >Add queue</UButton
-          >
+          <UButton color="neutral" variant="outline" @click="emit('add-queue')">Add queue</UButton>
         </header>
-        <div class="overflow-hidden rounded-[9px] border border-[var(--border)]">
+        <div class="overflow-hidden rounded-[9px] border border-default">
           <button
             v-for="destination in destinations"
             :key="destination.id"
             type="button"
-            class="flex w-full items-center gap-2.5 border-b border-[var(--border)] bg-[var(--panel)] px-2.5 py-2.5 text-left last:border-b-0 hover:bg-[var(--panel2)]"
+            class="flex w-full items-center gap-2.5 border-b border-default bg-default px-2.5 py-2.5 text-left last:border-b-0 hover:bg-elevated"
             :aria-label="`Edit ${destination.name}`"
             @click="emit('edit-destination', destination.id)"
           >
             <span
-              class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+              class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated"
               :title="destination.broker === 'kafka' ? 'Kafka' : 'RabbitMQ'"
             >
               <img
@@ -129,19 +125,19 @@ function frameworkIcon(framework: string) {
               <span class="truncate font-mono text-[12.5px] font-semibold">{{
                 destination.name
               }}</span>
-              <span class="truncate text-[11.5px] text-[var(--muted)]">{{
+              <span class="truncate text-[11.5px] text-muted">{{
                 destination.queueName || destination.name
               }}</span>
             </span>
-            <span class="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
+            <span class="flex shrink-0 items-center gap-1.5 text-[11px] text-muted">
               <span
                 class="size-[7px] rounded-full"
                 :class="
                   destination.health === true
-                    ? 'bg-[var(--success)]'
+                    ? 'bg-success'
                     : destination.health === false
-                      ? 'bg-[var(--warning)]'
-                      : 'bg-[var(--muted)]'
+                      ? 'bg-warning'
+                      : 'bg-[var(--ui-text-muted)]'
                 "
               />
               {{
@@ -152,14 +148,14 @@ function frameworkIcon(framework: string) {
                     : "Unknown"
               }}
             </span>
-            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-[var(--muted)]" />
+            <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted" />
           </button>
-          <p v-if="!destinations.length" class="p-3 text-xs text-[var(--muted)]">
+          <p v-if="!destinations.length" class="p-3 text-xs text-muted">
             No message queues configured.
           </p>
         </div>
       </section>
-      <p class="text-xs leading-relaxed text-[var(--muted)]">
+      <p class="text-xs leading-relaxed text-muted">
         Mock API triggers aren't listed here. Configure them from Mock APIs.
       </p>
     </template>

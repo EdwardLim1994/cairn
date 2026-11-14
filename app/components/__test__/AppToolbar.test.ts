@@ -5,6 +5,7 @@ import { defineComponent, h } from "vue";
 import AppToolbar from "../AppToolbar.vue";
 
 const components = {
+  UColorModeButton: { template: '<button aria-label="Switch color mode" />' },
   UButton: defineComponent({
     inheritAttrs: false,
     props: { type: String },
@@ -17,7 +18,7 @@ const components = {
 describe("AppToolbar", () => {
   it("hides sign out when operator authentication is disabled", () => {
     const wrapper = mount(AppToolbar, {
-      props: { dark: false, logsOpen: false, authEnabled: false },
+      props: { logsOpen: false, authEnabled: false },
       global: { components },
     });
     expect(wrapper.find('[aria-label="Sign out"]').exists()).toBe(false);
@@ -25,7 +26,7 @@ describe("AppToolbar", () => {
 
   it("omits service status and emits graph and theme actions", async () => {
     const wrapper = mount(AppToolbar, {
-      props: { dark: true, logsOpen: false },
+      props: { logsOpen: false },
       global: { components },
     });
     expect(wrapper.get("header").classes()).toContain("z-[80]");
@@ -34,13 +35,13 @@ describe("AppToolbar", () => {
     expect(wrapper.text()).not.toContain("services");
     expect(wrapper.find('[class*="bg-[#15966f]"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Graph as code"]').exists()).toBe(false);
-    await wrapper.get('[aria-label="Use light theme"]').trigger("click");
+    expect(wrapper.find('[aria-label="Switch color mode"]').exists()).toBe(true);
     await wrapper.get('[aria-label="Mock APIs"]').trigger("click");
     await wrapper.get('[aria-label="Manage nodes"]').trigger("click");
     await wrapper.get('[aria-label="Manage access tokens"]').trigger("click");
     await wrapper.get('[aria-label="Run history"]').trigger("click");
     expect(wrapper.find('[aria-label="Lock node positions"]').exists()).toBe(false);
-    expect(wrapper.emitted("toggleTheme")).toEqual([[]]);
+
     expect(wrapper.emitted("openMockApis")).toEqual([[]]);
     expect(wrapper.emitted("openManageNodes")).toEqual([[]]);
     expect(wrapper.emitted("openAccessTokens")).toEqual([[]]);
@@ -49,7 +50,7 @@ describe("AppToolbar", () => {
 
   it("shows the project ID only when configured", () => {
     const withProject = mount(AppToolbar, {
-      props: { dark: false, logsOpen: false, projectId: "cairn-dev" },
+      props: { logsOpen: false, projectId: "cairn-dev" },
       global: { components },
     });
     expect(withProject.get('[aria-label="Project ID"]').text()).toContain("cairn-dev");
@@ -57,7 +58,7 @@ describe("AppToolbar", () => {
     expect(withProject.text()).not.toContain("environment");
 
     const withoutProject = mount(AppToolbar, {
-      props: { dark: false, logsOpen: false },
+      props: { logsOpen: false },
       global: { components },
     });
     expect(withoutProject.find('[aria-label="Project ID"]').exists()).toBe(false);
@@ -65,7 +66,7 @@ describe("AppToolbar", () => {
 
   it("always shows sign out and emits its action", async () => {
     const wrapper = mount(AppToolbar, {
-      props: { dark: false, logsOpen: false },
+      props: { logsOpen: false },
       global: { components },
     });
     await wrapper.get('[aria-label="Sign out"]').trigger("click");

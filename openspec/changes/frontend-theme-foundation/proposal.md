@@ -9,7 +9,7 @@ Cairn's shared colors and control styles are spread across global CSS, component
 - Make the existing light and dark palettes the reference for a single Nuxt UI and Tailwind theme foundation.
 - Standardize shared control colors, sizes, spacing, and states through Nuxt UI theme configuration and named tokens.
 - Consolidate shared side-drawer and card structure while preserving panel and button positions, graph behavior, and current workflows.
-- Place tests for each migrated frontend module under its `_test_` directory, mirroring production paths.
+- Place tests for each migrated frontend module under its `__test__` directory, mirroring production paths.
 - Keep feature organization, editor workflow changes, and panel lazy loading in later frontend slices.
 
 ## Capabilities

@@ -38,7 +38,7 @@ Alternative: implement a dialect-neutral adapter now. Rejected because Cairn alr
 
 ### Move tests with modules
 
-Put each module's unit and integration tests in one `_test_` directory, mirroring production paths. Use small fakes for use-case and class coordination. Keep focused disposable SQLite tests for queries, ownership checks, and cross-module rollback, and disposable DuckDB tests for telemetry. Preserve HTTP contract tests for routes and the existing embedded test setup.
+Put each module's unit and integration tests in one `__test__` directory, mirroring production paths. Use small fakes for use-case and class coordination. Keep focused disposable SQLite tests for queries, ownership checks, and cross-module rollback, and disposable DuckDB tests for telemetry. Preserve HTTP contract tests for routes and the existing embedded test setup.
 
 ## Risks / Trade-offs
 
@@ -52,6 +52,6 @@ Put each module's unit and integration tests in one `_test_` directory, mirrorin
 
 1. Inventory tables, current cross-module imports, and API behavior; define ownership and public operations.
 2. Move one vertical path at a time, starting with service CRUD and graph positions, while preserving route/use-case function signatures where practical.
-3. Convert focused repositories and domain services to transaction-injected classes; move their tests into module `_test_` directories.
+3. Convert focused repositories and domain services to transaction-injected classes; move their tests into module `__test__` directories.
 4. Move message destinations, mock APIs/templates, and observability/runs; replace direct cross-module repository imports with public operations.
 5. Verify project scoping, API compatibility, SQLite cross-module rollback, DuckDB telemetry behavior, focused embedded integration tests, `vp check`, `vp run build`, and strict OpenSpec validation.

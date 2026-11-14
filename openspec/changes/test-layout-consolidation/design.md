@@ -12,9 +12,9 @@ See `proposal.md`. Existing tests span `app/`, `server/`, and `shared/`. `script
 
 ## Decisions
 
-### Mirror production paths under one module-local `_test_`
+### Mirror production paths under one module-local `__test__`
 
-For a production file `<module>/<relative-path>/<name>.ts`, place its test at `<module>/_test_/<relative-path>/<name>.test.ts`. Component tests use the same rule for `.vue` files. Keep route adapter tests with their owning backend module, mirroring the route path under that module's `_test_`. `app/pages` and Nuxt route directories remain framework entry points; modules own their behavior tests. Keep shared contract tests under a shared module's `_test_`.
+For a production file `<module>/<relative-path>/<name>.ts`, place its test at `<module>/__test__/<relative-path>/<name>.test.ts`. Component tests use the same rule for `.vue` files. Keep route adapter tests with their owning backend module, mirroring the route path under that module's `__test__`. `app/pages` and Nuxt route directories remain framework entry points; modules own their behavior tests. Keep shared contract tests under a shared module's `__test__`.
 
 Alternative: one repository-level test tree. Rejected because it separates tests from responsibility ownership and makes module moves harder.
 
@@ -39,6 +39,6 @@ Alternative: introduce MySQL for integration tests. Rejected because the applica
 ## Migration Plan
 
 1. Complete module moves in the frontend and backend changes, including their attached tests.
-2. Inventory remaining tests and map each to an owning module and mirrored `_test_` path.
+2. Inventory remaining tests and map each to an owning module and mirrored `__test__` path.
 3. Relocate leftovers in small groups; update imports and mocks, then run focused tests.
 4. Compare test discovery counts and run unit/component and SQLite/DuckDB integration suites in CI-compatible commands, followed by strict OpenSpec validation.

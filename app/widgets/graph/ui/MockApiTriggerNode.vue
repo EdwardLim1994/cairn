@@ -79,7 +79,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
   <article
     class="app__graph-node--mock-trigger app__graph-node relative w-[296px] overflow-visible rounded-[10px]"
   >
-    <header class="relative flex h-11 items-center gap-2 border-b border-[var(--border)] px-3">
+    <header class="relative flex h-11 items-center gap-2 border-b border-default px-3">
       <span
         class="app__trigger-protocol inline-flex h-[18px] min-w-[42px] shrink-0 items-center justify-center rounded px-1 font-mono text-[10px] font-semibold"
         :class="`app__trigger-protocol--${data.entry.apiType.toLowerCase()}`"
@@ -97,7 +97,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
       }}</strong>
       <button
         type="button"
-        class="nodrag inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-[11px] font-medium text-[var(--muted)] hover:border-[var(--border-strong)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+        class="nodrag inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-default bg-default px-2 text-[11px] font-medium text-muted hover:border-accented hover:bg-elevated hover:text-default"
         :aria-label="`Edit ${data.name}`"
         title="Edit mock API"
         @click.stop="emit('edit', data.id)"
@@ -121,26 +121,24 @@ function responseLabel(data: MockApiTriggerNodeData) {
           :class="`app__method-tag--${data.endpoint.method.toLowerCase()}`"
           >{{ data.endpoint.method }}</span
         >
-        <span class="min-w-0 truncate text-[var(--muted)]">{{ endpointPath(data.endpoint) }}</span>
+        <span class="min-w-0 truncate text-muted">{{ endpointPath(data.endpoint) }}</span>
       </div>
-      <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
+      <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
         <UIcon name="i-lucide-server" class="size-3 shrink-0" aria-hidden="true" />
         <span class="truncate">{{ data.serviceName ?? "Target service" }}</span>
-        <span v-if="data.entry.status !== 'ready'" class="shrink-0 text-[var(--warning)]"
-          >· Not ready</span
-        >
+        <span v-if="data.entry.status !== 'ready'" class="shrink-0 text-warning">· Not ready</span>
       </div>
       <output
         v-if="data.entry.apiType === 'WEBSOCKET'"
-        class="flex items-center gap-1.5 text-[11px] text-[var(--muted)]"
+        class="flex items-center gap-1.5 text-[11px] text-muted"
       >
         <span
           class="size-2 shrink-0 rounded-full"
           :class="{
-            'bg-[var(--success)] shadow-[0_0_0_3px_var(--success-soft)]':
+            'bg-success shadow-[0_0_0_3px_color-mix(in_srgb,_var(--ui-success)_10%,_transparent)]':
               data.websocketState === 'connected',
-            'bg-[var(--warning)]': data.websocketState === 'connecting',
-            'bg-[var(--muted)]': data.websocketState === 'disconnected',
+            'bg-warning': data.websocketState === 'connecting',
+            'bg-[var(--ui-text-muted)]': data.websocketState === 'disconnected',
           }"
         />
         {{
@@ -155,7 +153,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
         <button
           v-if="data.entry.apiType === 'WEBSOCKET'"
           type="button"
-          class="nodrag inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[11.5px] font-medium hover:bg-[var(--panel2)] disabled:cursor-not-allowed disabled:opacity-50"
+          class="nodrag inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-default bg-default px-2.5 text-[11.5px] font-medium hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="data.websocketState === 'connecting' || !data.active || !data.ready"
           @click.stop="
             emit(data.websocketState === 'connected' ? 'disconnect' : 'connect', data.id)
@@ -176,7 +174,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
         </button>
         <button
           type="button"
-          class="nodrag inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-[var(--accent)] bg-[var(--accent)] px-2.5 text-[11.5px] font-semibold text-[var(--accent-ink)] hover:brightness-105 disabled:cursor-not-allowed disabled:border-dashed disabled:opacity-50"
+          class="nodrag inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 text-[11.5px] font-semibold text-[var(--ui-text-inverted)] hover:brightness-105 disabled:cursor-not-allowed disabled:border-dashed disabled:opacity-50"
           :disabled="
             !data.active ||
             !data.ready ||
@@ -207,7 +205,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
         <button
           v-if="data.latestResponse || data.messages?.length || data.responseOpen"
           type="button"
-          class="nodrag relative inline-flex h-7 min-w-0 flex-1 items-center gap-1.5 truncate rounded-md border border-[var(--border)] bg-[var(--panel2)] px-2 text-[11px] font-medium text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--text)]"
+          class="nodrag relative inline-flex h-7 min-w-0 flex-1 items-center gap-1.5 truncate rounded-md border border-default bg-elevated px-2 text-[11px] font-medium text-muted hover:bg-[var(--ui-border)] hover:text-default"
           :class="{
             'app__trigger-last-chip--failed': data.latestResponse?.status === 'failed',
             'app__trigger-last-chip--completed': data.latestResponse?.status === 'completed',
@@ -217,13 +215,13 @@ function responseLabel(data: MockApiTriggerNodeData) {
           @click.stop="emit('toggleResponse', data.id)"
         >
           <span
-            class="size-[7px] shrink-0 rounded-full bg-[var(--success)]"
-            :class="{ 'bg-[var(--danger)]': data.latestResponse?.status === 'failed' }"
+            class="size-[7px] shrink-0 rounded-full bg-success"
+            :class="{ 'bg-error': data.latestResponse?.status === 'failed' }"
           />
           <span class="truncate font-mono">{{ responseLabel(data) }}</span>
           <span
             v-if="data.unread"
-            class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--accent)]"
+            class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary"
             aria-label="New response"
           />
         </button>
@@ -231,7 +229,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
       <button
         v-if="!data.ready"
         type="button"
-        class="nodrag inline-flex min-h-[26px] items-center gap-1.5 self-start rounded-md border border-dashed border-[var(--warning)] bg-[var(--warning-soft)] px-2 text-[11px] font-semibold text-[var(--warning)]"
+        class="nodrag inline-flex min-h-[26px] items-center gap-1.5 self-start rounded-md border border-dashed border-warning bg-[color-mix(in_srgb,_var(--ui-warning)_10%,_transparent)] px-2 text-[11px] font-semibold text-warning"
         @click.stop="emit('edit', data.id)"
       >
         <UIcon name="i-lucide-triangle-alert" class="size-3" aria-hidden="true" />
@@ -241,7 +239,7 @@ function responseLabel(data: MockApiTriggerNodeData) {
     <aside
       v-if="data.responseOpen"
       :data-response-panel="data.id"
-      class="app__mock-response-panel app__surface absolute right-full top-0 z-20 mr-3 max-h-[470px] w-[380px] overflow-auto rounded-xl p-3"
+      class="app__mock-response-panel border border-default bg-default shadow-md absolute right-full top-0 z-20 mr-3 max-h-[470px] w-[380px] overflow-auto rounded-xl p-3"
     >
       <header class="mb-2 flex items-center justify-between text-xs font-semibold">
         <span>Latest response</span>
@@ -254,34 +252,32 @@ function responseLabel(data: MockApiTriggerNodeData) {
         </button>
       </header>
       <template v-if="data.entry.apiType === 'WEBSOCKET'">
-        <p v-if="!data.messages?.length" class="text-xs text-[var(--muted)]">
-          No messages received yet.
-        </p>
+        <p v-if="!data.messages?.length" class="text-xs text-muted">No messages received yet.</p>
         <template v-else>
-          <small class="mb-2 block text-[10px] text-[var(--muted)]">{{
+          <small class="mb-2 block text-[10px] text-muted">{{
             data.messages.at(-1)?.receivedAt
           }}</small>
-          <pre
-            class="whitespace-pre-wrap break-words rounded-md bg-[var(--panel2)] p-2 text-[11px]"
-            >{{ data.messages.at(-1)?.data }}</pre>
+          <pre class="whitespace-pre-wrap break-words rounded-md bg-elevated p-2 text-[11px]">{{
+            data.messages.at(-1)?.data
+          }}</pre>
         </template>
       </template>
       <template v-else-if="data.latestResponse">
         <p
           v-if="data.latestResponse.telemetryState === 'expired'"
-          class="mb-2 text-xs text-[var(--warning)]"
+          class="mb-2 text-xs text-warning"
         >
           Telemetry expired; run history is retained.
         </p>
         <p
           v-else-if="data.latestResponse.telemetryState === 'partial'"
-          class="mb-2 text-xs text-[var(--warning)]"
+          class="mb-2 text-xs text-warning"
         >
           Telemetry is partially expired; flow timing is incomplete.
         </p>
         <p
           v-else-if="data.latestResponse.telemetryState === 'unavailable'"
-          class="mb-2 text-xs text-[var(--muted)]"
+          class="mb-2 text-xs text-muted"
         >
           No telemetry was observed for this run.
         </p>
@@ -293,24 +289,21 @@ function responseLabel(data: MockApiTriggerNodeData) {
             {{ data.latestResponse.status }} ·
             {{ data.latestResponse.grpcStatusName ?? data.latestResponse.responseStatus ?? "—" }}
           </span>
-          <span class="text-[10px] text-[var(--muted)]">
+          <span class="text-[10px] text-muted">
             Total {{ formatDuration(data.latestResponse.totalDurationMs) }}
           </span>
         </div>
-        <p
-          v-if="data.latestResponse.traceId"
-          class="mb-2 break-all text-[10px] text-[var(--muted)]"
-        >
+        <p v-if="data.latestResponse.traceId" class="mb-2 break-all text-[10px] text-muted">
           Trace ID: {{ data.latestResponse.traceId }}
         </p>
-        <p v-if="data.latestResponse.error" class="mb-2 text-xs text-[var(--danger)]">
+        <p v-if="data.latestResponse.error" class="mb-2 text-xs text-error">
           {{ data.latestResponse.error }}
         </p>
-        <pre
-          class="whitespace-pre-wrap break-words rounded-md bg-[var(--panel2)] p-2 text-[11px]"
-          >{{ prettyResponse(data.latestResponse.responseBody) }}</pre>
+        <pre class="whitespace-pre-wrap break-words rounded-md bg-elevated p-2 text-[11px]">{{
+          prettyResponse(data.latestResponse.responseBody)
+        }}</pre>
       </template>
-      <p v-else class="text-xs text-[var(--muted)]">No response yet.</p>
+      <p v-else class="text-xs text-muted">No response yet.</p>
     </aside>
   </article>
 </template>

@@ -68,8 +68,8 @@ describe("SquareEdge", () => {
       y1: "80",
       x2: "400",
       y2: "180",
-      startColor: "var(--accent)",
-      endColor: "color-mix(in srgb, var(--accent) 58%, var(--panel))",
+      startColor: "var(--ui-primary)",
+      endColor: "color-mix(in srgb, var(--ui-primary) 58%, var(--ui-bg))",
     },
     {
       direction: "target",
@@ -78,8 +78,8 @@ describe("SquareEdge", () => {
       y1: "180",
       x2: "100",
       y2: "80",
-      startColor: "var(--accent)",
-      endColor: "color-mix(in srgb, var(--accent) 58%, var(--panel))",
+      startColor: "var(--ui-primary)",
+      endColor: "color-mix(in srgb, var(--ui-primary) 58%, var(--ui-bg))",
     },
     {
       direction: "source",
@@ -88,8 +88,8 @@ describe("SquareEdge", () => {
       y1: "80",
       x2: "400",
       y2: "180",
-      startColor: "color-mix(in srgb, var(--accent) 58%, var(--panel))",
-      endColor: "color-mix(in srgb, var(--accent) 38%, var(--panel))",
+      startColor: "color-mix(in srgb, var(--ui-primary) 58%, var(--ui-bg))",
+      endColor: "color-mix(in srgb, var(--ui-primary) 38%, var(--ui-bg))",
     },
   ] as const)(
     "fades a connection from its lower-level endpoint ($direction) toward level $toLevel",

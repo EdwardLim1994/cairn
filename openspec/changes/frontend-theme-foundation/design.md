@@ -30,9 +30,9 @@ Move the reusable drawer and card structure to `app/shared/ui`, with a deliberat
 
 Alternative: build a generic form framework. Rejected because the controls share presentation, while entity forms retain distinct behavior.
 
-### Keep tests under module `_test_` directories
+### Keep tests under module `__test__` directories
 
-Place each migrated module's tests in one `_test_` directory, mirroring paths relative to that module. For example, `app/shared/ui/WorkspaceDrawer.vue` pairs with `app/shared/ui/_test_/WorkspaceDrawer.test.ts`. Move existing tests with their production modules. Add focused light/dark and interaction checks for shared controls; compare rendered layouts at desktop and narrow widths.
+Place each migrated module's tests in one `__test__` directory, mirroring paths relative to that module. For example, `app/shared/ui/WorkspaceDrawer.vue` pairs with `app/shared/ui/__test__/WorkspaceDrawer.test.ts`. Move existing tests with their production modules. Add focused light/dark and interaction checks for shared controls; compare rendered layouts at desktop and narrow widths.
 
 Alternative: leave tests beside production files. Rejected because the agreed module convention separates test navigation from production code.
 
@@ -46,6 +46,6 @@ Alternative: leave tests beside production files. Rejected because the agreed mo
 
 1. Record current light/dark palette values and rendered shared-control appearance at desktop and narrow widths.
 2. Introduce Nuxt UI theme configuration and map existing shared tokens without changing geometry.
-3. Move shared drawer and card controls plus their tests into `app/shared/ui` and `_test_`; update imports through its public API.
+3. Move shared drawer and card controls plus their tests into `app/shared/ui` and `__test__`; update imports through its public API.
 4. Remove superseded global control rules while retaining graph and integration selectors.
 5. Run focused tests, `vp check`, `vp build`, and strict OpenSpec validation; compare both themes and widths. Revert an individual control migration if appearance or behavior changes unexpectedly.

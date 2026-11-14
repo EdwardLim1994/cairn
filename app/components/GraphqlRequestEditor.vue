@@ -66,7 +66,7 @@ const queryExtensions = computed(() => [graphql(), EditorView.lineWrapping]);
 
 <template>
   <div class="flex flex-col gap-2">
-    <div class="flex flex-col gap-1 text-[10px] font-medium text-[var(--muted)]">
+    <div class="flex flex-col gap-1 text-[10px] font-medium text-muted">
       Query
       <Codemirror
         v-model="query"
@@ -76,15 +76,12 @@ const queryExtensions = computed(() => [graphql(), EditorView.lineWrapping]);
         aria-label="GraphQL query"
       />
     </div>
-    <label class="flex flex-col gap-1 text-[10px] font-medium text-[var(--muted)]">
+    <label class="flex flex-col gap-1 text-[10px] font-medium text-muted">
       Operation name (optional)
-      <input
-        v-model="operationName"
-        class="rounded border border-[var(--border)] px-2 py-1 text-xs"
-      />
+      <input v-model="operationName" class="rounded border border-default px-2 py-1 text-xs" />
     </label>
     <fieldset class="m-0 flex flex-col gap-1 border-0 p-0">
-      <legend class="text-[10px] font-medium text-[var(--muted)]">Variables (JSON)</legend>
+      <legend class="text-[10px] font-medium text-muted">Variables (JSON)</legend>
       <RequestJsonEditor
         :model-value="variablesText"
         :variables="variables"

@@ -28,10 +28,13 @@ async function signIn() {
 </script>
 
 <template>
-  <main class="grid min-h-screen place-items-center bg-neutral-50 p-6 dark:bg-neutral-950">
+  <main class="grid min-h-screen place-items-center bg-default p-6 text-default">
     <UCard class="w-full max-w-sm">
       <template #header>
-        <h1 class="text-xl font-semibold">Sign in to Cairn</h1>
+        <div class="flex items-center justify-between gap-4">
+          <h1 class="text-xl font-semibold">Sign in to Cairn</h1>
+          <UColorModeButton />
+        </div>
       </template>
       <form class="space-y-4" @submit.prevent="signIn">
         <label class="block space-y-1 text-sm font-medium" for="username">
@@ -58,7 +61,7 @@ async function signIn() {
           />
         </label>
         <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>
-        <UButton class="w-full justify-center" type="submit" :loading="loading"> Sign in </UButton>
+        <UButton class="w-full" type="submit" :loading="loading"> Sign in </UButton>
       </form>
     </UCard>
   </main>

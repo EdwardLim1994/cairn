@@ -20,9 +20,7 @@ defineProps<{
 
 <template>
   <article class="app__graph-node app__graph-node--message-queue relative w-72 rounded-[10px]">
-    <div
-      class="relative flex h-[58px] items-center gap-2 border-b border-[var(--border)] px-3 pr-[4.5rem]"
-    >
+    <div class="relative flex h-[58px] items-center gap-2 border-b border-default px-3 pr-[4.5rem]">
       <div class="grid size-[31px] shrink-0 place-items-center rounded-[9px]">
         <img
           v-if="data.destinations[0]?.broker === 'kafka'"
@@ -35,13 +33,13 @@ defineProps<{
       <div class="flex min-w-0 flex-1 flex-col">
         <div class="flex min-w-0 items-center gap-1.5">
           <output
-            class="inline-block size-[9px] shrink-0 rounded-full border-2 border-[var(--panel)]"
+            class="inline-block size-[9px] shrink-0 rounded-full border-2 border-[var(--ui-bg)]"
             :class="
               data.online === true
-                ? 'bg-[var(--success)]'
+                ? 'bg-success'
                 : data.online === false
-                  ? 'bg-[var(--danger)]'
-                  : 'bg-[var(--muted)]'
+                  ? 'bg-error'
+                  : 'bg-[var(--ui-text-muted)]'
             "
             :aria-label="
               data.online === true
@@ -56,7 +54,7 @@ defineProps<{
           />
           <strong class="truncate font-semibold">{{ data.name }}</strong>
         </div>
-        <span class="text-[10px] text-[var(--muted)]">
+        <span class="text-[10px] text-muted">
           {{
             data.destinations[0]?.broker === "rabbitmq" ? "RabbitMQ topic exchange" : "Kafka topic"
           }}
@@ -64,7 +62,7 @@ defineProps<{
       </div>
       <button
         type="button"
-        class="nodrag absolute right-2 top-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-[11.5px] font-medium text-[var(--muted)] hover:border-[var(--border-strong)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+        class="nodrag absolute right-2 top-2 inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-default bg-default px-2 text-[11.5px] font-medium text-muted hover:border-accented hover:bg-elevated hover:text-default"
         :aria-label="`Edit ${data.name}`"
         title="Edit message queue"
         @click.stop="emit('edit', data.destinationId)"
@@ -91,7 +89,7 @@ defineProps<{
         />
       </template>
       <div
-        class="flex h-[47px] items-center border-t border-dashed border-[var(--border)] px-3 text-[10px] text-[var(--muted)]"
+        class="flex h-[47px] items-center border-t border-dashed border-default px-3 text-[10px] text-muted"
       >
         Queue connections bundled
       </div>
@@ -100,7 +98,7 @@ defineProps<{
       <div
         v-for="destination in data.destinations"
         :key="destination.id"
-        class="relative flex h-[47px] min-w-0 items-center gap-2 border-t border-dashed border-[var(--border)] px-3 text-xs"
+        class="relative flex h-[47px] min-w-0 items-center gap-2 border-t border-dashed border-default px-3 text-xs"
       >
         <Handle
           :id="`publish-in:${destination.id}`"

@@ -67,16 +67,8 @@ const observabilityStore = useObservabilityStore();
 const { logs, logsOpen, logsPanelHeight, logSearch, logService, logSeverity } =
   storeToRefs(observabilityStore);
 const { nodes, edges, services, serviceEdges, allNodesCollapsed } = storeToRefs(graphStore);
-const dark = useCookie("cairn-dark-mode", {
-  default: () => false,
-  maxAge: 60 * 60 * 24 * 365,
-  sameSite: "lax",
-});
-useHead({
-  htmlAttrs: {
-    class: computed(() => (dark.value ? "dark app--dark" : "")),
-  },
-});
+const colorMode = useColorMode();
+const dark = computed(() => colorMode.value === "dark");
 const loading = ref(true);
 const errorMessage = ref("");
 const lastServiceHealthCheckAt = ref<Record<string, string>>({});
@@ -658,19 +650,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main
-    class="relative h-screen min-h-[620px] overflow-hidden text-[13px] leading-[1.4] app"
-    :class="{ 'app--dark': dark }"
-  >
+  <main class="relative h-screen min-h-[620px] overflow-hidden bg-default text-default app">
     <AppToolbar
-      :dark="dark"
       :logs-open="logsOpen"
       :project-id="runtimeConfig.public.projectId"
       :auth-enabled="authStatus.enabled"
       :manage-nodes-open="manageNodesOpen"
       :mock-apis-open="mockPanel"
       :history-open="historyOpen"
-      @toggle-theme="dark = !dark"
       @open-mock-apis="toggleMockApis"
       @open-manage-nodes="manageNodesOpen = !manageNodesOpen"
       @open-logs="logsOpen = !logsOpen"
@@ -681,11 +668,11 @@ onUnmounted(() => {
 
     <section
       v-if="activeObservedTrace"
-      class="app__surface absolute left-3 top-[82px] z-20 flex min-h-12 max-w-[calc(100vw-24px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3.5 py-1.5 text-[12px] shadow-[var(--shadow)] max-[720px]:left-2 max-[720px]:top-[66px]"
+      class="border border-default bg-default shadow-md absolute left-3 top-[82px] z-20 flex min-h-12 max-w-[calc(100vw-24px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3.5 py-1.5 text-[12px] shadow-md max-[720px]:left-2 max-[720px]:top-[66px]"
       aria-label="Active observed trace"
       aria-live="polite"
     >
-      <span class="text-[11px] font-medium text-[var(--muted)]">Active observed trace</span>
+      <span class="text-[11px] font-medium text-muted">Active observed trace</span>
       <span class="max-w-48 truncate font-mono font-medium" :title="activeObservedTrace.traceId">
         {{ activeObservedTrace.traceId }}
       </span>
@@ -705,24 +692,14 @@ onUnmounted(() => {
             : `${activeObservedTrace.totalDurationMs} ms`
         }}
       </span>
-      <span class="text-[var(--muted)]">
-        {{ activeObservedTrace.connectionCount }} connections
-      </span>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="h-7 px-2 text-[11.5px]"
-        @click="showActiveTraceLogs"
+      <span class="text-muted"> {{ activeObservedTrace.connectionCount }} connections </span>
+      <UButton type="button" color="neutral" variant="ghost" @click="showActiveTraceLogs"
         >Logs</UButton
       >
       <UButton
         type="button"
         color="neutral"
         variant="ghost"
-        size="sm"
-        class="h-7 px-2 text-[11.5px]"
         aria-label="Clear active observed trace"
         @click="activeObservedTrace = null"
         ><UIcon name="i-lucide-x" class="size-3.5" aria-hidden="true"
@@ -790,7 +767,7 @@ onUnmounted(() => {
       </ContextMenu>
       <div
         v-if="loading"
-        class="app__surface absolute left-1/2 top-[86px] -translate-x-1/2 rounded-lg px-3 py-2 text-[11px] text-[var(--muted)]"
+        class="border border-default bg-default shadow-md absolute left-1/2 top-[86px] -translate-x-1/2 rounded-lg px-3 py-2 text-[11px] text-muted"
       >
         Loading saved graph...
       </div>
@@ -801,9 +778,9 @@ onUnmounted(() => {
         @dismiss-warning="dismissImportWarning"
       />
       <div
-        class="app__surface pointer-events-none absolute bottom-5 left-[72px] rounded-lg px-3 py-2 text-[10px] text-[var(--muted)] max-[720px]:hidden"
+        class="border border-default bg-default shadow-md pointer-events-none absolute bottom-5 left-[72px] rounded-lg px-3 py-2 text-[10px] text-muted max-[720px]:hidden"
       >
-        <kbd class="rounded border border-[var(--border)] px-1 text-[var(--text)]">Right click</kbd>
+        <kbd class="rounded border border-default px-1 text-default">Right click</kbd>
         to add a service <span class="px-1"> | </span> Drag from a node to an endpoint to connect
       </div>
     </section>

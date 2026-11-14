@@ -11,7 +11,7 @@ Frontend workflows span a large page, components, stores, and composables groupe
 - Keep one full initial canvas dataset, one owner for shared entity state, and derived graph/card views. Reload canonical canvas data after successful mutations.
 - Standardize single-item Create, Update, Delete, Discard, and Close flows across manage-node and mock-API cards. Remove batch create/update behavior. **BREAKING:** panel-level batch Save is removed.
 - Warn before losing changed form data; confirm deletion; return to card list and show an automatically closing success toast after a successful mutation and refresh.
-- Move tests into each module's `_test_` directory, mirroring production paths.
+- Move tests into each module's `__test__` directory, mirroring production paths.
 
 ## Capabilities
 

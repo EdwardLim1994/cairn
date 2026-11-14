@@ -9,188 +9,26 @@ const authStatus = useState<AuthSessionStatus>("auth-session-status", () => ({
 </script>
 
 <template>
-  <UApp>
+  <UApp class="font-sans text-default bg-default">
     <NuxtPage v-if="authStatus.authenticated || route.path === '/login'" />
   </UApp>
 </template>
 
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @import "@nuxt/ui";
 
-@theme inline {
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --color-background: var(--bg);
-  --color-surface: var(--panel);
-  --color-surface-raised: var(--panel2);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-foreground: var(--text);
-  --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-cairn-bg: var(--bg);
-  --color-cairn-panel: var(--panel);
-  --color-cairn-panel-2: var(--panel2);
-  --color-cairn-border: var(--border);
-  --color-cairn-border-strong: var(--border-strong);
-  --color-cairn-text: var(--text);
-  --color-cairn-muted: var(--muted);
-  --color-cairn-accent: var(--accent);
-  --color-cairn-accent-soft: var(--accent-soft);
-  --color-cairn-success: var(--success);
-  --color-cairn-warning: var(--warning);
-  --color-cairn-danger: var(--danger);
-}
-
-:root {
-  font-family: "Inter", system-ui, sans-serif;
-  color-scheme: light;
-  --bg: #f5f6f8;
-  --dots: #c9cfd8;
-  --panel: #fff;
-  --panel2: #f1f3f6;
-  --border: #dce0e6;
-  --border-strong: #c3c9d2;
-  --text: #151a21;
-  --muted: #5d6673;
-  --accent: #0a7898;
-  --accent-ink: #fff;
-  --accent-soft: #e0f1f6;
-  --message-edge: #8a5100;
-  --danger: #c4282f;
-  --danger-soft: #fde8e8;
-  --warning: #8a5100;
-  --warning-soft: #fcf1dc;
-  --success: #146c2e;
-  --success-soft: #e3f4e8;
-  --runtime-spring-bg: #e3f4e8;
-  --runtime-spring-fg: #146c2e;
-  --runtime-dotnet-bg: #ede7fb;
-  --runtime-dotnet-fg: #5631b8;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.08);
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.07);
-  --shadow-lg: 0 16px 48px rgba(16, 24, 40, 0.18);
-  --edge: #a3abb7;
-  --trace: #0a8bb0;
-  --trace-soft: rgba(10, 139, 176, 0.18);
-  --timing-label-bg: #fff;
-  --timing-label-text: #151a21;
-  --get-fg: #1d56b0;
-  --get-bg: #e5edfa;
-  --post-fg: #0b6b5f;
-  --post-bg: #dff3ef;
-  --put-fg: #8a5100;
-  --put-bg: #fbefd9;
-  --patch-fg: #9c1f68;
-  --patch-bg: #fae6f1;
-  --delete-fg: #c4282f;
-  --delete-bg: #fde8e8;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-.app {
-  --ui-primary: var(--accent);
-  --ui-success: var(--success);
-  --ui-warning: var(--warning);
-  --ui-error: var(--danger);
-  --ui-bg: var(--panel);
-  --ui-bg-muted: var(--panel2);
-  --ui-bg-elevated: var(--panel2);
-  --ui-bg-accented: var(--accent-soft);
-  --ui-text: var(--text);
-  --ui-text-highlighted: var(--text);
-  --ui-text-muted: var(--muted);
-  --ui-text-toned: var(--muted);
-  --ui-text-inverted: var(--accent-ink);
-  --ui-border: var(--border);
-  --ui-border-muted: var(--border);
-  --ui-border-accented: var(--border-strong);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.4;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.app.app--dark {
-  color-scheme: dark;
-  --bg: #0d1117;
-  --dots: #262d38;
-  --panel: #161b22;
-  --panel2: #1c232c;
-  --border: #29313c;
-  --border-strong: #3a4452;
-  --text: #e6eaf0;
-  --muted: #8f9aa9;
-  --accent: #3cc4e6;
-  --accent-ink: #04222b;
-  --accent-soft: rgba(60, 196, 230, 0.14);
-  --message-edge: #e9b565;
-  --danger: #ff7b7b;
-  --danger-soft: rgba(255, 123, 123, 0.14);
-  --warning: #e7b04a;
-  --warning-soft: rgba(231, 176, 74, 0.14);
-  --success: #5bcb78;
-  --success-soft: rgba(91, 203, 120, 0.14);
-  --runtime-spring-bg: rgba(116, 209, 142, 0.13);
-  --runtime-spring-fg: #74d18e;
-  --runtime-dotnet-bg: rgba(185, 164, 255, 0.13);
-  --runtime-dotnet-fg: #b9a4ff;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
-  --edge: #4b5563;
-  --trace: #3cc4e6;
-  --trace-soft: rgba(60, 196, 230, 0.22);
-  --timing-label-bg: #161b22;
-  --timing-label-text: #e6eaf0;
-  --get-fg: #8db8ff;
-  --get-bg: rgba(141, 184, 255, 0.13);
-  --post-fg: #6ed8c6;
-  --post-bg: rgba(110, 216, 198, 0.13);
-  --put-fg: #e9b565;
-  --put-bg: rgba(233, 181, 101, 0.13);
-  --patch-fg: #f59acf;
-  --patch-bg: rgba(245, 154, 207, 0.13);
-  --delete-fg: #ff7b7b;
-  --delete-bg: rgba(255, 123, 123, 0.14);
-}
-
-.app button,
-.app input,
-.app select,
-.app textarea {
-  font-family: inherit;
-  color: inherit;
-}
-
-.app button {
-  cursor: pointer;
-}
-
-.app__surface,
 .app__graph-node {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--shadow-md);
 }
 
 .app__graph-flow {
-  background-color: var(--bg);
-  background-image: radial-gradient(circle, var(--dots) 1.1px, transparent 1.3px);
+  font-size: 13px;
+  line-height: 1.4;
+  background-color: var(--ui-bg);
+  background-image: radial-gradient(circle, var(--ui-border) 1.1px, transparent 1.3px);
   background-size: 22px 22px;
 }
 
@@ -202,54 +40,54 @@ body {
   bottom: 76px;
   right: 16px;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: var(--panel);
+  background: var(--ui-bg);
 }
 
 .app .vue-flow__controls {
   bottom: 76px;
   left: 16px;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  background: var(--ui-bg);
+  box-shadow: var(--shadow-md);
 }
 
 .app .vue-flow__controls-button {
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  fill: var(--text);
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  fill: var(--ui-text);
 }
 
 .vue-flow__controls-button svg,
 .vue-flow__controls-button svg path {
-  fill: var(--text);
+  fill: var(--ui-text);
 }
 
 .vue-flow__edge-path {
-  stroke: var(--edge);
+  stroke: var(--ui-text-dimmed);
   stroke-width: 2;
 }
 
 .vue-flow__edge.app__flow-edge--observed .vue-flow__edge-path,
 .vue-flow__edge.app__flow-edge--running .vue-flow__edge-path {
-  stroke: var(--accent);
+  stroke: var(--ui-primary);
   stroke-width: 3.5;
 }
 .vue-flow__edge.app__flow-edge--message.app__flow-edge--observed .vue-flow__edge-path {
-  stroke: var(--message-edge);
+  stroke: var(--ui-warning);
 }
 
 .vue-flow__edge-text {
-  fill: var(--timing-label-text);
+  fill: var(--ui-text);
   font-size: 10px;
 }
 
 .vue-flow__edge-textbg {
-  fill: var(--timing-label-bg);
+  fill: var(--ui-bg);
 }
 
 .app__graph-node--service {
@@ -259,45 +97,6 @@ body {
 
 .app__graph-node {
   box-shadow: var(--shadow-sm);
-}
-
-.app__toolbar-group {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 2px;
-  padding: 0 4px;
-  border-left: 1px solid var(--border);
-}
-
-.app__toolbar-group:first-child {
-  border-left: 0;
-}
-
-.app__toolbar-button {
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  color: var(--muted);
-}
-
-.app__toolbar-button:hover,
-.app__toolbar-button[aria-pressed="true"] {
-  background: var(--panel2);
-  color: var(--text);
-}
-
-.app__toolbar-button[aria-pressed="true"] {
-  color: var(--accent);
-}
-
-.app__toolbar-group--account {
-  margin-left: 2px;
 }
 
 .app__graph-legend-panel {
@@ -311,12 +110,12 @@ body {
   min-height: 36px;
   align-items: center;
   gap: 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: var(--panel);
+  background: var(--ui-bg);
   padding: 0 12px;
-  box-shadow: var(--shadow);
-  color: var(--muted);
+  box-shadow: var(--shadow-md);
+  color: var(--ui-text-muted);
   font-size: 11px;
 }
 
@@ -329,7 +128,7 @@ body {
 
 .app__legend-line {
   width: 24px;
-  border-top: 1.5px solid var(--edge);
+  border-top: 1.5px solid var(--ui-text-dimmed);
 }
 
 .app__legend-line--message {
@@ -337,14 +136,14 @@ body {
 }
 
 .app__legend-line--observed {
-  border-top: 2.25px solid var(--trace);
+  border-top: 2.25px solid var(--ui-primary);
 }
 
 .app__legend-dot {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: var(--trace);
+  background: var(--ui-primary);
 }
 
 .app__edge-label-wrap {
@@ -364,12 +163,12 @@ body {
   height: 22px;
   align-items: center;
   gap: 5px;
-  border: 1.5px solid var(--trace);
+  border: 1.5px solid var(--ui-primary);
   border-radius: 11px;
-  background: var(--panel);
+  background: var(--ui-bg);
   padding: 0 8px;
   box-shadow: var(--shadow-sm);
-  color: var(--accent);
+  color: var(--ui-primary);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
@@ -378,14 +177,14 @@ body {
 }
 
 .app__edge-label-count {
-  color: var(--muted);
+  color: var(--ui-text-muted);
   font-weight: 500;
 }
 
 .app__edge-label--unavailable {
   border-style: dashed;
-  border-color: var(--warning);
-  color: var(--warning);
+  border-color: var(--ui-warning);
+  color: var(--ui-warning);
 }
 
 .app__edge-label-popover {
@@ -396,11 +195,11 @@ body {
   width: 230px;
   padding: 10px 12px;
   transform: translateX(-50%);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--ui-border-accented);
   border-radius: 9px;
-  background: var(--panel);
+  background: var(--ui-bg);
   box-shadow: var(--shadow-lg);
-  color: var(--text);
+  color: var(--ui-text);
   font-size: 12px;
   text-align: left;
 }
@@ -421,58 +220,43 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 3px 0;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
   font-size: 11.5px;
 }
 
 .app__edge-label-popover-row .font-mono {
-  color: var(--text);
+  color: var(--ui-text);
   font-weight: 500;
 }
 
 .app__edge-label-note {
-  color: var(--muted);
+  color: var(--ui-text-muted);
   font-size: 11.5px;
   line-height: 1.45;
 }
 
 .app__trigger-protocol--http {
-  color: #1d56b0;
-  background: #e5edfa;
+  color: var(--ui-info);
+  background: color-mix(in srgb, var(--ui-info) 10%, transparent);
 }
 
 .app__trigger-protocol--grpc {
-  color: #146c62;
-  background: #dff3ef;
+  color: var(--ui-success);
+  background: color-mix(in srgb, var(--ui-success) 10%, transparent);
 }
 
 .app__trigger-protocol--websocket {
-  color: #6842ad;
-  background: #eee8fb;
-}
-
-.app.app--dark .app__trigger-protocol--http {
-  color: #8db8ff;
-  background: #26344a;
-}
-
-.app.app--dark .app__trigger-protocol--grpc {
-  color: #6ed8c6;
-  background: #213b38;
-}
-
-.app.app--dark .app__trigger-protocol--websocket {
-  color: #bca4ff;
-  background: #332d4a;
+  color: var(--ui-secondary);
+  background: color-mix(in srgb, var(--ui-secondary) 10%, transparent);
 }
 
 .app__trigger-last-chip--completed {
-  color: var(--success);
+  color: var(--ui-success);
 }
 
 .app__trigger-last-chip--failed {
-  color: var(--danger);
+  color: var(--ui-error);
 }
 
 .app__mock-response-panel {
@@ -485,27 +269,27 @@ body {
   }
 }
 
-.app.app--dark .app__message-queue-kafka-icon {
+.dark .app__message-queue-kafka-icon {
   filter: brightness(0) invert(1);
 }
 
 .vue-flow__node.app__flow-node--service-observed .app__graph-node {
-  border-color: var(--accent);
+  border-color: var(--ui-primary);
   box-shadow:
-    0 0 0 2px var(--accent-soft),
-    var(--shadow);
+    0 0 0 2px color-mix(in srgb, var(--ui-primary) 10%, transparent),
+    var(--shadow-md);
 }
 
 .vue-flow__node.app__flow-node--service-error .app__graph-node--service {
-  border-color: var(--danger);
+  border-color: var(--ui-error);
   box-shadow:
-    0 0 0 2px var(--danger-soft),
-    var(--shadow);
+    0 0 0 2px color-mix(in srgb, var(--ui-error) 10%, transparent),
+    var(--shadow-md);
 }
 
 .vue-flow__node.selected .app__graph-node {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
+  border-color: var(--ui-primary);
+  outline: 2px solid var(--ui-primary);
   outline-offset: 2px;
 }
 
@@ -530,47 +314,47 @@ body {
 }
 
 .app__method-tag--get {
-  color: var(--get-fg);
-  background: var(--get-bg);
+  color: var(--ui-info);
+  background: color-mix(in srgb, var(--ui-info) 10%, transparent);
 }
 
 .app__method-tag--post {
-  color: var(--post-fg);
-  background: var(--post-bg);
+  color: var(--ui-success);
+  background: color-mix(in srgb, var(--ui-success) 10%, transparent);
 }
 
 .app__method-tag--put {
-  color: var(--put-fg);
-  background: var(--put-bg);
+  color: var(--ui-warning);
+  background: color-mix(in srgb, var(--ui-warning) 10%, transparent);
 }
 
 .app__method-tag--patch {
-  color: var(--patch-fg);
-  background: var(--patch-bg);
+  color: var(--ui-secondary);
+  background: color-mix(in srgb, var(--ui-secondary) 10%, transparent);
 }
 
 .app__method-tag--delete {
-  color: var(--delete-fg);
-  background: var(--delete-bg);
+  color: var(--ui-error);
+  background: color-mix(in srgb, var(--ui-error) 10%, transparent);
 }
 
 .app__status-text,
 .app__run-state--failed {
-  color: var(--danger);
+  color: var(--ui-error);
 }
 
 .app__run-state--failed {
-  background: var(--danger-soft);
+  background: color-mix(in srgb, var(--ui-error) 10%, transparent);
 }
 
 .app__run-state--completed {
-  color: var(--success);
-  background: var(--success-soft);
+  color: var(--ui-success);
+  background: color-mix(in srgb, var(--ui-success) 10%, transparent);
 }
 
 .app__run-state--running {
-  color: var(--warning);
-  background: var(--warning-soft);
+  color: var(--ui-warning);
+  background: color-mix(in srgb, var(--ui-warning) 10%, transparent);
 }
 
 .app__run-spinner {
@@ -592,8 +376,8 @@ body {
 .app .app__service-source {
   width: 10px;
   height: 10px;
-  border: 2px solid var(--panel);
-  background: var(--edge);
+  border: 2px solid var(--ui-bg);
+  background: var(--ui-text-dimmed);
 }
 
 .app .app__endpoint-handle {
@@ -603,18 +387,18 @@ body {
   right: -5px;
 }
 .app .app__endpoint-source--connected {
-  background: var(--edge);
+  background: var(--ui-text-dimmed);
 }
 .app .app__endpoint-source--message {
-  background: var(--edge);
+  background: var(--ui-text-dimmed);
 }
 .app .app__endpoint-source--authoring {
-  border-color: var(--edge);
-  background: var(--panel);
+  border-color: var(--ui-text-dimmed);
+  background: var(--ui-bg);
 }
 .app .app__endpoint-handle--observed,
 .app .app__endpoint-source--observed {
-  background: var(--accent);
+  background: var(--ui-primary);
 }
 .app .app__endpoint-handle--collapsed,
 .app .app__endpoint-source--collapsed {
@@ -639,12 +423,12 @@ body {
 }
 
 .vue-flow__node.app__flow-node--relationship-1 .app__graph-node--service {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
+  border-color: var(--ui-primary);
+  outline: 2px solid var(--ui-primary);
   outline-offset: 2px;
   box-shadow:
-    0 0 0 3px var(--accent-soft),
-    var(--shadow);
+    0 0 0 3px color-mix(in srgb, var(--ui-primary) 10%, transparent),
+    var(--shadow-md);
 }
 
 .vue-flow__node.app__flow-node--relationship-2 {
@@ -652,12 +436,13 @@ body {
 }
 
 .vue-flow__node.app__flow-node--relationship-2 .app__graph-node--service {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--panel));
-  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  border-color: color-mix(in srgb, var(--ui-primary) 58%, var(--ui-bg));
+  outline: 2px solid color-mix(in srgb, var(--ui-primary) 58%, transparent);
   outline-offset: 2px;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent-soft) 58%, transparent),
-    var(--shadow);
+    0 0 0 1px
+      color-mix(in srgb, color-mix(in srgb, var(--ui-primary) 10%, transparent) 58%, transparent),
+    var(--shadow-md);
 }
 
 .vue-flow__node.app__flow-node--relationship-dimmed {
@@ -680,7 +465,7 @@ body {
     .app__flow-edge--running
   )
   .vue-flow__edge-path {
-  stroke: var(--accent);
+  stroke: var(--ui-primary);
   stroke-width: 2.5;
 }
 
@@ -688,7 +473,7 @@ body {
     .app__flow-edge--running
   )
   .vue-flow__edge-path {
-  stroke: color-mix(in srgb, var(--accent) 58%, var(--panel));
+  stroke: color-mix(in srgb, var(--ui-primary) 58%, var(--ui-bg));
   stroke-width: 2.5;
 }
 
@@ -696,7 +481,7 @@ body {
     .app__flow-edge--running
   )
   .vue-flow__edge-path {
-  stroke: color-mix(in srgb, var(--accent) 38%, var(--panel));
+  stroke: color-mix(in srgb, var(--ui-primary) 38%, var(--ui-bg));
   stroke-width: 2.5;
 }
 </style>

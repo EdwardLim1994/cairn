@@ -440,15 +440,6 @@ function confirmDelete() {
       'aria-label': 'Service settings',
       onInteractOutside: preventOutsideDismiss,
     }"
-    :ui="{
-      overlay:
-        'fixed inset-0 z-[70] flex h-full w-full max-h-none max-w-none justify-end m-0 border-0 bg-[rgba(20,24,28,0.4)] p-0 text-inherit',
-      content:
-        'z-[71] flex h-full w-[min(520px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
-      header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
-      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
-      footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
-    }"
     @update:open="handleOpenChange"
   >
     <template #back>
@@ -457,8 +448,7 @@ function confirmDelete() {
         type="button"
         color="neutral"
         variant="ghost"
-        size="sm"
-        class="grid size-8 shrink-0 place-items-center p-0"
+        class="shrink-0"
         aria-label="Back to Manage Nodes"
         title="Back to Manage Nodes"
         @click="requestExit('back')"
@@ -476,7 +466,6 @@ function confirmDelete() {
         type="button"
         color="error"
         variant="outline"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--danger)] bg-[var(--panel)] p-0 leading-none text-[var(--danger)] hover:bg-[var(--danger-soft)]"
         aria-label="Remove service"
         title="Remove service"
         @click="deleteConfirmationOpen = true"
@@ -485,41 +474,30 @@ function confirmDelete() {
       </UButton>
     </template>
     <template #body>
-      <section class="rounded-xl border border-[var(--border)] bg-[var(--panel2)] p-3">
+      <section class="rounded-xl border border-default bg-elevated p-3">
         <div class="flex items-center justify-between gap-3 text-xs">
           <strong>Health checks</strong>
-          <span class="text-[var(--muted)]">Checks every 1 minute</span>
+          <span class="text-muted">Checks every 1 minute</span>
         </div>
-        <p class="mt-1 text-[12.5px] text-[var(--muted)]">{{ lastCheckAge }}</p>
+        <p class="mt-1 text-[12.5px] text-muted">{{ lastCheckAge }}</p>
       </section>
       <div class="flex flex-col gap-0">
         <label for="service-name" class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">Service name</span>
-          <UInput
-            id="service-name"
-            v-model="draft.name"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
-            placeholder="e.g. Checkout API"
-            required
-          />
+          <span class="text-[12px] font-medium text-muted">Service name</span>
+          <UInput id="service-name" v-model="draft.name" placeholder="e.g. Checkout API" required />
         </label>
         <label for="service-api-type" class="mt-2 flex flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">API type</span>
+          <span class="text-[12px] font-medium text-muted">API type</span>
           <USelect
             id="service-api-type"
             :model-value="draft.apiType"
             @update:model-value="selectApiType(String($event))"
             :items="apiTypes"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
           />
         </label>
         <div class="flex gap-2.5 max-[720px]:flex-col">
           <div class="min-w-0 flex flex-1 flex-col gap-1">
-            <span class="text-[12px] font-medium text-[var(--muted)]"
+            <span class="text-[12px] font-medium text-muted"
               >Framework <span aria-hidden="true">*</span></span
             >
             <USelect
@@ -530,11 +508,6 @@ function confirmDelete() {
               :aria-label="`Framework: ${draft.framework || 'Select framework'}`"
               placeholder="Select framework"
               class="app__framework-select"
-              :ui="{
-                base: 'min-h-[38px] w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                content:
-                  'app__framework-select-menu rounded-lg border border-[var(--border)] bg-[var(--panel)] shadow-lg',
-              }"
             >
               <template #leading="{ modelValue }">
                 <img
@@ -557,7 +530,7 @@ function confirmDelete() {
             </USelect>
           </div>
           <label for="service-base-url" class="min-w-0 flex flex-1 flex-col gap-1">
-            <span class="text-[12px] font-medium text-[var(--muted)]">{{
+            <span class="text-[12px] font-medium text-muted">{{
               draft.apiType === "REST"
                 ? "Base URL"
                 : draft.apiType === "WEBSOCKET"
@@ -567,9 +540,6 @@ function confirmDelete() {
             <UInput
               id="service-base-url"
               v-model="draft.baseUrl"
-              :ui="{
-                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-              }"
               :placeholder="
                 draft.apiType === 'REST'
                   ? 'http://localhost:4000'
@@ -587,17 +557,17 @@ function confirmDelete() {
         <div v-if="draft.apiType === 'GRPC'" class="mt-3">
           <div
             v-if="draft.protoFileName"
-            class="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel2)] p-3"
+            class="flex items-center justify-between gap-3 rounded-xl border border-default bg-elevated p-3"
           >
             <div class="flex min-w-0 items-center gap-2">
               <UIcon
                 name="i-lucide-file-code-2"
-                class="size-5 shrink-0 text-[var(--accent)]"
+                class="size-5 shrink-0 text-primary"
                 aria-hidden="true"
               />
               <div class="min-w-0">
                 <p class="truncate text-xs font-medium">{{ draft.protoFileName }}</p>
-                <p class="text-[12px] text-[var(--muted)]">Proto definition</p>
+                <p class="text-[12px] text-muted">Proto definition</p>
               </div>
             </div>
             <UButton
@@ -624,32 +594,26 @@ function confirmDelete() {
           />
         </div>
       </div>
-      <section class="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3">
+      <section class="flex flex-col gap-2 rounded-xl border border-default p-3">
         <strong class="text-xs">Health check</strong>
         <label for="service-health-check-url" class="flex flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">Health-check URL override</span>
+          <span class="text-[12px] font-medium text-muted">Health-check URL override</span>
           <UInput
             id="service-health-check-url"
             v-model="draft.healthCheckUrl"
             placeholder="Leave blank to use the framework default"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
           />
-          <span class="text-[12px] text-[var(--muted)]">
+          <span class="text-[12px] text-muted">
             Spring Boot defaults to Actuator readiness; use an absolute URL when the health endpoint
             uses a different host or port.
           </span>
         </label>
         <label for="service-health-header-template" class="flex flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">Header template</span>
+          <span class="text-[12px] font-medium text-muted">Header template</span>
           <USelect
             id="service-health-header-template"
             v-model="draft.healthCheckHeaderTemplateId"
             :items="healthTemplateOptions()"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
           />
         </label>
         <HeaderRowsEditor
@@ -682,7 +646,7 @@ function confirmDelete() {
           @delete="subscriptions.splice(index, 1)"
         >
           <div class="flex flex-col gap-1">
-            <span class="text-[12px] font-medium text-[var(--muted)]">Message queue topic</span>
+            <span class="text-[12px] font-medium text-muted">Message queue topic</span>
             <USelect
               :model-value="subscription.destinationId"
               :items="availableDestinations(subscription)"
@@ -697,7 +661,7 @@ function confirmDelete() {
             "
             class="flex flex-col gap-1"
           >
-            <span class="text-[12px] font-medium text-[var(--muted)]">Consumer group</span>
+            <span class="text-[12px] font-medium text-muted">Consumer group</span>
             <UInput
               v-model="subscription.consumerGroup"
               :aria-label="`Subscriber ${index + 1} consumer group`"
@@ -705,14 +669,14 @@ function confirmDelete() {
             />
           </div>
           <div v-else class="flex flex-col gap-1">
-            <span class="text-[12px] font-medium text-[var(--muted)]">RabbitMQ binding key</span>
+            <span class="text-[12px] font-medium text-muted">RabbitMQ binding key</span>
             <UInput
               v-model="subscription.bindingKey"
               :aria-label="`Subscriber ${index + 1} binding key`"
               required
             />
           </div>
-          <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
+          <section class="flex flex-col gap-2 border-t border-default pt-2">
             <div class="flex items-center justify-between gap-2">
               <strong class="text-[12px] font-medium">Outbound calls</strong>
               <UButton
@@ -741,23 +705,21 @@ function confirmDelete() {
                 type="button"
                 color="error"
                 variant="ghost"
-                class="grid size-7 shrink-0 place-items-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+                class="shrink-0"
                 :aria-label="`Delete outbound call ${rowIndex + 1}`"
                 @click="removeOutboundRow(subscription.id, row)"
               >
                 <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
               </UButton>
             </div>
-            <span
-              v-if="!isSavedSubscription(subscription.id)"
-              class="text-[12px] text-[var(--muted)]"
+            <span v-if="!isSavedSubscription(subscription.id)" class="text-[12px] text-muted"
               >Save this consumer before adding outbound calls.</span
             >
           </section>
         </SettingsAccordionCard>
         <p
           v-if="!subscriptions.length"
-          class="rounded-xl border border-dashed border-[var(--border)] p-3 text-[12px] text-[var(--muted)]"
+          class="rounded-xl border border-dashed border-default p-3 text-[12px] text-muted"
         >
           {{
             props.messageDestinations.length
@@ -765,7 +727,7 @@ function confirmDelete() {
               : "Add a message queue topic before configuring consumers."
           }}
         </p>
-        <p v-if="!props.editingServiceId" class="text-[12px] text-[var(--muted)]">
+        <p v-if="!props.editingServiceId" class="text-[12px] text-muted">
           Save the service before adding subscribers.
         </p>
       </section>
@@ -777,7 +739,6 @@ function confirmDelete() {
             type="button"
             color="neutral"
             variant="outline"
-            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
             @click="openApiFileInput?.click()"
           >
             Import OpenAPI
@@ -791,13 +752,7 @@ function confirmDelete() {
             aria-label="Upload OpenAPI schema"
             @change="handleOpenApiFileChange"
           />
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
-            @click="emit('addEndpoint')"
-          >
+          <UButton type="button" color="neutral" variant="outline" @click="emit('addEndpoint')">
             + New endpoint
           </UButton>
         </div>
@@ -817,13 +772,10 @@ function confirmDelete() {
           :for="`service-endpoint-name-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[12px] font-medium text-[var(--muted)]">Name</span>
+          <span class="text-[12px] font-medium text-muted">Name</span>
           <UInput
             :id="`service-endpoint-name-${endpoint.id || index}`"
             v-model="endpoint.name"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
             placeholder="e.g. Get order"
           />
         </label>
@@ -833,14 +785,11 @@ function confirmDelete() {
             :for="`service-endpoint-method-${endpoint.id || index}`"
             class="min-w-0 flex flex-1 flex-col gap-1"
           >
-            <span class="text-[12px] font-medium text-[var(--muted)]">Method</span>
+            <span class="text-[12px] font-medium text-muted">Method</span>
             <USelect
               :id="`service-endpoint-method-${endpoint.id || index}`"
               v-model="endpoint.method"
               :items="methods"
-              :ui="{
-                base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-              }"
             />
           </label>
         </div>
@@ -849,15 +798,12 @@ function confirmDelete() {
           :for="`service-endpoint-url-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[12px] font-medium text-[var(--muted)]">{{
+          <span class="text-[12px] font-medium text-muted">{{
             draft.apiType === "WEBSOCKET" ? "WebSocket URL" : "URL"
           }}</span>
           <UInput
             :id="`service-endpoint-url-${endpoint.id || index}`"
             v-model="endpoint.url"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
             :placeholder="draft.apiType === 'WEBSOCKET' ? 'ws://localhost:4000/events' : '/orders'"
           />
         </label>
@@ -866,19 +812,14 @@ function confirmDelete() {
           :for="`service-endpoint-rpc-${endpoint.id || index}`"
           class="min-w-0 flex flex-1 flex-col gap-1"
         >
-          <span class="text-[12px] font-medium text-[var(--muted)]"
-            >Fully qualified RPC method</span
-          >
+          <span class="text-[12px] font-medium text-muted">Fully qualified RPC method</span>
           <UInput
             :id="`service-endpoint-rpc-${endpoint.id || index}`"
             v-model="endpoint.rpcMethod"
-            :ui="{
-              base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-            }"
             placeholder="/example.v1.Orders/GetOrder"
           />
         </label>
-        <section class="flex flex-col gap-2 border-t border-[var(--border)] pt-2">
+        <section class="flex flex-col gap-2 border-t border-default pt-2">
           <div class="flex items-center justify-between gap-2">
             <strong class="text-[12px] font-medium">Outbound calls</strong>
             <UButton
@@ -907,35 +848,24 @@ function confirmDelete() {
               type="button"
               color="error"
               variant="ghost"
-              class="grid size-7 shrink-0 place-items-center rounded-md text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+              class="shrink-0"
               :aria-label="`Delete outbound call ${rowIndex + 1}`"
               @click="removeOutboundRow(endpoint.id!, row)"
             >
               <UIcon name="i-lucide-trash" class="size-3.5" aria-hidden="true" />
             </UButton>
           </div>
-          <span v-if="!endpoint.id" class="text-[12px] text-[var(--muted)]"
+          <span v-if="!endpoint.id" class="text-[12px] text-muted"
             >Save endpoint before adding calls.</span
           >
         </section>
       </SettingsAccordionCard>
     </template>
     <template #footer>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="outline"
-        class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel2)]"
-        @click="requestExit('discard')"
-      >
+      <UButton type="button" color="neutral" variant="outline" @click="requestExit('discard')">
         Discard
       </UButton>
-      <UButton
-        type="button"
-        class="rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-xs font-medium text-[var(--accent-ink)] disabled:opacity-60"
-        :disabled="!subscriptionsValid()"
-        @click="emit('save', subscriptions)"
-      >
+      <UButton type="button" :disabled="!subscriptionsValid()" @click="emit('save', subscriptions)">
         {{ props.editingServiceId ? "Update" : "Save" }}
       </UButton>
     </template>

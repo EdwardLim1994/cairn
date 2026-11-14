@@ -120,15 +120,6 @@ function confirmDelete() {
   <WorkspaceDrawer
     :open="open"
     :content="{ 'aria-label': 'Message queue settings' }"
-    :ui="{
-      overlay:
-        'fixed inset-0 z-[70] flex h-full w-full max-h-none max-w-none justify-end m-0 border-0 bg-[rgba(20,24,28,0.4)] p-0 text-inherit',
-      content:
-        'z-[71] flex h-full w-[min(520px,100vw)] flex-col overflow-hidden rounded-l-[18px] bg-[var(--panel)] text-inherit max-[720px]:w-full max-[720px]:rounded-none',
-      header: 'flex items-center justify-between border-b border-[var(--border)] px-5 py-4',
-      body: 'flex flex-1 flex-col gap-3 overflow-auto px-5 py-4',
-      footer: 'flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3',
-    }"
     @update:open="(value: boolean) => !value && requestClose()"
   >
     <template #title>{{ destination ? "Message queue settings" : "Add message queue" }}</template>
@@ -139,7 +130,6 @@ function confirmDelete() {
         type="button"
         color="error"
         variant="outline"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--danger)] bg-[var(--panel)] p-0 text-[var(--danger)] hover:bg-[var(--danger-soft)]"
         aria-label="Remove message queue"
         title="Remove message queue"
         @click="deleteConfirmationOpen = true"
@@ -149,16 +139,16 @@ function confirmDelete() {
     </template>
     <template #body>
       <div class="flex flex-col gap-1">
-        <span class="text-[12px] font-medium text-[var(--muted)]">Topic or exchange name</span>
+        <span class="text-[12px] font-medium text-muted">Topic or exchange name</span>
         <UInput v-model="name" aria-label="Topic or exchange name" required />
       </div>
       <div class="flex gap-2.5 max-[720px]:flex-col">
         <div class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">Broker type</span>
+          <span class="text-[12px] font-medium text-muted">Broker type</span>
           <USelect v-model="broker" :items="brokerOptions" aria-label="Broker type" />
         </div>
         <div class="min-w-0 flex flex-1 flex-col gap-1">
-          <span class="text-[12px] font-medium text-[var(--muted)]">Connection URL</span>
+          <span class="text-[12px] font-medium text-muted">Connection URL</span>
           <UInput
             v-model="url"
             aria-label="Connection URL"

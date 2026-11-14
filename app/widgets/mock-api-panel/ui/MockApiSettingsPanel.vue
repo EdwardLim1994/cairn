@@ -452,9 +452,6 @@ function handleOpenChange(open: boolean) {
       'aria-label': 'Mock API settings',
       onInteractOutside: preventOutsideDismiss,
     }"
-    :ui="{
-      body: 'mock-api-settings-panel__body',
-    }"
     @update:open="handleOpenChange"
   >
     <template #back>
@@ -463,8 +460,7 @@ function handleOpenChange(open: boolean) {
         type="button"
         color="neutral"
         variant="ghost"
-        size="sm"
-        class="grid size-8 shrink-0 place-items-center p-0"
+        class="shrink-0"
         aria-label="Back to Mock APIs"
         title="Back to Mock APIs"
         @click="discardEditor"
@@ -480,7 +476,6 @@ function handleOpenChange(open: boolean) {
         type="button"
         color="error"
         variant="outline"
-        class="inline-grid size-[34px] place-items-center rounded-lg border border-[var(--danger)] bg-[var(--panel)] p-0 leading-none text-[var(--danger)] hover:bg-[var(--danger-soft)]"
         :aria-label="`Delete ${editorTitle}`"
         :title="`Delete ${editorTitle}`"
         :loading="deletingEditor"
@@ -498,7 +493,7 @@ function handleOpenChange(open: boolean) {
         @submit.prevent="saveEditor"
       >
         <template v-if="editor.kind === 'variable'">
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Variable name
             <UInput
               v-model="editor.draft.name"
@@ -507,7 +502,7 @@ function handleOpenChange(open: boolean) {
               required
             />
           </div>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Value
             <UTextarea
               v-model="editor.draft.value"
@@ -516,13 +511,13 @@ function handleOpenChange(open: boolean) {
               placeholder="Variable value"
             />
           </div>
-          <p class="text-xs text-[var(--muted)]">
+          <p class="text-xs text-muted">
             Use <code class="font-mono">&#123;&#123;name&#125;&#125;</code> to reference this value
             in requests.
           </p>
         </template>
         <template v-else-if="editor.kind === 'header'">
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Template name
             <UInput
               v-model="editor.draft.name"
@@ -547,7 +542,6 @@ function handleOpenChange(open: boolean) {
                 type="button"
                 color="neutral"
                 variant="outline"
-                size="sm"
                 @click="removeHeaderRow(editor.draft.headers, index)"
                 >Remove</UButton
               >
@@ -556,7 +550,6 @@ function handleOpenChange(open: boolean) {
               type="button"
               color="neutral"
               variant="outline"
-              size="sm"
               class="self-start"
               @click="addHeaderRow(editor.draft.headers)"
               >Add header</UButton
@@ -564,7 +557,7 @@ function handleOpenChange(open: boolean) {
           </div>
         </template>
         <template v-else-if="editor.kind === 'authorization'">
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Template name
             <UInput
               v-model="editor.draft.name"
@@ -573,7 +566,7 @@ function handleOpenChange(open: boolean) {
               required
             />
           </div>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Authorization type
             <USelect
               :model-value="editor.draft.type"
@@ -583,7 +576,7 @@ function handleOpenChange(open: boolean) {
             />
           </div>
           <template v-if="editor.draft.type === 'bearer'">
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Bearer token
               <UInput
                 v-model="editor.draft.token"
@@ -596,21 +589,20 @@ function handleOpenChange(open: boolean) {
               type="button"
               color="neutral"
               variant="ghost"
-              size="sm"
               class="self-start"
               @click="toggleSecret(editor.draft, 'token')"
               >{{ secretVisible(editor.draft, "token") ? "Hide" : "Show" }} token</UButton
             >
           </template>
           <template v-else-if="editor.draft.type === 'basic'">
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Username<UInput
                 v-model="editor.draft.username"
                 aria-label="Username"
                 placeholder="Username or {{variable}}"
               />
             </div>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Password<UInput
                 v-model="editor.draft.password"
                 aria-label="Password"
@@ -619,14 +611,14 @@ function handleOpenChange(open: boolean) {
             </div>
           </template>
           <template v-else-if="editor.draft.type === 'api-key'">
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Header name<UInput
                 v-model="editor.draft.headerName"
                 aria-label="Header name"
                 placeholder="X-API-Key"
               />
             </div>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               API key value<UInput
                 v-model="editor.draft.value"
                 aria-label="API key value"
@@ -635,30 +627,30 @@ function handleOpenChange(open: boolean) {
             </div>
           </template>
           <template v-else>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Token URL<UInput
                 v-model="editor.draft.tokenUrl"
                 aria-label="Token URL"
                 placeholder="https://auth.example.com/token"
               />
             </div>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Client ID<UInput v-model="editor.draft.clientId" aria-label="Client ID" />
             </div>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Client secret<UInput
                 v-model="editor.draft.clientSecret"
                 aria-label="Client secret"
                 type="password"
               />
             </div>
-            <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+            <div class="flex flex-col gap-1 text-xs font-medium text-muted">
               Scope (optional)<UInput v-model="editor.draft.scope" aria-label="Scope (optional)" />
             </div>
           </template>
         </template>
         <template v-else>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Mock API name
             <UInput
               v-model="editor.draft.name"
@@ -667,7 +659,7 @@ function handleOpenChange(open: boolean) {
               required
             />
           </div>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             API type
             <USelect
               :model-value="editor.draft.apiType ?? 'HTTP'"
@@ -676,7 +668,7 @@ function handleOpenChange(open: boolean) {
               @update:model-value="setMockApiType(editor.draft, $event)"
             />
           </div>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Service endpoint
             <USelect
               v-model="editor.draft.targetEndpointId"
@@ -688,7 +680,7 @@ function handleOpenChange(open: boolean) {
           <div
             v-for="name in props.endpointPathParameterNames(editor.draft)"
             :key="name"
-            class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
+            class="flex flex-col gap-1 text-xs font-medium text-muted"
           >
             Path parameter: {{ name }}
             <UInput
@@ -699,7 +691,7 @@ function handleOpenChange(open: boolean) {
           </div>
           <div
             v-if="supportsHandshakeSettings(editor.draft)"
-            class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
+            class="flex flex-col gap-1 text-xs font-medium text-muted"
           >
             Header template
             <USelect
@@ -710,7 +702,7 @@ function handleOpenChange(open: boolean) {
           </div>
           <div
             v-if="supportsHandshakeSettings(editor.draft)"
-            class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]"
+            class="flex flex-col gap-1 text-xs font-medium text-muted"
           >
             Authorization
             <USelect
@@ -723,7 +715,7 @@ function handleOpenChange(open: boolean) {
             v-if="supportsHandshakeSettings(editor.draft)"
             v-model="editor.draft.customHeaders"
           />
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             {{ editor.draft.apiType === "WEBSOCKET" ? "Message" : "Request (JSON)" }}
             <UTextarea
               v-if="editor.draft.apiType === 'WEBSOCKET'"
@@ -738,7 +730,6 @@ function handleOpenChange(open: boolean) {
                   type="button"
                   color="neutral"
                   variant="outline"
-                  size="sm"
                   @click="emit('formatRequest', editor.draft)"
                   >Format JSON</UButton
                 >
@@ -750,7 +741,7 @@ function handleOpenChange(open: boolean) {
               />
             </template>
           </div>
-          <div class="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+          <div class="flex flex-col gap-1 text-xs font-medium text-muted">
             Description<UInput
               v-model="editor.draft.description"
               aria-label="Description"
@@ -758,18 +749,17 @@ function handleOpenChange(open: boolean) {
             />
           </div>
           <div
-            class="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium"
+            class="flex items-center justify-between gap-3 rounded-lg border border-default px-3 py-2 text-xs font-medium"
           >
             Active
             <USwitch
               v-model="editor.draft.active"
               aria-label="Active"
-              size="sm"
               :disabled="!editor.draft.targetEndpointId"
             />
           </div>
         </template>
-        <p v-if="editorError" role="alert" class="text-xs text-[var(--danger)]">
+        <p v-if="editorError" role="alert" class="text-xs text-error">
           {{ editorError }}
         </p>
       </form>
@@ -783,15 +773,6 @@ function handleOpenChange(open: boolean) {
               collapsible
               :unmount-on-hide="false"
               :model-value="headerTemplatesOpen ? 'headers' : undefined"
-              :ui="{
-                root: 'w-full min-w-0',
-                item: 'border-0',
-                trigger:
-                  'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
-                trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
-                content: 'pt-3',
-                body: 'w-full',
-              }"
               @update:model-value="headerTemplatesOpen = $event === 'headers'"
             >
               <template #default><strong>Shareable header templates</strong></template>
@@ -801,7 +782,6 @@ function handleOpenChange(open: boolean) {
                     type="button"
                     color="neutral"
                     variant="outline"
-                    size="sm"
                     @click="beginCreate('header')"
                     >New template</UButton
                   >
@@ -817,62 +797,36 @@ function handleOpenChange(open: boolean) {
                   @select="beginEditHeader(template)"
                 >
                   <template #leading>
-                    <span
-                      class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
-                    >
-                      <UIcon
-                        name="i-lucide-braces"
-                        class="size-5 text-[var(--muted)]"
-                        aria-hidden="true"
-                      />
+                    <span class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated">
+                      <UIcon name="i-lucide-braces" class="size-5 text-muted" aria-hidden="true" />
                     </span>
                   </template>
                   <label
                     :for="`header-template-name-${template.id}`"
-                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[12px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-muted [&>legend]:text-[12px] [&>legend]:font-medium [&>legend]:text-muted"
                   >
                     <span>Name</span>
-                    <UInput
-                      :id="`header-template-name-${template.id}`"
-                      v-model="template.name"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
-                    />
+                    <UInput :id="`header-template-name-${template.id}`" v-model="template.name" />
                   </label>
                   <div
                     v-for="(header, row) in template.headers"
                     :key="row"
                     class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
                   >
-                    <UInput
-                      v-model="header.name"
-                      aria-label="Header name"
-                      placeholder="Header"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
-                    />
+                    <UInput v-model="header.name" aria-label="Header name" placeholder="Header" />
                     <UInput
                       v-model="header.value"
                       aria-label="Header value"
                       placeholder="Value or {{variable}}"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
                     />
                     <UButton
                       type="button"
                       aria-label="Remove header row"
-                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
                       @click="removeHeaderRow(template.headers, row)"
                       >Remove</UButton
                     >
                   </div>
-                  <UButton
-                    type="button"
-                    class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
-                    @click="addHeaderRow(template.headers)"
+                  <UButton type="button" @click="addHeaderRow(template.headers)"
                     >Add header</UButton
                   >
                 </SettingsAccordionCard>
@@ -887,15 +841,6 @@ function handleOpenChange(open: boolean) {
               collapsible
               :unmount-on-hide="false"
               :model-value="authorizationTemplatesOpen ? 'authorization' : undefined"
-              :ui="{
-                root: 'w-full min-w-0',
-                item: 'border-0',
-                trigger:
-                  'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
-                trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
-                content: 'pt-3',
-                body: 'w-full',
-              }"
               @update:model-value="authorizationTemplatesOpen = $event === 'authorization'"
             >
               <template #default><strong>Shareable authorization templates</strong></template>
@@ -905,7 +850,6 @@ function handleOpenChange(open: boolean) {
                     type="button"
                     color="neutral"
                     variant="outline"
-                    size="sm"
                     @click="beginCreate('authorization')"
                     >New template</UButton
                   >
@@ -922,33 +866,28 @@ function handleOpenChange(open: boolean) {
                   @select="beginEditAuthorization(template)"
                 >
                   <template #leading>
-                    <span
-                      class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
-                    >
+                    <span class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated">
                       <UIcon
                         name="i-lucide-key-round"
-                        class="size-5 text-[var(--muted)]"
+                        class="size-5 text-muted"
                         aria-hidden="true"
                       />
                     </span>
                   </template>
                   <label
                     :for="`authorization-template-name-${template.id}`"
-                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-muted"
                   >
                     <span>Name</span>
                     <UInput
                       :id="`authorization-template-name-${template.id}`"
                       v-model="template.name"
                       aria-label="Authorization template name"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
                     />
                   </label>
                   <label
                     :for="`authorization-template-type-${template.id}`"
-                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-muted"
                   >
                     <span>Authorization type</span>
                     <USelect
@@ -956,16 +895,13 @@ function handleOpenChange(open: boolean) {
                       :model-value="template.type"
                       :items="authorizationTypeOptions"
                       aria-label="Authorization type"
-                      :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                      }"
                       @update:model-value="setAuthorizationType(template, $event)"
                     />
                   </label>
                   <template v-if="template.type === 'bearer'">
                     <label
                       :for="`authorization-token-${template.id}`"
-                      class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
+                      class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-muted"
                     >
                       <span>Token</span>
                       <div class="flex gap-2">
@@ -975,9 +911,6 @@ function handleOpenChange(open: boolean) {
                           :type="secretVisible(template, 'token') ? 'text' : 'password'"
                           aria-label="Bearer token"
                           placeholder="Token or {{variable}}"
-                          :ui="{
-                            base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px]',
-                          }"
                         />
                         <UButton
                           type="button"
@@ -992,7 +925,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-username-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Username
                       </label>
@@ -1006,7 +939,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-password-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Password
                       </label>
@@ -1030,7 +963,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-header-name-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Header name
                       </label>
@@ -1044,7 +977,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-value-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Value
                       </label>
@@ -1068,7 +1001,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-token-url-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Token URL
                       </label>
@@ -1082,7 +1015,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-client-id-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Client ID
                       </label>
@@ -1095,7 +1028,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-client-secret-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Client secret
                       </label>
@@ -1117,7 +1050,7 @@ function handleOpenChange(open: boolean) {
                     <div class="min-w-0 flex flex-1 flex-col gap-1">
                       <label
                         :for="`authorization-scope-${template.id}`"
-                        class="text-[12px] font-medium text-[var(--muted)]"
+                        class="text-[12px] font-medium text-muted"
                       >
                         Scope (optional)
                       </label>
@@ -1142,15 +1075,6 @@ function handleOpenChange(open: boolean) {
                 collapsible
                 :unmount-on-hide="false"
                 :model-value="variablesOpen ? 'variables' : undefined"
-                :ui="{
-                  root: 'w-full min-w-0',
-                  item: 'border-0',
-                  trigger:
-                    'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
-                  trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
-                  content: 'pt-3',
-                  body: 'w-full',
-                }"
                 @update:model-value="variablesOpen = $event === 'variables'"
               >
                 <template #default><strong>Shared environment variables</strong></template>
@@ -1160,7 +1084,6 @@ function handleOpenChange(open: boolean) {
                       type="button"
                       color="neutral"
                       variant="outline"
-                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
                       :disabled="props.environmentVariablesLoading"
                       @click="beginCreate('variable')"
                       >New variable</UButton
@@ -1181,11 +1104,11 @@ function handleOpenChange(open: boolean) {
                       >
                         <template #leading>
                           <span
-                            class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+                            class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated"
                           >
                             <UIcon
                               name="i-lucide-braces"
-                              class="size-5 text-[var(--muted)]"
+                              class="size-5 text-muted"
                               aria-hidden="true"
                             />
                           </span>
@@ -1207,15 +1130,6 @@ function handleOpenChange(open: boolean) {
                 collapsible
                 :unmount-on-hide="false"
                 :model-value="apisOpen ? 'apis' : undefined"
-                :ui="{
-                  root: 'w-full min-w-0',
-                  item: 'border-0',
-                  trigger:
-                    'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
-                  trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
-                  content: 'pt-3',
-                  body: 'w-full',
-                }"
                 @update:model-value="apisOpen = $event === 'apis'"
               >
                 <template #default><strong>Registered mock APIs</strong></template>
@@ -1225,7 +1139,6 @@ function handleOpenChange(open: boolean) {
                       type="button"
                       color="neutral"
                       variant="outline"
-                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
                       @click="beginCreate('mock')"
                     >
                       + New API
@@ -1245,20 +1158,20 @@ function handleOpenChange(open: boolean) {
                     >
                       <template #leading>
                         <span
-                          class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+                          class="grid size-8 shrink-0 place-items-center rounded-md bg-elevated"
                         >
                           <UIcon
                             :name="mockApiTypeIcon(entry)"
-                            class="size-5 text-[var(--muted)]"
+                            class="size-5 text-muted"
                             aria-hidden="true"
                           />
                         </span>
                       </template>
-                      <p class="text-xs text-[var(--muted)]">{{ entry.status }}</p>
+                      <p class="text-xs text-muted">{{ entry.status }}</p>
                     </SettingsAccordionCard>
                     <div
                       v-if="!mockApis.length"
-                      class="rounded-lg border border-dashed border-[var(--border)] p-3 text-[12.5px] text-[var(--muted)]"
+                      class="rounded-lg border border-dashed border-default p-3 text-[12.5px] text-muted"
                     >
                       No mock API rows yet. Add one to get started.
                     </div>

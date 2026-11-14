@@ -10,6 +10,7 @@ export default defineNuxtConfig({
     },
   },
   modules: ["@pinia/nuxt", "@nuxt/ui"],
+  colorMode: { preference: "system", storageKey: "nuxt-color-mode" },
   nitro: { ignore: ["modules/**"] },
   vite: {
     build: { chunkSizeWarningLimit: 700 },
