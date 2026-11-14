@@ -5,14 +5,17 @@ import type { MessageDestinationInput } from "#shared/api/message-flows";
 import { messageDestinationInputSchema } from "#shared/api/message-flows";
 import type { AuthorizationTemplate } from "#shared/api/mock-apis";
 import { getDb } from "../../db";
-import { listMockApis } from "../mock-apis";
+import {
+  listMessageDestinations,
+  MessageDestinationWriter,
+} from "../../modules/message-destinations";
+import { listMockApis } from "../../modules/mock-apis";
 import {
   headerTemplates,
   authorizationTemplates,
   environmentVariables,
   graphNodePositions,
   messageConnections,
-  messageDestinations,
   mockApis,
   projects,
   serviceEdges,
@@ -55,7 +58,7 @@ export class CanvasRepository {
         .select()
         .from(authorizationTemplates)
         .where(eq(authorizationTemplates.projectId, projectId)),
-      db.select().from(messageDestinations).where(eq(messageDestinations.projectId, projectId)),
+      listMessageDestinations(projectId, db),
       db.select().from(messageConnections).where(eq(messageConnections.projectId, projectId)),
     ]);
     if (!project) throw new Error("Project canvas could not be initialized");
@@ -155,26 +158,14 @@ export class CanvasRepository {
     await db.transaction(async (tx) => {
       const destinations = canvas.messageDestinations ?? [];
       const connections = canvas.messageConnections ?? [];
+      const destinationWriter = new MessageDestinationWriter(tx);
       const { existingDestinationIds, destinationIdSet } = await (async () => {
         const destinationIds = destinations.map(({ id }) => id);
-        const existingDestinations = destinationIds.length
-          ? await tx
-              .select({ id: messageDestinations.id })
-              .from(messageDestinations)
-              .where(inArray(messageDestinations.id, destinationIds))
-          : [];
+        const existingDestinations = await destinationWriter.findExistingIds(destinationIds);
         const existingDestinationIds = new Set(existingDestinations.map(({ id }) => id));
-        const ownedDestinationIds = destinationIds.length
-          ? await tx
-              .select({ id: messageDestinations.id })
-              .from(messageDestinations)
-              .where(
-                and(
-                  eq(messageDestinations.projectId, projectId),
-                  inArray(messageDestinations.id, destinationIds),
-                ),
-              )
-          : [];
+        const ownedDestinationIds = existingDestinations.filter(
+          ({ projectId: owner }) => owner === projectId,
+        );
         assertCanvasConstraint(
           existingDestinationIds.size === ownedDestinationIds.length,
           "Message destination belongs to another project",
@@ -267,10 +258,7 @@ export class CanvasRepository {
         }
         return { existingDestinationIds, destinationIdSet };
       })();
-      const oldDestinationRows = await tx
-        .select({ id: messageDestinations.id, queueId: messageDestinations.queueId })
-        .from(messageDestinations)
-        .where(eq(messageDestinations.projectId, projectId));
+      const oldDestinationRows = await destinationWriter.listIds(projectId);
       const removedDestinationIds = oldDestinationRows
         .map(({ id }) => id)
         .filter((id) => !destinationIdSet.has(id));
@@ -285,14 +273,7 @@ export class CanvasRepository {
               inArray(graphNodePositions.entityId, removedDestinationIds),
             ),
           );
-        await tx
-          .delete(messageDestinations)
-          .where(
-            and(
-              eq(messageDestinations.projectId, projectId),
-              inArray(messageDestinations.id, removedDestinationIds),
-            ),
-          );
+        await destinationWriter.deleteIds(projectId, removedDestinationIds);
       }
       await tx
         .delete(graphNodePositions)
@@ -302,29 +283,7 @@ export class CanvasRepository {
             eq(graphNodePositions.nodeType, "message_queue"),
           ),
         );
-      await Promise.all(
-        destinations.map((destination) => {
-          const values = {
-            projectId,
-            queueId: destination.queueId ?? "legacy-queue",
-            queueName: destination.queueName ?? "Message Queue",
-            broker: destination.broker,
-            name: destination.name,
-            connection: destination.connection as Record<string, string | boolean | undefined>,
-          };
-          if (existingDestinationIds.has(destination.id))
-            return tx
-              .update(messageDestinations)
-              .set(values)
-              .where(
-                and(
-                  eq(messageDestinations.id, destination.id),
-                  eq(messageDestinations.projectId, projectId),
-                ),
-              );
-          return tx.insert(messageDestinations).values({ id: destination.id, ...values });
-        }),
-      );
+      await destinationWriter.upsert(projectId, destinations, existingDestinationIds);
       await Promise.all(
         destinations.map((destination) =>
           tx

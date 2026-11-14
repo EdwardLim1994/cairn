@@ -2,11 +2,8 @@ import {
   environmentVariableCreateRequestSchema,
   environmentVariableCreateResponseSchema,
 } from "#shared/api/environment-variables";
-import {
-  createEnvironmentVariable,
-  findEnvironmentVariableByName,
-} from "../../repositories/environment-variables";
-import { DuplicateEnvironmentVariableError } from "../../repositories/environment-variables/errors";
+import { createEnvironmentVariable, findEnvironmentVariableByName } from "../../modules/mock-apis";
+import { DuplicateEnvironmentVariableError } from "../../modules/mock-apis";
 import { environmentVariableInput } from "../../utils/environment-variables";
 import { ensureProject } from "../../utils/project";
 import { createCreateEnvironmentVariableUseCase } from "../../use-cases/environment-variables/create-environment-variable";

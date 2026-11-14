@@ -1,44 +1,22 @@
-import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "../../db";
-import { otelAccessTokens } from "../../db/schema";
-import { changedRows } from "../../db/changes";
+import { AccessTokenRepository } from "./AccessTokenRepository";
+import { ProjectRepository } from "./ProjectRepository";
 
-export async function listOtelAccessTokens(projectId: string) {
-  return getDb()
-    .select()
-    .from(otelAccessTokens)
-    .where(eq(otelAccessTokens.projectId, projectId))
-    .orderBy(asc(otelAccessTokens.createdAt));
-}
+export { AccessTokenRepository } from "./AccessTokenRepository";
+export { ProjectRepository } from "./ProjectRepository";
 
-export async function createOtelAccessToken(input: {
+export const listOtelAccessTokens = (projectId: string) =>
+  new AccessTokenRepository(getDb()).list(projectId);
+export const createOtelAccessToken = (input: {
   id: string;
   projectId: string;
   name: string;
   digest: string;
   expiresAt: Date | null;
-}) {
-  await getDb().insert(otelAccessTokens).values(input);
-}
-
-export async function deleteOtelAccessToken(projectId: string, id: string) {
-  const result = await getDb()
-    .delete(otelAccessTokens)
-    .where(and(eq(otelAccessTokens.projectId, projectId), eq(otelAccessTokens.id, id)));
-  return changedRows(result) > 0;
-}
-
-export async function hasValidOtelAccessToken(projectId: string, digest: string, now = new Date()) {
-  const [row] = await getDb()
-    .select({ id: otelAccessTokens.id })
-    .from(otelAccessTokens)
-    .where(
-      and(
-        eq(otelAccessTokens.projectId, projectId),
-        eq(otelAccessTokens.digest, digest),
-        or(isNull(otelAccessTokens.expiresAt), gt(otelAccessTokens.expiresAt, now)),
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
-}
+}) => new AccessTokenRepository(getDb()).create(input);
+export const deleteOtelAccessToken = (projectId: string, id: string) =>
+  new AccessTokenRepository(getDb()).delete(projectId, id);
+export const hasValidOtelAccessToken = (projectId: string, digest: string, now = new Date()) =>
+  new AccessTokenRepository(getDb()).isValid(projectId, digest, now);
+export const ensureProjectRow = (projectId: string) =>
+  new ProjectRepository(getDb()).ensure(projectId);

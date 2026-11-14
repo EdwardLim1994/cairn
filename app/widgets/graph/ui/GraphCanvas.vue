@@ -211,7 +211,7 @@ defineExpose({
         </ControlButton>
       </div>
     </Controls>
-    <Panel position="bottom-left" class="app__graph-legend-panel">
+    <Panel position="top-right" class="app__graph-legend-panel">
       <div class="app__graph-legend" aria-label="Graph legend">
         <span><i class="app__legend-line" aria-hidden="true" />Call</span>
         <span

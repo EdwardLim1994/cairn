@@ -1,8 +1,8 @@
 import type { RunFlowResponse } from "#shared/api/observability";
-import { RunNotFoundError } from "../../repositories/runs/errors";
+import { RunNotFoundError } from "../../modules/runs";
 
 type RunFlowData = NonNullable<
-  Awaited<ReturnType<typeof import("../../repositories/runs").getRunFlowData>>
+  Awaited<ReturnType<typeof import("../../modules/runs").getRunFlowData>>
 >;
 
 function normalizeServiceName(name: string, registeredServices: Array<{ name: string }>) {

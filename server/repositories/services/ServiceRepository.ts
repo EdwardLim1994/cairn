@@ -3,9 +3,14 @@ import { randomUUID } from "node:crypto";
 import type { ServiceCreateRequest, ServiceUpdateRequest } from "#shared/api/services";
 import { getDb } from "../../db";
 import { changedRows } from "../../db/changes";
-import { environmentVariables, headerTemplates, serviceEndpoints, services } from "../../db/schema";
+import { serviceEndpoints, services } from "../../db/schema";
 import { ServiceEndpointOwnershipError, ServiceHeaderTemplateOwnershipError } from "./errors";
-import { deactivateInvalidMockApis } from "../mock-apis/reconcile-readiness";
+import {
+  deactivateInvalidMockApis,
+  getEnvironmentVariableValues,
+  isHeaderTemplateOwned,
+  listHeaderTemplates,
+} from "../../modules/mock-apis";
 import { putProtoFile, removeProtoFile } from "../../utils/proto-storage";
 import { GraphPositionRepository } from "../../modules/graph-canvas";
 
@@ -13,6 +18,24 @@ type Database = ReturnType<typeof getDb>;
 
 export class ServiceRepository {
   constructor(private readonly db: Database) {}
+  listServiceNames(projectId: string) {
+    return this.db
+      .select({ name: services.name })
+      .from(services)
+      .where(eq(services.projectId, projectId));
+  }
+  listServiceSummaries(projectId: string) {
+    return this.db
+      .select({ id: services.id, name: services.name })
+      .from(services)
+      .where(eq(services.projectId, projectId));
+  }
+  listEndpointOwners(projectId: string) {
+    return this.db
+      .select({ id: serviceEndpoints.id, serviceId: serviceEndpoints.serviceId })
+      .from(serviceEndpoints)
+      .where(eq(serviceEndpoints.projectId, projectId));
+  }
   async listServices(projectId: string) {
     const db = this.db;
     const rows = await db
@@ -43,16 +66,7 @@ export class ServiceRepository {
     try {
       await db.transaction(async (tx) => {
         if (input.healthCheckHeaderTemplateId) {
-          const [template] = await tx
-            .select({ id: headerTemplates.id })
-            .from(headerTemplates)
-            .where(
-              and(
-                eq(headerTemplates.id, input.healthCheckHeaderTemplateId),
-                eq(headerTemplates.projectId, projectId),
-              ),
-            );
-          if (!template)
+          if (!(await isHeaderTemplateOwned(tx, projectId, input.healthCheckHeaderTemplateId)))
             throw new ServiceHeaderTemplateOwnershipError(
               "Selected health-check header template is not in this project",
             );
@@ -122,16 +136,7 @@ export class ServiceRepository {
     try {
       await db.transaction(async (tx) => {
         if (input.healthCheckHeaderTemplateId) {
-          const [template] = await tx
-            .select({ id: headerTemplates.id })
-            .from(headerTemplates)
-            .where(
-              and(
-                eq(headerTemplates.id, input.healthCheckHeaderTemplateId),
-                eq(headerTemplates.projectId, projectId),
-              ),
-            );
-          if (!template)
+          if (!(await isHeaderTemplateOwned(tx, projectId, input.healthCheckHeaderTemplateId)))
             throw new ServiceHeaderTemplateOwnershipError(
               "Selected health-check header template is not in this project",
             );
@@ -228,27 +233,19 @@ export class ServiceRepository {
           healthCheckUrl: services.healthCheckUrl,
           healthCheckHeaderTemplateId: services.healthCheckHeaderTemplateId,
           healthCheckCustomHeaders: services.healthCheckCustomHeaders,
-          headerTemplateId: headerTemplates.id,
-          headerTemplateHeaders: headerTemplates.headers,
         })
         .from(services)
-        .leftJoin(
-          headerTemplates,
-          and(
-            eq(services.healthCheckHeaderTemplateId, headerTemplates.id),
-            eq(headerTemplates.projectId, projectId),
-          ),
-        )
         .where(eq(services.projectId, projectId)),
-      db
-        .select({ name: environmentVariables.name, value: environmentVariables.value })
-        .from(environmentVariables)
-        .where(eq(environmentVariables.projectId, projectId)),
-    ]).then(([targets, variableRows]) => {
+      listHeaderTemplates(projectId),
+      getEnvironmentVariableValues(projectId),
+    ]).then(([targets, templates, variableRows]) => {
       const variables = new Map(variableRows.map(({ name, value }) => [name, value]));
-      return targets.map(({ headerTemplateId, headerTemplateHeaders, ...target }) => ({
+      const templateHeaders = new Map(templates.map(({ id, headers }) => [id, headers]));
+      return targets.map((target) => ({
         ...target,
-        headerTemplateHeaders: headerTemplateId ? (headerTemplateHeaders ?? []) : [],
+        headerTemplateHeaders: target.healthCheckHeaderTemplateId
+          ? (templateHeaders.get(target.healthCheckHeaderTemplateId) ?? [])
+          : [],
         variables,
       }));
     });

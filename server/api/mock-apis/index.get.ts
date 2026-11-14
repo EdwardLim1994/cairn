@@ -1,5 +1,5 @@
 import { mockApiListResponseSchema } from "#shared/api/mock-apis";
-import { listMockApis } from "../../repositories/mock-apis";
+import { listMockApis } from "../../modules/mock-apis";
 import { ensureProject } from "../../utils/project";
 import { createListMockApisUseCase } from "../../use-cases/mock-apis/list-mock-apis";
 

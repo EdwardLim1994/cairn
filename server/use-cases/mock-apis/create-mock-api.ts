@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { MockApiInput } from "#shared/api/mock-apis";
-import { MockApiEndpointError } from "../../repositories/mock-apis/errors";
+import { MockApiEndpointError } from "../../modules/mock-apis";
 import { validateEndpointPathParameters } from "../../utils/mock-api-validation";
 
 export function createCreateMockApiUseCase(dependencies: {

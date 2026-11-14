@@ -7,11 +7,13 @@ withDefaults(
     manageNodesOpen?: boolean;
     mockApisOpen?: boolean;
     historyOpen?: boolean;
+    authEnabled?: boolean;
   }>(),
   {
     manageNodesOpen: false,
     mockApisOpen: false,
     historyOpen: false,
+    authEnabled: true,
   },
 );
 const emit = defineEmits<{
@@ -138,7 +140,10 @@ const emit = defineEmits<{
           />
         </UButton>
       </fieldset>
-      <fieldset class="app__toolbar-group app__toolbar-group--account m-0 min-w-0 border-0">
+      <fieldset
+        v-if="authEnabled"
+        class="app__toolbar-group app__toolbar-group--account m-0 min-w-0 border-0"
+      >
         <legend class="sr-only">Account</legend>
         <UButton
           type="button"

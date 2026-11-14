@@ -1,5 +1,5 @@
 import { ensureProject } from "../utils/project";
-import { getCanvas } from "../repositories/canvas";
+import { getCanvas } from "../modules/graph-canvas";
 import { createGetCanvasUseCase } from "../use-cases/canvas/get-canvas";
 
 const getCanvasUseCase = createGetCanvasUseCase({ ensureProject, getCanvas });

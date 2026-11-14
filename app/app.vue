@@ -1,6 +1,16 @@
+<script setup lang="ts">
+import type { AuthSessionStatus } from "./utils/auth-route";
+
+const route = useRoute();
+const authStatus = useState<AuthSessionStatus>("auth-session-status", () => ({
+  enabled: true,
+  authenticated: false,
+}));
+</script>
+
 <template>
   <UApp>
-    <NuxtPage />
+    <NuxtPage v-if="authStatus.authenticated || route.path === '/login'" />
   </UApp>
 </template>
 
@@ -291,8 +301,8 @@ body {
 }
 
 .app__graph-legend-panel {
-  bottom: 12px;
-  left: 58px;
+  top: 82px;
+  right: 12px;
   z-index: 12;
 }
 

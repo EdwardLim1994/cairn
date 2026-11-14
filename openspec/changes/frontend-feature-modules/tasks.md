@@ -15,15 +15,22 @@
 ## 3. Graph and mock API slices
 
 - [x] 3.1 Move graph canvas and all graph node types into a graph widget, including trigger-node response panel; verify observed timing, endpoint highlighting, response focus, and graph event tests in `_test_`.
-- [ ] 3.2 Move mock API cards, editors, execution, and WebSocket session handling into FSD slices; remove batch Save and verify single-item CRUD, run, and session tests in `_test_`.
-- [ ] 3.3 Make mock API updates refresh canonical canvas data and show success only after refresh; verify card and graph projections stay in sync with focused tests.
+- [x] 3.2 Move mock API cards, editors, execution, and WebSocket session handling into FSD slices; remove batch Save and verify single-item CRUD, run, and session tests in `_test_`.
+- [x] 3.3 Make mock API updates refresh canonical canvas data and show success only after refresh; verify card and graph projections stay in sync with focused tests.
 
 ## 4. Deferred panels and page coordination
 
-- [ ] 4.1 Load closed panel UI on demand while keeping toolbar, graph canvas, and all node types on initial path; verify initial render and first-open loading in focused tests.
-- [ ] 4.2 Defer logs, history, and other panel-only fetches until open while keeping graph health polling active; verify no panel-only fetch on initial load and correct fetch on open.
-- [ ] 4.3 Reduce `index.vue` to bootstrap and cross-slice event wiring, move remaining tests into owning `_test_` directories, and verify route-level behavior with `vp test run` and `vp check`.
+- [x] 4.1 Load closed panel UI on demand while keeping toolbar, graph canvas, and all node types on initial path; verify initial render and first-open loading in focused tests.
+- [x] 4.2 Defer logs, history, and other panel-only fetches until open while keeping graph health polling active; verify no panel-only fetch on initial load and correct fetch on open.
+- [x] 4.3 Reduce `index.vue` to bootstrap and cross-slice event wiring, move remaining tests into owning `_test_` directories, and verify route-level behavior with `vp test run` and `vp check`.
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run full relevant frontend tests, `vp check`, `vp run build`, and `openspec validate frontend-feature-modules --strict`; verify light/dark, narrow/desktop, and graph telemetry behavior remain correct.
+- [x] 5.1 Run full relevant frontend tests, `vp check`, `vp run build`, and `openspec validate frontend-feature-modules --strict`; verify light/dark, narrow/desktop, and graph telemetry behavior remain correct.
+
+## 6. Workspace adjustments
+
+- [x] 6.1 Open drawers on the right, move timing labels near outbound connections, and keep the graph legend clear of controls and instructions.
+- [x] 6.2 Gate the app by operator session, rerender after login, and hide Sign out when authentication is disabled.
+- [x] 6.3 Show header and authorization templates in independently collapsible sections.
+- [x] 6.4 Keep every drawer within shared viewport gaps below the toolbar.

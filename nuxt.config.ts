@@ -10,6 +10,7 @@ export default defineNuxtConfig({
     },
   },
   modules: ["@pinia/nuxt", "@nuxt/ui"],
+  nitro: { ignore: ["modules/**"] },
   vite: {
     build: { chunkSizeWarningLimit: 700 },
     plugins: [tailwindcss()],

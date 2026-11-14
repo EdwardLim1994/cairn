@@ -56,6 +56,12 @@ const emit = defineEmits<{
 }>();
 const variableSectionItems = [{ value: "variables", label: "Shared environment variables" }];
 const mockApiSectionItems = [{ value: "apis", label: "Registered mock APIs" }];
+const headerSectionItems = [{ value: "headers", label: "Shareable header templates" }];
+const authorizationSectionItems = [
+  { value: "authorization", label: "Shareable authorization templates" },
+];
+const headerTemplatesOpen = ref(true);
+const authorizationTemplatesOpen = ref(true);
 type EditorState =
   | {
       kind: "variable";
@@ -770,315 +776,361 @@ function handleOpenChange(open: boolean) {
       <template v-else>
         <div class="mock-api-settings-panel__list flex flex-col gap-4">
           <section>
-            <div class="flex items-center justify-between gap-2">
-              <strong>Shareable header templates</strong>
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                @click="beginCreate('header')"
-                >New template</UButton
-              >
-            </div>
-            <SettingsAccordionCard
-              v-for="template in headerTemplates"
-              :key="template.id"
-              :title="template.name || 'New header template'"
-              :subtitle="`${template.headers.length} headers`"
-              :delete-label="`Delete ${template.name || 'header template'}`"
-              navigation
-              hide-delete
-              @select="beginEditHeader(template)"
+            <UAccordion
+              id="shareable-header-templates-toggle"
+              :items="headerSectionItems"
+              type="single"
+              collapsible
+              :unmount-on-hide="false"
+              :model-value="headerTemplatesOpen ? 'headers' : undefined"
+              :ui="{
+                root: 'w-full min-w-0',
+                item: 'border-0',
+                trigger:
+                  'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
+                trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+                content: 'pt-3',
+                body: 'w-full',
+              }"
+              @update:model-value="headerTemplatesOpen = $event === 'headers'"
             >
-              <template #leading>
-                <span class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]">
-                  <UIcon
-                    name="i-lucide-braces"
-                    class="size-5 text-[var(--muted)]"
-                    aria-hidden="true"
-                  />
-                </span>
-              </template>
-              <label
-                :for="`header-template-name-${template.id}`"
-                class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[12px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
-              >
-                <span>Name</span>
-                <UInput
-                  :id="`header-template-name-${template.id}`"
-                  v-model="template.name"
-                  :ui="{
-                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                  }"
-                />
-              </label>
-              <div
-                v-for="(header, row) in template.headers"
-                :key="row"
-                class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
-              >
-                <UInput
-                  v-model="header.name"
-                  aria-label="Header name"
-                  placeholder="Header"
-                  :ui="{
-                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                  }"
-                />
-                <UInput
-                  v-model="header.value"
-                  aria-label="Header value"
-                  placeholder="Value or {{variable}}"
-                  :ui="{
-                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                  }"
-                />
-                <UButton
-                  type="button"
-                  aria-label="Remove header row"
-                  class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
-                  @click="removeHeaderRow(template.headers, row)"
-                  >Remove</UButton
+              <template #default><strong>Shareable header templates</strong></template>
+              <template #body>
+                <div class="mb-3 flex justify-end gap-2">
+                  <UButton
+                    type="button"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="beginCreate('header')"
+                    >New template</UButton
+                  >
+                </div>
+                <SettingsAccordionCard
+                  v-for="template in headerTemplates"
+                  :key="template.id"
+                  :title="template.name || 'New header template'"
+                  :subtitle="`${template.headers.length} headers`"
+                  :delete-label="`Delete ${template.name || 'header template'}`"
+                  navigation
+                  hide-delete
+                  @select="beginEditHeader(template)"
                 >
-              </div>
-              <UButton
-                type="button"
-                class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
-                @click="addHeaderRow(template.headers)"
-                >Add header</UButton
-              >
-            </SettingsAccordionCard>
-          </section>
-          <section id="authorization-templates">
-            <div class="flex items-center justify-between gap-2">
-              <strong>Shareable authorization templates</strong>
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                @click="beginCreate('authorization')"
-                >New template</UButton
-              >
-            </div>
-            <SettingsAccordionCard
-              v-for="template in authorizationTemplates"
-              :key="template.id"
-              :id="`authorization-template-${template.id}`"
-              :title="template.name || 'New authorization template'"
-              :subtitle="authorizationTypeLabel(template.type)"
-              :delete-label="`Delete ${template.name || 'authorization template'}`"
-              navigation
-              hide-delete
-              @select="beginEditAuthorization(template)"
-            >
-              <template #leading>
-                <span class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]">
-                  <UIcon
-                    name="i-lucide-key-round"
-                    class="size-5 text-[var(--muted)]"
-                    aria-hidden="true"
-                  />
-                </span>
-              </template>
-              <label
-                :for="`authorization-template-name-${template.id}`"
-                class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-              >
-                <span>Name</span>
-                <UInput
-                  :id="`authorization-template-name-${template.id}`"
-                  v-model="template.name"
-                  aria-label="Authorization template name"
-                  :ui="{
-                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                  }"
-                />
-              </label>
-              <label
-                :for="`authorization-template-type-${template.id}`"
-                class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-              >
-                <span>Authorization type</span>
-                <USelect
-                  :id="`authorization-template-type-${template.id}`"
-                  :model-value="template.type"
-                  :items="authorizationTypeOptions"
-                  aria-label="Authorization type"
-                  :ui="{
-                    base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
-                  }"
-                  @update:model-value="setAuthorizationType(template, $event)"
-                />
-              </label>
-              <template v-if="template.type === 'bearer'">
-                <label
-                  :for="`authorization-token-${template.id}`"
-                  class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
-                >
-                  <span>Token</span>
-                  <div class="flex gap-2">
+                  <template #leading>
+                    <span
+                      class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+                    >
+                      <UIcon
+                        name="i-lucide-braces"
+                        class="size-5 text-[var(--muted)]"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </template>
+                  <label
+                    :for="`header-template-name-${template.id}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)] [&>legend]:text-[12px] [&>legend]:font-medium [&>legend]:text-[var(--muted)]"
+                  >
+                    <span>Name</span>
                     <UInput
-                      :id="`authorization-token-${template.id}`"
-                      v-model="template.token"
-                      :type="secretVisible(template, 'token') ? 'text' : 'password'"
-                      aria-label="Bearer token"
-                      placeholder="Token or {{variable}}"
+                      :id="`header-template-name-${template.id}`"
+                      v-model="template.name"
                       :ui="{
-                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px]',
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
+                    />
+                  </label>
+                  <div
+                    v-for="(header, row) in template.headers"
+                    :key="row"
+                    class="grid grid-cols-[1fr_1fr_auto] items-center gap-2"
+                  >
+                    <UInput
+                      v-model="header.name"
+                      aria-label="Header name"
+                      placeholder="Header"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
+                    />
+                    <UInput
+                      v-model="header.value"
+                      aria-label="Header value"
+                      placeholder="Value or {{variable}}"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
                       }"
                     />
                     <UButton
                       type="button"
-                      :aria-label="`${secretVisible(template, 'token') ? 'Hide' : 'Show'} Bearer token`"
-                      @click="toggleSecret(template, 'token')"
-                      >{{ secretVisible(template, "token") ? "Hide" : "Show" }}</UButton
+                      aria-label="Remove header row"
+                      class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
+                      @click="removeHeaderRow(template.headers, row)"
+                      >Remove</UButton
                     >
                   </div>
-                </label>
+                  <UButton
+                    type="button"
+                    class="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 text-[12.5px] font-medium hover:bg-[var(--panel2)]"
+                    @click="addHeaderRow(template.headers)"
+                    >Add header</UButton
+                  >
+                </SettingsAccordionCard>
               </template>
-              <template v-else-if="template.type === 'basic'">
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-username-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
+            </UAccordion>
+          </section>
+          <section id="authorization-templates">
+            <UAccordion
+              id="shareable-authorization-templates-toggle"
+              :items="authorizationSectionItems"
+              type="single"
+              collapsible
+              :unmount-on-hide="false"
+              :model-value="authorizationTemplatesOpen ? 'authorization' : undefined"
+              :ui="{
+                root: 'w-full min-w-0',
+                item: 'border-0',
+                trigger:
+                  'flex w-full items-center justify-between gap-2 !border-0 !bg-transparent !p-0 text-left text-inherit',
+                trailingIcon: 'text-[var(--muted)] transition-transform duration-150',
+                content: 'pt-3',
+                body: 'w-full',
+              }"
+              @update:model-value="authorizationTemplatesOpen = $event === 'authorization'"
+            >
+              <template #default><strong>Shareable authorization templates</strong></template>
+              <template #body>
+                <div class="mb-3 flex justify-end gap-2">
+                  <UButton
+                    type="button"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    @click="beginCreate('authorization')"
+                    >New template</UButton
                   >
-                    Username
-                  </label>
-                  <UInput
-                    :id="`authorization-username-${template.id}`"
-                    v-model="template.username"
-                    aria-label="Basic username"
-                    placeholder="Username or {{variable}}"
-                  />
                 </div>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
+                <SettingsAccordionCard
+                  v-for="template in authorizationTemplates"
+                  :key="template.id"
+                  :id="`authorization-template-${template.id}`"
+                  :title="template.name || 'New authorization template'"
+                  :subtitle="authorizationTypeLabel(template.type)"
+                  :delete-label="`Delete ${template.name || 'authorization template'}`"
+                  navigation
+                  hide-delete
+                  @select="beginEditAuthorization(template)"
+                >
+                  <template #leading>
+                    <span
+                      class="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--panel2)]"
+                    >
+                      <UIcon
+                        name="i-lucide-key-round"
+                        class="size-5 text-[var(--muted)]"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </template>
                   <label
-                    :for="`authorization-password-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
+                    :for="`authorization-template-name-${template.id}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
                   >
-                    Password
-                  </label>
-                  <div class="flex gap-2">
+                    <span>Name</span>
                     <UInput
-                      :id="`authorization-password-${template.id}`"
-                      v-model="template.password"
-                      :type="secretVisible(template, 'password') ? 'text' : 'password'"
-                      aria-label="Basic password"
+                      :id="`authorization-template-name-${template.id}`"
+                      v-model="template.name"
+                      aria-label="Authorization template name"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
                     />
-                    <UButton
-                      type="button"
-                      :aria-label="`${secretVisible(template, 'password') ? 'Hide' : 'Show'} Basic password`"
-                      @click="toggleSecret(template, 'password')"
-                      >{{ secretVisible(template, "password") ? "Hide" : "Show" }}</UButton
-                    >
-                  </div>
-                </div>
-              </template>
-              <template v-else-if="template.type === 'api-key'">
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-header-name-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
-                  >
-                    Header name
                   </label>
-                  <UInput
-                    :id="`authorization-header-name-${template.id}`"
-                    v-model="template.headerName"
-                    aria-label="API key header name"
-                    placeholder="X-API-Key"
-                  />
-                </div>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
                   <label
-                    :for="`authorization-value-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
+                    :for="`authorization-template-type-${template.id}`"
+                    class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
                   >
-                    Value
-                  </label>
-                  <div class="flex gap-2">
-                    <UInput
-                      :id="`authorization-value-${template.id}`"
-                      v-model="template.value"
-                      :type="secretVisible(template, 'value') ? 'text' : 'password'"
-                      aria-label="API key value"
+                    <span>Authorization type</span>
+                    <USelect
+                      :id="`authorization-template-type-${template.id}`"
+                      :model-value="template.type"
+                      :items="authorizationTypeOptions"
+                      aria-label="Authorization type"
+                      :ui="{
+                        base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_2px_var(--accent-soft)]',
+                      }"
+                      @update:model-value="setAuthorizationType(template, $event)"
                     />
-                    <UButton
-                      type="button"
-                      :aria-label="`${secretVisible(template, 'value') ? 'Hide' : 'Show'} API key value`"
-                      @click="toggleSecret(template, 'value')"
-                      >{{ secretVisible(template, "value") ? "Hide" : "Show" }}</UButton
+                  </label>
+                  <template v-if="template.type === 'bearer'">
+                    <label
+                      :for="`authorization-token-${template.id}`"
+                      class="min-w-0 flex flex-1 flex-col gap-1 [&>span]:text-[12px] [&>span]:font-medium [&>span]:text-[var(--muted)]"
                     >
-                  </div>
-                </div>
+                      <span>Token</span>
+                      <div class="flex gap-2">
+                        <UInput
+                          :id="`authorization-token-${template.id}`"
+                          v-model="template.token"
+                          :type="secretVisible(template, 'token') ? 'text' : 'password'"
+                          aria-label="Bearer token"
+                          placeholder="Token or {{variable}}"
+                          :ui="{
+                            base: 'w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] h-8 px-2.5 py-0 text-[12.5px]',
+                          }"
+                        />
+                        <UButton
+                          type="button"
+                          :aria-label="`${secretVisible(template, 'token') ? 'Hide' : 'Show'} Bearer token`"
+                          @click="toggleSecret(template, 'token')"
+                          >{{ secretVisible(template, "token") ? "Hide" : "Show" }}</UButton
+                        >
+                      </div>
+                    </label>
+                  </template>
+                  <template v-else-if="template.type === 'basic'">
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-username-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Username
+                      </label>
+                      <UInput
+                        :id="`authorization-username-${template.id}`"
+                        v-model="template.username"
+                        aria-label="Basic username"
+                        placeholder="Username or {{variable}}"
+                      />
+                    </div>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-password-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Password
+                      </label>
+                      <div class="flex gap-2">
+                        <UInput
+                          :id="`authorization-password-${template.id}`"
+                          v-model="template.password"
+                          :type="secretVisible(template, 'password') ? 'text' : 'password'"
+                          aria-label="Basic password"
+                        />
+                        <UButton
+                          type="button"
+                          :aria-label="`${secretVisible(template, 'password') ? 'Hide' : 'Show'} Basic password`"
+                          @click="toggleSecret(template, 'password')"
+                          >{{ secretVisible(template, "password") ? "Hide" : "Show" }}</UButton
+                        >
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else-if="template.type === 'api-key'">
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-header-name-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Header name
+                      </label>
+                      <UInput
+                        :id="`authorization-header-name-${template.id}`"
+                        v-model="template.headerName"
+                        aria-label="API key header name"
+                        placeholder="X-API-Key"
+                      />
+                    </div>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-value-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Value
+                      </label>
+                      <div class="flex gap-2">
+                        <UInput
+                          :id="`authorization-value-${template.id}`"
+                          v-model="template.value"
+                          :type="secretVisible(template, 'value') ? 'text' : 'password'"
+                          aria-label="API key value"
+                        />
+                        <UButton
+                          type="button"
+                          :aria-label="`${secretVisible(template, 'value') ? 'Hide' : 'Show'} API key value`"
+                          @click="toggleSecret(template, 'value')"
+                          >{{ secretVisible(template, "value") ? "Hide" : "Show" }}</UButton
+                        >
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-token-url-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Token URL
+                      </label>
+                      <UInput
+                        :id="`authorization-token-url-${template.id}`"
+                        v-model="template.tokenUrl"
+                        aria-label="OAuth token URL"
+                        placeholder="https://auth.example.com/token"
+                      />
+                    </div>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-client-id-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Client ID
+                      </label>
+                      <UInput
+                        :id="`authorization-client-id-${template.id}`"
+                        v-model="template.clientId"
+                        aria-label="OAuth client ID"
+                      />
+                    </div>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-client-secret-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Client secret
+                      </label>
+                      <div class="flex gap-2">
+                        <UInput
+                          :id="`authorization-client-secret-${template.id}`"
+                          v-model="template.clientSecret"
+                          :type="secretVisible(template, 'clientSecret') ? 'text' : 'password'"
+                          aria-label="OAuth client secret"
+                        />
+                        <UButton
+                          type="button"
+                          :aria-label="`${secretVisible(template, 'clientSecret') ? 'Hide' : 'Show'} OAuth client secret`"
+                          @click="toggleSecret(template, 'clientSecret')"
+                          >{{ secretVisible(template, "clientSecret") ? "Hide" : "Show" }}</UButton
+                        >
+                      </div>
+                    </div>
+                    <div class="min-w-0 flex flex-1 flex-col gap-1">
+                      <label
+                        :for="`authorization-scope-${template.id}`"
+                        class="text-[12px] font-medium text-[var(--muted)]"
+                      >
+                        Scope (optional)
+                      </label>
+                      <UInput
+                        :id="`authorization-scope-${template.id}`"
+                        v-model="template.scope"
+                        aria-label="OAuth scope"
+                      />
+                    </div>
+                  </template>
+                </SettingsAccordionCard>
               </template>
-              <template v-else>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-token-url-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
-                  >
-                    Token URL
-                  </label>
-                  <UInput
-                    :id="`authorization-token-url-${template.id}`"
-                    v-model="template.tokenUrl"
-                    aria-label="OAuth token URL"
-                    placeholder="https://auth.example.com/token"
-                  />
-                </div>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-client-id-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
-                  >
-                    Client ID
-                  </label>
-                  <UInput
-                    :id="`authorization-client-id-${template.id}`"
-                    v-model="template.clientId"
-                    aria-label="OAuth client ID"
-                  />
-                </div>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-client-secret-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
-                  >
-                    Client secret
-                  </label>
-                  <div class="flex gap-2">
-                    <UInput
-                      :id="`authorization-client-secret-${template.id}`"
-                      v-model="template.clientSecret"
-                      :type="secretVisible(template, 'clientSecret') ? 'text' : 'password'"
-                      aria-label="OAuth client secret"
-                    />
-                    <UButton
-                      type="button"
-                      :aria-label="`${secretVisible(template, 'clientSecret') ? 'Hide' : 'Show'} OAuth client secret`"
-                      @click="toggleSecret(template, 'clientSecret')"
-                      >{{ secretVisible(template, "clientSecret") ? "Hide" : "Show" }}</UButton
-                    >
-                  </div>
-                </div>
-                <div class="min-w-0 flex flex-1 flex-col gap-1">
-                  <label
-                    :for="`authorization-scope-${template.id}`"
-                    class="text-[12px] font-medium text-[var(--muted)]"
-                  >
-                    Scope (optional)
-                  </label>
-                  <UInput
-                    :id="`authorization-scope-${template.id}`"
-                    v-model="template.scope"
-                    aria-label="OAuth scope"
-                  />
-                </div>
-              </template>
-            </SettingsAccordionCard>
+            </UAccordion>
           </section>
           <section>
             <div class="text-xs">

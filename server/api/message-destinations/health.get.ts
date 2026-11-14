@@ -1,11 +1,11 @@
 import { messageDestinationHealthResponseSchema } from "#shared/api/message-flows";
-import { listBrokerHealthTargets } from "../../repositories/message-destinations";
 import { ensureProject } from "../../utils/project";
 import {
   checkKafkaBroker,
   checkRabbitMqBroker,
   createCheckMessageDestinationHealthUseCase,
-} from "../../use-cases/message-destinations/check-health";
+  listBrokerHealthTargets,
+} from "../../modules/message-destinations";
 
 const checkHealth = createCheckMessageDestinationHealthUseCase({
   ensureProject,

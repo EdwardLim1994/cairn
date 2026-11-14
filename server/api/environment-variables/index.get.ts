@@ -1,5 +1,5 @@
 import { environmentVariableListResponseSchema } from "#shared/api/environment-variables";
-import { listEnvironmentVariables } from "../../repositories/environment-variables";
+import { listEnvironmentVariables } from "../../modules/mock-apis";
 import { ensureProject } from "../../utils/project";
 import { createListEnvironmentVariablesUseCase } from "../../use-cases/environment-variables/list-environment-variables";
 

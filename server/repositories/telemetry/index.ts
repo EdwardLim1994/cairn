@@ -1,77 +1,17 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
-import { getDb } from "../../db";
-import {
-  readLogs,
-  writeLogs,
-  writeSpans,
-  type LogRecord,
-  type SpanRecord,
-} from "../../db/telemetry";
-import { runs, services } from "../../db/schema";
+import type { LogRecord, SpanRecord } from "../../db/telemetry";
+import { TelemetryRepository } from "./TelemetryRepository";
 
-export async function addMockRunFailureLog(input: {
-  projectId: string;
-  traceId: string;
-  serviceName: string;
-  mockApiName: string;
-  mockApiId: string;
-  runId: string;
-  method: string;
-  url: string;
-  responseStatus: number | null;
-  message: string;
-}) {
-  await writeLogs([
-    {
-      projectId: input.projectId,
-      traceId: input.traceId,
-      serviceName: input.serviceName,
-      severity: "ERROR",
-      timestamp: new Date(),
-      message: `Mock API ${input.mockApiName} failed: ${input.message}`,
-      attributes: {
-        mockApiId: input.mockApiId,
-        runId: input.runId,
-        method: input.method,
-        url: input.url,
-        responseStatus: input.responseStatus,
-      },
-    },
-  ]);
-}
+export { TelemetryRepository } from "./TelemetryRepository";
 
-export async function queryLogs(
-  projectId: string,
-  filters: { severities?: string[]; search?: string },
-) {
-  const [records, registeredServices] = await Promise.all([
-    readLogs(projectId, filters),
-    getDb().select({ name: services.name }).from(services).where(eq(services.projectId, projectId)),
-  ]);
-  return { records, registeredServices };
-}
-
-export function listTelemetryServiceNames(projectId: string) {
-  return getDb()
-    .select({ name: services.name })
-    .from(services)
-    .where(eq(services.projectId, projectId));
-}
-
-export async function insertOtlpLogs(records: LogRecord[]) {
-  await writeLogs(records);
-}
-
-export async function insertOtlpSpans(records: SpanRecord[]) {
-  if (!records.length) return;
-  await writeSpans(records);
-  const traceIds = [...new Set(records.map((span) => span.traceId))];
-  const acceptedAt = new Date();
-  await getDb()
-    .update(runs)
-    .set({
-      lastTelemetryAt: acceptedAt,
-      firstTelemetryAt: sql`coalesce(${runs.firstTelemetryAt}, ${acceptedAt.getTime()})`,
-    })
-    .where(and(eq(runs.projectId, records[0]!.projectId), inArray(runs.traceId, traceIds)));
-}
+const telemetry = new TelemetryRepository();
+export const addMockRunFailureLog = (
+  input: Parameters<TelemetryRepository["addMockRunFailureLog"]>[0],
+) => telemetry.addMockRunFailureLog(input);
+export const queryLogs = (projectId: string, filters: { severities?: string[]; search?: string }) =>
+  telemetry.queryLogs(projectId, filters);
+export const listTelemetryServiceNames = (projectId: string) =>
+  telemetry.listTelemetryServiceNames(projectId);
+export const insertOtlpLogs = (records: LogRecord[]) => telemetry.insertOtlpLogs(records);
+export const insertOtlpSpans = (records: SpanRecord[]) => telemetry.insertOtlpSpans(records);
+export const readTelemetrySpans = (projectId: string, traceId: string) =>
+  telemetry.readSpans(projectId, traceId);

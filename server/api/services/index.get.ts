@@ -1,5 +1,5 @@
 import { serviceListResponseSchema } from "#shared/api/services";
-import { listServices } from "../../repositories/services";
+import { listServices } from "../../modules/service-registry";
 import { ensureProject } from "../../utils/project";
 import { createListServicesUseCase } from "../../use-cases/services/list-services";
 

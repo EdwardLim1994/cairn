@@ -1,6 +1,5 @@
 import { mockApiDeleteResponseSchema } from "#shared/api/mock-apis";
-import { deleteMockApi } from "../../repositories/mock-apis";
-import { MockApiNotFoundError } from "../../repositories/mock-apis/errors";
+import { deleteMockApi, MockApiNotFoundError } from "../../modules/mock-apis";
 import { ensureProject } from "../../utils/project";
 import { createDeleteMockApiUseCase } from "../../use-cases/mock-apis/delete-mock-api";
 

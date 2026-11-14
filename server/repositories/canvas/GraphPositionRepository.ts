@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDb } from "../../db";
 import { graphNodePositions } from "../../db/schema";
@@ -27,6 +27,31 @@ export class GraphPositionRepository {
           eq(graphNodePositions.projectId, projectId),
           eq(graphNodePositions.nodeType, "service"),
           eq(graphNodePositions.entityId, serviceId),
+        ),
+      );
+  }
+
+  deleteMockApiPosition(projectId: string, mockApiId: string) {
+    return this.db
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "mock_api"),
+          eq(graphNodePositions.entityId, mockApiId),
+        ),
+      );
+  }
+
+  deleteMockApiPositions(projectId: string, mockApiIds: string[]) {
+    if (!mockApiIds.length) return Promise.resolve();
+    return this.db
+      .delete(graphNodePositions)
+      .where(
+        and(
+          eq(graphNodePositions.projectId, projectId),
+          eq(graphNodePositions.nodeType, "mock_api"),
+          inArray(graphNodePositions.entityId, mockApiIds),
         ),
       );
   }

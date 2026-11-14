@@ -2,7 +2,7 @@ import {
   otelAccessTokenCreateRequestSchema,
   otelAccessTokenCreateResponseSchema,
 } from "#shared/api/otel-access-tokens";
-import { createOtelAccessToken } from "../../repositories/otel-access-tokens";
+import { createOtelAccessToken } from "../../modules/project-access";
 import { ensureProject } from "../../utils/project";
 import { createOtelAccessTokenUseCase } from "../../use-cases/otel-access-tokens/manage";
 

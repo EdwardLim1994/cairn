@@ -1,6 +1,6 @@
 import { websocketSessionResponseSchema } from "#shared/api/mock-apis";
-import { getEnvironmentVariableValues } from "../../../repositories/environment-variables";
-import { getMockApiExecutionTarget } from "../../../repositories/runs";
+import { getEnvironmentVariableValues } from "../../../modules/mock-apis";
+import { getMockApiExecutionTarget } from "../../../modules/mock-apis";
 import { getAppConfig } from "../../../utils/config";
 import { ensureProject } from "../../../utils/project";
 import {

@@ -1,5 +1,5 @@
 import { mockApiCallHistoryListResponseSchema } from "#shared/api/mock-api-call-history";
-import { listMockApiCallHistory } from "../../repositories/runs";
+import { listMockApiCallHistory } from "../../modules/runs";
 import { ensureProject } from "../../utils/project";
 
 export default defineEventHandler(async () =>

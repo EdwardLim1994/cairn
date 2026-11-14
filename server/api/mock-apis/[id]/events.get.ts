@@ -1,4 +1,4 @@
-import { getMockApiExecutionTarget } from "../../../repositories/runs";
+import { getMockApiExecutionTarget } from "../../../modules/mock-apis";
 import { ensureProject } from "../../../utils/project";
 import { webSocketSessionRegistry } from "../../../utils/websocket-sessions";
 

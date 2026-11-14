@@ -52,10 +52,10 @@ describe("WorkspaceDrawer", () => {
     const wrapper = mountDrawer();
     const drawer = wrapper.get("aside");
     expect(drawer.attributes("data-side")).toBe("right");
-    expect(drawer.attributes("data-content-class")).toContain("inset-[76px_12px_12px_auto]");
-    expect(drawer.attributes("data-content-class")).toContain(
-      "max-[899px]:inset-[124px_12px_12px]",
-    );
+    expect(drawer.attributes("data-content-class")).toContain("!top-[96px]");
+    expect(drawer.attributes("data-content-class")).toContain("!h-[calc(100dvh-108px)]");
+    expect(drawer.attributes("data-content-class")).toContain("max-[720px]:!top-[80px]");
+    expect(drawer.attributes("data-content-class")).toContain("max-[720px]:!h-[calc(100dvh-88px)]");
     expect(drawer.text()).toMatch(/Settings.*Edit settings.*Save.*Form body.*Discard/);
   });
 

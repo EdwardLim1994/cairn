@@ -25,7 +25,7 @@ const props = {
 };
 
 describe("SquareEdge", () => {
-  it("renders a square step path and lifts the label above it", () => {
+  it("renders a square step path and places the label near its outbound connection", () => {
     const wrapper = mount(SquareEdge, {
       props,
       global: {
@@ -53,10 +53,10 @@ describe("SquareEdge", () => {
     expect(wrapper.get(".app__edge-label").text()).toBe("275 ms");
     expect(baseEdge.props("path")).toBe(expectedPath[0]);
     expect(wrapper.get(".app__edge-label-wrap").attributes("style")).toContain(
-      `left: ${expectedPath[1]}px`,
+      `left: ${props.sourceX + 48}px`,
     );
     expect(wrapper.get(".app__edge-label-wrap").attributes("style")).toContain(
-      `top: ${expectedPath[2]}px`,
+      `top: ${props.sourceY}px`,
     );
   });
 });

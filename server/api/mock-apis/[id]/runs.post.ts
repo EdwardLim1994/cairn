@@ -1,8 +1,12 @@
 import { mockApiRunResponseSchema } from "#shared/api/mock-apis";
-import { getEnvironmentVariableValues } from "../../../repositories/environment-variables";
-import { MockApiNotFoundError, MockApiNotReadyError } from "../../../repositories/mock-apis/errors";
-import { getMockApiExecutionTarget, createRun, finishRun } from "../../../repositories/runs";
-import { addMockRunFailureLog } from "../../../repositories/telemetry";
+import {
+  getEnvironmentVariableValues,
+  MockApiNotFoundError,
+  MockApiNotReadyError,
+} from "../../../modules/mock-apis";
+import { getMockApiExecutionTarget } from "../../../modules/mock-apis";
+import { createRun, finishRun } from "../../../modules/runs";
+import { addMockRunFailureLog } from "../../../modules/observability";
 import { getAppConfig } from "../../../utils/config";
 import { ensureProject } from "../../../utils/project";
 import { createRunMockApiUseCase } from "../../../use-cases/mock-apis/run-mock-api";

@@ -1,5 +1,6 @@
 import type { createApiClient } from "../shared/api";
 import type { useObservabilityStore } from "../stores/observability";
+import { getCurrentScope, onScopeDispose, watch } from "vue";
 
 type Store = ReturnType<typeof useObservabilityStore>;
 
@@ -18,6 +19,7 @@ export function useObservabilityViewModel(options: {
   store: Store;
   apiClient: ReturnType<typeof createApiClient>;
 }) {
+  let logTimer: ReturnType<typeof setTimeout> | undefined;
   async function loadLogs() {
     try {
       options.store.setLogs(
@@ -49,8 +51,28 @@ export function useObservabilityViewModel(options: {
   }
   function setOpen(value: boolean) {
     options.store.setLogsOpen(value);
-    if (value) void loadLogs();
   }
+  watch(
+    () => options.store.logsOpen,
+    (open) => {
+      if (open) void loadLogs();
+    },
+    { flush: "sync" },
+  );
+  watch(
+    () => [
+      options.store.logSearch,
+      options.store.logService.join("\0"),
+      options.store.logSeverity.join("\0"),
+    ],
+    () => {
+      if (!options.store.logsOpen) return;
+      clearTimeout(logTimer);
+      logTimer = setTimeout(loadLogs, 180);
+    },
+    { flush: "sync" },
+  );
+  if (getCurrentScope()) onScopeDispose(() => clearTimeout(logTimer));
   function resizePanel(
     startY: number,
     startHeight: number,

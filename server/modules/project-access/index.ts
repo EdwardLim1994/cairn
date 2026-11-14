@@ -4,5 +4,8 @@ export {
   createOtelAccessToken,
   deleteOtelAccessToken,
   hasValidOtelAccessToken,
+  ensureProjectRow,
+  AccessTokenRepository,
+  ProjectRepository,
 } from "../../repositories/otel-access-tokens";
-export { ensureProject } from "../../utils/project";
+export { ensureProject } from "./ensure-project";

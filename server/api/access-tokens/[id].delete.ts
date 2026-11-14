@@ -2,7 +2,7 @@ import {
   otelAccessTokenDeleteResponseSchema,
   otelAccessTokenIdRequestSchema,
 } from "#shared/api/otel-access-tokens";
-import { deleteOtelAccessToken } from "../../repositories/otel-access-tokens";
+import { deleteOtelAccessToken } from "../../modules/project-access";
 import { ensureProject } from "../../utils/project";
 import { createDeleteOtelAccessTokenUseCase } from "../../use-cases/otel-access-tokens/manage";
 

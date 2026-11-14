@@ -1,4 +1,4 @@
-import { MockApiNotFoundError } from "../../repositories/mock-apis/errors";
+import { MockApiNotFoundError } from "../../modules/mock-apis";
 
 export function createDeleteMockApiUseCase(dependencies: {
   ensureProject: () => Promise<string>;

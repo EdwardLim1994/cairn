@@ -1,6 +1,5 @@
 import { mockApiCreateRequestSchema, mockApiCreateResponseSchema } from "#shared/api/mock-apis";
-import { createMockApi, findMockApiEndpoint } from "../../repositories/mock-apis";
-import { MockApiEndpointError } from "../../repositories/mock-apis/errors";
+import { createMockApi, findMockApiEndpoint, MockApiEndpointError } from "../../modules/mock-apis";
 import { ensureProject } from "../../utils/project";
 import { mockApiInput } from "../../utils/mock-api-validation";
 import { createCreateMockApiUseCase } from "../../use-cases/mock-apis/create-mock-api";

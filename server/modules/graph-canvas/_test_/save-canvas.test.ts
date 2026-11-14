@@ -134,6 +134,75 @@ describe("save canvas use case", () => {
     await expect(createSaveCanvasUseCase(dependencies)(canvas)).resolves.toEqual({ saved: true });
   });
 
+  it("allows one service to publish to a topic from different subscriptions", async () => {
+    const dependencies = {
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      saveCanvas: vi.fn().mockResolvedValue(undefined),
+    };
+    const canvas = {
+      ...validCanvas,
+      messageDestinations: [
+        {
+          id: "notifications",
+          broker: "kafka",
+          name: "notifications",
+          connection: { brokers: "localhost:9092" },
+          x: 0,
+          y: 0,
+        },
+      ],
+      messageConnections: [
+        {
+          id: "sub-a",
+          type: "subscribe",
+          destinationId: "orders",
+          serviceId: "service-1",
+          consumerGroup: "service-1",
+        },
+        {
+          id: "sub-b",
+          type: "subscribe",
+          destinationId: "payments",
+          serviceId: "service-1",
+          consumerGroup: "service-1",
+        },
+        {
+          type: "publish",
+          destinationId: "notifications",
+          serviceId: "service-1",
+          subscriptionId: "sub-a",
+        },
+        {
+          type: "publish",
+          destinationId: "notifications",
+          serviceId: "service-1",
+          subscriptionId: "sub-b",
+        },
+      ],
+    };
+    canvas.messageDestinations.push(
+      {
+        id: "orders",
+        broker: "kafka",
+        name: "orders",
+        connection: { brokers: "localhost:9092" },
+        x: 1,
+        y: 0,
+      },
+      {
+        id: "payments",
+        broker: "kafka",
+        name: "payments",
+        connection: { brokers: "localhost:9092" },
+        x: 2,
+        y: 0,
+      },
+    );
+
+    await expect(createSaveCanvasUseCase(dependencies)(canvas)).resolves.toEqual({ saved: true });
+    expect(dependencies.saveCanvas).toHaveBeenCalledOnce();
+  });
+
   it("rejects invalid broker-specific connection fields", async () => {
     const dependencies = { ensureProject: vi.fn(), saveCanvas: vi.fn() };
     const canvas = {
@@ -161,6 +230,23 @@ describe("save canvas use case", () => {
     await expect(createSaveCanvasUseCase(dependencies)(canvas)).rejects.toBeInstanceOf(
       CanvasConstraintError,
     );
+    expect(dependencies.saveCanvas).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty graph from a stale canvas", async () => {
+    const dependencies = {
+      ensureProject: vi.fn().mockResolvedValue("project-1"),
+      getCanvas: vi.fn().mockResolvedValue({
+        edges: [{ id: "edge-1" }, { id: "edge-2" }],
+        messageDestinations: [],
+        messageConnections: [],
+      }),
+      saveCanvas: vi.fn(),
+    };
+
+    await expect(
+      createSaveCanvasUseCase(dependencies)({ ...validCanvas, edges: [] }),
+    ).rejects.toThrow("Canvas has changed; reload before saving");
     expect(dependencies.saveCanvas).not.toHaveBeenCalled();
   });
 });

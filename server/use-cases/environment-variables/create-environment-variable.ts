@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EnvironmentVariableInput } from "#shared/api/environment-variables";
-import { DuplicateEnvironmentVariableError } from "../../repositories/environment-variables/errors";
+import { DuplicateEnvironmentVariableError } from "../../modules/mock-apis";
 
 export function createCreateEnvironmentVariableUseCase(dependencies: {
   ensureProject: () => Promise<string>;

@@ -1,9 +1,8 @@
 import { ensureProject } from "../utils/project";
-import { saveCanvas } from "../repositories/canvas";
-import { CanvasConstraintError } from "../repositories/canvas/errors";
+import { getCanvas, saveCanvas, CanvasConstraintError } from "../modules/graph-canvas";
 import { createSaveCanvasUseCase } from "../use-cases/canvas/save-canvas";
 
-const saveCanvasUseCase = createSaveCanvasUseCase({ ensureProject, saveCanvas });
+const saveCanvasUseCase = createSaveCanvasUseCase({ ensureProject, getCanvas, saveCanvas });
 
 export default defineEventHandler(async (event) => {
   try {

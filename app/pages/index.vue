@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { deferredPanel } from "../shared/ui/deferredPanel";
 import ContextMenu from "../components/ContextMenu.vue";
 import AppToolbar from "../components/AppToolbar.vue";
 import AppToastStack from "../components/AppToastStack.vue";
 import { useMessageDestinationMutations } from "../features/message-destination-editor";
 import { GraphCanvas } from "../widgets/graph";
-const ServiceSettingsPanel = defineAsyncComponent(
+const ServiceSettingsPanel = deferredPanel(
   () => import("../features/service-editor/ui/ServiceSettingsPanel.vue"),
 );
-const MessageQueueSettingsPanel = defineAsyncComponent(
+const MessageQueueSettingsPanel = deferredPanel(
   () => import("../features/message-destination-editor/ui/MessageQueueSettingsPanel.vue"),
 );
-const ManageNodesPanel = defineAsyncComponent(
+const ManageNodesPanel = deferredPanel(
   () => import("../widgets/manage-nodes/ui/ManageNodesPanel.vue"),
 );
-const MockApiSettingsPanel = defineAsyncComponent(
+const MockApiSettingsPanel = deferredPanel(
   () => import("../widgets/mock-api-panel/ui/MockApiSettingsPanel.vue"),
 );
-const LogsPanel = defineAsyncComponent(() => import("../components/LogsPanel.vue"));
-const MockApiCallHistoryPanel = defineAsyncComponent(
+const LogsPanel = deferredPanel(() => import("../components/LogsPanel.vue"));
+const MockApiCallHistoryPanel = deferredPanel(
   () => import("../components/MockApiCallHistoryPanel.vue"),
 );
-const OtelAccessTokensDialog = defineAsyncComponent(
+const OtelAccessTokensDialog = deferredPanel(
   () => import("../components/OtelAccessTokensDialog.vue"),
 );
 import { createApiClient } from "../shared/api";
-import type { MockApiCallHistoryEntry } from "#shared/api/mock-api-call-history";
 import type { CanvasGetResponse } from "#shared/api/canvas";
 import { storeToRefs } from "pinia";
 import { useGraphStore } from "../stores/graph";
@@ -33,9 +33,10 @@ import { useGraphViewModel } from "../composables/useGraphViewModel";
 import { useServiceViewModel, type ServiceDraft } from "../composables/useServiceViewModel";
 import { useMockApiStore } from "../entities/mock-api";
 import { useObservabilityStore } from "../stores/observability";
-import { useMockApiViewModel } from "../features/mock-api-editor/model/useMockApiViewModel";
-import { useMockApiRunViewModel } from "../features/mock-api-run/model/useMockApiRunViewModel";
-import { useWebSocketMockApiStreams } from "../features/mock-api-session/model/useWebSocketMockApiStreams";
+import { useMockApiViewModel } from "../features/mock-api-editor";
+import { useMockApiRunViewModel } from "../features/mock-api-run";
+import { useWebSocketMockApiStreams } from "../features/mock-api-session";
+import { useMockApiHistory } from "../features/mock-api-history";
 import { useObservabilityViewModel } from "../composables/useObservabilityViewModel";
 import { useCanvasViewModel } from "../composables/useCanvasViewModel";
 import { useGraphInteractionViewModel } from "../composables/useGraphInteractionViewModel";
@@ -142,9 +143,6 @@ const sharedEnvironmentVariablesOpen = ref(true);
 const environmentVariablesLoading = ref(false);
 const accessTokensOpen = drawerModel("access-tokens");
 const historyOpen = drawerModel("history");
-const historyReplayEntryId = ref<string | null>(null);
-const historyEntries = ref<MockApiCallHistoryEntry[]>([]);
-const historyLoading = ref(false);
 const manageNodesOpen = drawerModel("manage-nodes");
 const followActiveTraceInLogs = ref(true);
 const editingEnvironmentVariableId = ref<string | null>(null);
@@ -153,6 +151,7 @@ const environmentCardDraft = ref({ name: "", value: "" });
 async function signOut() {
   try {
     await $fetch("/api/auth/logout", { method: "POST" });
+    authStatus.value = { enabled: true, authenticated: false };
     await navigateTo("/login");
   } catch {
     errorMessage.value = "Could not sign out. Try again.";
@@ -296,10 +295,37 @@ const resetEnvironmentCardEdit = mockApiViewModel.resetEnvironmentCardEdit;
 const dismissImportWarning = (id: number) => {
   importWarnings.value = importWarnings.value.filter((warning) => warning.id !== id);
 };
-const deleteEnvironmentVariable = mockApiViewModel.deleteEnvironmentVariable;
-const saveEnvironmentVariable = mockApiViewModel.saveEnvironmentVariable;
-const saveHeaderTemplate = mockApiViewModel.saveHeaderTemplate;
-const saveAuthorizationTemplate = mockApiViewModel.saveAuthorizationTemplate;
+async function deleteEnvironmentVariable(variable: (typeof environmentVariables.value)[number]) {
+  const deleted = await mockApiViewModel.deleteEnvironmentVariable(variable);
+  if (deleted) toast.add({ title: "Environment variable deleted", duration: 4000 });
+  return deleted;
+}
+async function saveEnvironmentVariable(id: string | null, draft: { name: string; value: string }) {
+  const saved = await mockApiViewModel.saveEnvironmentVariable(id, draft);
+  toast.add({
+    title: id ? "Environment variable updated" : "Environment variable created",
+    duration: 4000,
+  });
+  return saved;
+}
+async function saveHeaderTemplate(template: (typeof headerTemplates.value)[number]) {
+  const saved = await mockApiViewModel.saveHeaderTemplate(template);
+  toast.add({
+    title: template.pendingCreate ? "Header template created" : "Header template updated",
+    duration: 4000,
+  });
+  return saved;
+}
+async function saveAuthorizationTemplate(template: (typeof authorizationTemplates.value)[number]) {
+  const saved = await mockApiViewModel.saveAuthorizationTemplate(template);
+  toast.add({
+    title: template.pendingCreate
+      ? "Authorization template created"
+      : "Authorization template updated",
+    duration: 4000,
+  });
+  return saved;
+}
 async function saveMockApi(id: string | null, entry: MockApiDraft) {
   const saved = await mockApiViewModel.saveMockApi(id, entry);
   toast.add({ title: id ? "Mock API updated" : "Mock API created", duration: 4000 });
@@ -312,63 +338,25 @@ async function deleteMockApi(entry: MockApiDraft) {
 }
 const loadLogs = observabilityViewModel.loadLogs;
 
-async function loadMockApiCallHistory() {
-  historyLoading.value = true;
-  try {
-    historyEntries.value = await apiClient.listMockApiCallHistory();
-  } catch (cause) {
-    errorMessage.value = cause instanceof Error ? cause.message : "Could not load call history";
-  } finally {
-    historyLoading.value = false;
-  }
-}
-
-async function removeMockApiCallHistoryEntry(id: string) {
-  try {
-    await apiClient.deleteMockApiCallHistory(id);
-    historyEntries.value = historyEntries.value.filter((entry) => entry.id !== id);
-  } catch (cause) {
-    errorMessage.value = cause instanceof Error ? cause.message : "Could not remove call history";
-  }
-}
-
-async function clearMockApiCallHistory() {
-  try {
-    await apiClient.clearMockApiCallHistory();
-    historyEntries.value = [];
-  } catch (cause) {
-    errorMessage.value = cause instanceof Error ? cause.message : "Could not clear call history";
-  }
-}
-
-async function replayMockApiCallHistory(entry: MockApiCallHistoryEntry) {
-  errorMessage.value = "";
-  historyReplayEntryId.value = entry.id;
-  try {
-    await mockApiRunViewModel.replayHistoryEntry(entry);
-  } catch (cause) {
-    historyReplayEntryId.value = null;
-    errorMessage.value = cause instanceof Error ? cause.message : "Could not replay saved trace";
-  }
-}
-
-function stopMockApiCallHistoryReplay() {
-  mockApiRunViewModel.stopReplay();
-  historyReplayEntryId.value = null;
-  graphStore.setObservations({ services: [], errorServices: [], edges: [] });
-  graphViewModel.syncNodes();
-}
-
-let logTimer: ReturnType<typeof setTimeout>;
-watch([logSearch, () => logService.value.join("\0"), () => logSeverity.value.join("\0")], () => {
-  clearTimeout(logTimer);
-  logTimer = setTimeout(loadLogs, 180);
-});
-watch(logsOpen, (open) => {
-  if (open) void loadLogs();
-});
-watch(historyOpen, (open) => {
-  if (open) void loadMockApiCallHistory();
+const {
+  entries: historyEntries,
+  loading: historyLoading,
+  replayEntryId: historyReplayEntryId,
+  load: loadMockApiCallHistory,
+  removeEntry: removeMockApiCallHistoryEntry,
+  clear: clearMockApiCallHistory,
+  replayEntry: replayMockApiCallHistory,
+  stop: stopMockApiCallHistoryReplay,
+} = useMockApiHistory({
+  open: historyOpen,
+  apiClient,
+  replay: mockApiRunViewModel.replayHistoryEntry,
+  stopReplay: mockApiRunViewModel.stopReplay,
+  clearObservations: () => {
+    graphStore.setObservations({ services: [], errorServices: [], edges: [] });
+    graphViewModel.syncNodes();
+  },
+  onError: (message) => (errorMessage.value = message),
 });
 
 function beginAddService() {
@@ -575,14 +563,18 @@ function setMockEndpoint(entry: MockApi) {
 function formatRequestJson(entry: MockApi) {
   mockApiViewModel.formatRequestJson(entry);
 }
-function deleteHeaderTemplate(template: (typeof headerTemplates.value)[number]) {
-  return mockApiViewModel.removeHeaderTemplate(template, (message) => window.confirm(message));
+async function deleteHeaderTemplate(template: (typeof headerTemplates.value)[number]) {
+  const deleted = await mockApiViewModel.removeHeaderTemplate(template, () => true);
+  if (deleted) toast.add({ title: "Header template deleted", duration: 4000 });
+  return deleted;
 }
 
-function deleteAuthorizationTemplate(template: (typeof authorizationTemplates.value)[number]) {
-  return mockApiViewModel.removeAuthorizationTemplate(template, (message) =>
-    window.confirm(message),
-  );
+async function deleteAuthorizationTemplate(
+  template: (typeof authorizationTemplates.value)[number],
+) {
+  const deleted = await mockApiViewModel.removeAuthorizationTemplate(template, () => true);
+  if (deleted) toast.add({ title: "Authorization template deleted", duration: 4000 });
+  return deleted;
 }
 
 function discardMockSettings() {
@@ -647,7 +639,6 @@ function showActiveTraceLogs() {
   logService.value = [];
   logSeverity.value = [];
   logsOpen.value = true;
-  void loadLogs();
 }
 
 onMounted(async () => {
@@ -674,6 +665,7 @@ onUnmounted(() => {
       :dark="dark"
       :logs-open="logsOpen"
       :project-id="runtimeConfig.public.projectId"
+      :auth-enabled="authStatus.enabled"
       :manage-nodes-open="manageNodesOpen"
       :mock-apis-open="mockPanel"
       :history-open="historyOpen"

@@ -6,11 +6,11 @@ import {
   findEnvironmentVariable,
   findEnvironmentVariableByName,
   updateEnvironmentVariable,
-} from "../../repositories/environment-variables";
+} from "../../modules/mock-apis";
 import {
   DuplicateEnvironmentVariableError,
   EnvironmentVariableNotFoundError,
-} from "../../repositories/environment-variables/errors";
+} from "../../modules/mock-apis";
 import { environmentVariableInput } from "../../utils/environment-variables";
 import { ensureProject } from "../../utils/project";
 import { createUpdateEnvironmentVariableUseCase } from "../../use-cases/environment-variables/update-environment-variable";

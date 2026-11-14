@@ -4,6 +4,7 @@ import { createCreateServiceUseCase } from "../../../use-cases/services/create-s
 import { createDeleteServiceUseCase } from "../../../use-cases/services/delete-service";
 import { createListServicesUseCase } from "../../../use-cases/services/list-services";
 import { createUpdateServiceUseCase } from "../../../use-cases/services/update-service";
+import type { SqliteTransaction } from "../../../db";
 
 const serviceInput = {
   name: "Orders",
@@ -30,33 +31,105 @@ describe("service endpoint use cases", () => {
 
   it("creates a service using an injectable identifier", async () => {
     const createService = vi.fn().mockResolvedValue(undefined);
+    const createPosition = vi.fn().mockResolvedValue(undefined);
+    const tx = {} as SqliteTransaction;
     const useCase = createCreateServiceUseCase({
       ensureProject: vi.fn().mockResolvedValue("project-1"),
+      transaction: (work) => work(tx),
       createService,
+      createPosition,
+      putProtoFile: vi.fn(),
+      removeProtoFile: vi.fn(),
       newId: () => "service-1",
     });
     await expect(useCase(serviceInput)).resolves.toEqual({ id: "service-1" });
-    expect(createService).toHaveBeenCalledWith("project-1", "service-1", serviceInput);
+    expect(createService).toHaveBeenCalledWith(tx, "project-1", "service-1", serviceInput, null);
+    expect(createPosition).toHaveBeenCalledWith(tx, "project-1", "service-1", 0, 0);
   });
 
   it("updates a service and returns the repository result", async () => {
-    const updateService = vi.fn().mockResolvedValue("updated");
+    const updateService = vi.fn().mockResolvedValue(undefined);
+    const reconcileReadiness = vi.fn().mockResolvedValue(undefined);
+    const tx = {} as SqliteTransaction;
     const useCase = createUpdateServiceUseCase({
       ensureProject: vi.fn().mockResolvedValue("project-1"),
+      transaction: (work) => work(tx),
+      findProto: vi.fn().mockResolvedValue({ protoStorageKey: null, protoFileName: null }),
       updateService,
+      reconcileReadiness,
+      putProtoFile: vi.fn(),
+      removeProtoFile: vi.fn(),
     });
     await expect(useCase("service-1", serviceInput)).resolves.toBe("updated");
-    expect(updateService).toHaveBeenCalledWith("project-1", "service-1", serviceInput);
+    expect(updateService).toHaveBeenCalledWith(
+      tx,
+      "project-1",
+      "service-1",
+      serviceInput,
+      null,
+      null,
+    );
+    expect(reconcileReadiness).toHaveBeenCalledWith(tx, "project-1");
   });
 
   it("deletes a service and reports a missing service", async () => {
-    const deleteService = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const deleteService = vi
+      .fn()
+      .mockResolvedValueOnce({ protoStorageKey: null })
+      .mockResolvedValueOnce(null);
+    const tx = {} as SqliteTransaction;
     const useCase = createDeleteServiceUseCase({
       ensureProject: vi.fn().mockResolvedValue("project-1"),
+      transaction: (work) => work(tx),
       deleteService,
+      deletePosition: vi.fn().mockResolvedValue(undefined),
+      reconcileReadiness: vi.fn().mockResolvedValue(undefined),
+      removeProtoFile: vi.fn(),
     });
     await expect(useCase("service-1")).resolves.toEqual({ id: "service-1" });
     await expect(useCase("missing")).resolves.toBeNull();
+  });
+
+  it("removes a new proto file if service creation rolls back", async () => {
+    const removeProtoFile = vi.fn().mockResolvedValue(undefined);
+    const tx = {} as SqliteTransaction;
+    const useCase = createCreateServiceUseCase({
+      ensureProject: async () => "project-1",
+      transaction: (work) => work(tx),
+      createService: vi.fn().mockResolvedValue(undefined),
+      createPosition: vi.fn().mockRejectedValue(new Error("position failed")),
+      putProtoFile: vi.fn().mockResolvedValue(undefined),
+      removeProtoFile,
+      newId: () => "service-1",
+      newProtoId: () => "proto-1",
+    });
+    await expect(
+      useCase({ ...serviceInput, apiType: "GRPC", protoContent: "proto" }),
+    ).rejects.toThrow("position failed");
+    expect(removeProtoFile).toHaveBeenCalledWith("services/service-1/proto-1.proto");
+  });
+
+  it("keeps the old proto on update failure and removes the replacement", async () => {
+    const tx = {} as SqliteTransaction;
+    const removeProtoFile = vi.fn().mockResolvedValue(undefined);
+    const useCase = createUpdateServiceUseCase({
+      ensureProject: async () => "project-1",
+      transaction: (work) => work(tx),
+      findProto: vi.fn().mockResolvedValue({
+        protoStorageKey: "services/service-1/old.proto",
+        protoFileName: "old.proto",
+      }),
+      updateService: vi.fn().mockResolvedValue(undefined),
+      reconcileReadiness: vi.fn().mockRejectedValue(new Error("readiness failed")),
+      putProtoFile: vi.fn().mockResolvedValue(undefined),
+      removeProtoFile,
+      newProtoId: () => "new",
+    });
+    await expect(
+      useCase("service-1", { ...serviceInput, apiType: "GRPC", protoContent: "new proto" }),
+    ).rejects.toThrow("readiness failed");
+    expect(removeProtoFile).toHaveBeenCalledWith("services/service-1/new.proto");
+    expect(removeProtoFile).not.toHaveBeenCalledWith("services/service-1/old.proto");
   });
 
   it("checks supported frameworks and treats failures as offline", async () => {

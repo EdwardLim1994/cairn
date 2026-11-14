@@ -36,6 +36,19 @@ const pathLayout = computed(() =>
   }),
 );
 const durationCount = computed(() => props.data?.timing?.callDurationsMs.length ?? 0);
+const labelPosition = computed(() => {
+  const offset = 48;
+  switch (props.sourcePosition) {
+    case "left":
+      return { x: props.sourceX - offset, y: props.sourceY };
+    case "top":
+      return { x: props.sourceX, y: props.sourceY - offset };
+    case "bottom":
+      return { x: props.sourceX, y: props.sourceY + offset };
+    default:
+      return { x: props.sourceX + offset, y: props.sourceY };
+  }
+});
 
 function formatDuration(durationMs: number) {
   if (durationMs < 1_000) return `${Math.round(durationMs)} ms`;
@@ -55,7 +68,7 @@ function formatDuration(durationMs: number) {
   <EdgeLabelRenderer v-if="label">
     <div
       class="app__edge-label-wrap nodrag nopan"
-      :style="{ left: `${pathLayout[1]}px`, top: `${pathLayout[2]}px` }"
+      :style="{ left: `${labelPosition.x}px`, top: `${labelPosition.y}px` }"
     >
       <button
         type="button"

@@ -2,7 +2,7 @@ import type { EnvironmentVariableInput } from "#shared/api/environment-variables
 import {
   DuplicateEnvironmentVariableError,
   EnvironmentVariableNotFoundError,
-} from "../../repositories/environment-variables/errors";
+} from "../../modules/mock-apis";
 
 export function createUpdateEnvironmentVariableUseCase(dependencies: {
   ensureProject: () => Promise<string>;

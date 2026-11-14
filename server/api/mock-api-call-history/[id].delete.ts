@@ -1,5 +1,5 @@
 import { mockApiCallHistoryDeleteResponseSchema } from "#shared/api/mock-api-call-history";
-import { deleteMockApiCallHistory } from "../../repositories/runs";
+import { deleteMockApiCallHistory } from "../../modules/runs";
 import { ensureProject } from "../../utils/project";
 
 export default defineEventHandler(async (event) => {

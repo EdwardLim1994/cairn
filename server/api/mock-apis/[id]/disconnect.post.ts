@@ -1,4 +1,4 @@
-import { getMockApiExecutionTarget } from "../../../repositories/runs";
+import { getMockApiExecutionTarget } from "../../../modules/mock-apis";
 import { ensureProject } from "../../../utils/project";
 import { createDisconnectWebSocketMockApiUseCase } from "../../../use-cases/mock-apis/disconnect-websocket-mock-api";
 

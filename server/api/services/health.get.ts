@@ -1,5 +1,5 @@
 import { serviceHealthResponseSchema } from "#shared/api/services";
-import { listHealthTargets } from "../../repositories/services";
+import { listHealthTargets } from "../../modules/service-registry";
 import { ensureProject } from "../../utils/project";
 import { createCheckServiceHealthUseCase } from "../../use-cases/services/check-service-health";
 

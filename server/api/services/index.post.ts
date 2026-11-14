@@ -1,11 +1,26 @@
 import { serviceCreateRequestSchema, serviceCreateResponseSchema } from "#shared/api/services";
-import { createService } from "../../repositories/services";
+import { getDb } from "../../db";
+import { GraphPositionRepository } from "../../modules/graph-canvas";
+import {
+  ServiceWriteRepository,
+  ServiceHeaderTemplateOwnershipError,
+} from "../../modules/service-registry";
 import { finiteNumber, record, serviceInput } from "../../utils/graph-validation";
 import { ensureProject } from "../../utils/project";
 import { createCreateServiceUseCase } from "../../use-cases/services/create-service";
-import { ServiceHeaderTemplateOwnershipError } from "../../repositories/services/errors";
+import { putProtoFile, removeProtoFile } from "../../utils/proto-storage";
 
-const createServiceUseCase = createCreateServiceUseCase({ ensureProject, createService });
+const createServiceUseCase = createCreateServiceUseCase({
+  ensureProject,
+  transaction: (work) => getDb().transaction(work),
+  createService: (tx, projectId, id, input, protoStorageKey) =>
+    new ServiceWriteRepository(tx).create(projectId, id, input, protoStorageKey),
+  createPosition: async (tx, projectId, id, x, y) => {
+    await new GraphPositionRepository(tx).createServicePosition(projectId, id, x, y);
+  },
+  putProtoFile,
+  removeProtoFile,
+});
 
 export default defineEventHandler(async (event) => {
   const body = record(await readBody(event), "Service");

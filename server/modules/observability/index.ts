@@ -5,4 +5,6 @@ export {
   listTelemetryServiceNames,
   insertOtlpLogs,
   insertOtlpSpans,
+  TelemetryRepository,
+  readTelemetrySpans,
 } from "../../repositories/telemetry";

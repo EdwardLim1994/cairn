@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { getCanvas, saveCanvas } from "../../../repositories/canvas";
-import { listBrokerHealthTargets } from "../../../repositories/message-destinations";
+import { listBrokerHealthTargets } from "../../message-destinations";
 import { getDb } from "../../../db";
 import {
   environmentVariables,

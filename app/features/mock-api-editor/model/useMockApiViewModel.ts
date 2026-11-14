@@ -31,6 +31,11 @@ export function useMockApiViewModel(options: {
   closeSettings: () => void;
   onError: (message: string) => void;
 }) {
+  async function refreshCanvas(action: string) {
+    if ((await options.loadCanvas()) === false)
+      throw new Error(`${action}, but the workspace could not refresh. Retry loading the canvas.`);
+  }
+
   function endpointPathParameterNames(entry: MockApiDraft) {
     if ((entry.apiType ?? "HTTP") !== "HTTP") return [];
     const endpoint = options
@@ -107,10 +112,7 @@ export function useMockApiViewModel(options: {
     }
 
     await options.apiClient.deleteMockApi(id);
-    if ((await options.loadCanvas()) === false)
-      throw new Error(
-        "Mock API was deleted, but the workspace could not refresh. Retry loading the canvas.",
-      );
+    await refreshCanvas("Mock API was deleted");
     return true;
   }
 
@@ -158,7 +160,7 @@ export function useMockApiViewModel(options: {
     await saveTemplateSettings(nextHeaders, options.store.savedAuthorizationTemplates, nextApis);
     for (const api of options.store.mockDraft)
       if (api.headerTemplateId === template.id) api.headerTemplateId = null;
-    await options.loadCanvas();
+    await refreshCanvas("Header template was deleted");
     options.store.headerTemplates.push(...pendingHeaders);
     options.store.authorizationTemplates.push(...pendingAuthorization);
     return true;
@@ -209,7 +211,7 @@ export function useMockApiViewModel(options: {
     await saveTemplateSettings(options.store.savedHeaderTemplates, nextAuthorization, nextApis);
     for (const api of options.store.mockDraft)
       if (api.authorizationTemplateId === template.id) api.authorizationTemplateId = null;
-    await options.loadCanvas();
+    await refreshCanvas("Authorization template was deleted");
     options.store.headerTemplates.push(...pendingHeaders);
     options.store.authorizationTemplates.push(...pendingAuthorization);
     return true;
@@ -358,6 +360,7 @@ export function useMockApiViewModel(options: {
     ];
     delete options.store.savedEnvironmentVariableValues[id ?? ""];
     options.store.savedEnvironmentVariableValues[savedId] = { name, value: draft.value };
+    await refreshCanvas("Environment variable was saved");
     return saved;
   }
 
@@ -369,7 +372,8 @@ export function useMockApiViewModel(options: {
       (id) => id !== variable.id,
     );
     delete options.store.savedEnvironmentVariableValues[variable.id];
-    if (!variable.pendingCreate && !variable.id.startsWith("draft-")) await options.loadCanvas();
+    if (!variable.pendingCreate && !variable.id.startsWith("draft-"))
+      await refreshCanvas("Environment variable was deleted");
     return true;
   }
 
@@ -422,7 +426,7 @@ export function useMockApiViewModel(options: {
     options.store.setHeaderTemplates(
       next.map((item) => (item.id === template.id ? saved : { ...item, pendingCreate: false })),
     );
-    await options.loadCanvas();
+    await refreshCanvas("Header template was saved");
     return saved;
   }
 
@@ -437,7 +441,7 @@ export function useMockApiViewModel(options: {
     options.store.setAuthorizationTemplates(
       next.map((item) => (item.id === template.id ? saved : { ...item, pendingCreate: false })),
     );
-    await options.loadCanvas();
+    await refreshCanvas("Authorization template was saved");
     return saved;
   }
 
@@ -460,10 +464,7 @@ export function useMockApiViewModel(options: {
     const result = persistedId
       ? await options.apiClient.updateMockApi(persistedId, input)
       : await options.apiClient.createMockApi(input);
-    if ((await options.loadCanvas()) === false)
-      throw new Error(
-        "Mock API was saved, but the workspace could not refresh. Retry loading the canvas.",
-      );
+    await refreshCanvas("Mock API was saved");
     return { ...parsed, id: result.id };
   }
 

@@ -70,7 +70,7 @@ const drawerUi = computed(() => ({
     props.ui.overlay,
   ],
   content: [
-    "absolute z-[71] inset-[76px_12px_12px_auto] flex h-auto max-h-none w-[33.333vw] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border border-border bg-surface text-foreground shadow-[var(--shadow-lg)] max-[899px]:inset-[124px_12px_12px] max-[899px]:w-auto max-[899px]:max-w-none",
+    "absolute z-[71] !right-3 !bottom-3 !top-[96px] flex !h-[calc(100dvh-108px)] !max-h-[calc(100dvh-108px)] w-[33.333vw] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-xl border border-border bg-surface text-foreground shadow-[var(--shadow-lg)] max-[720px]:!right-2 max-[720px]:!bottom-2 max-[720px]:!left-2 max-[720px]:!top-[80px] max-[720px]:!h-[calc(100dvh-88px)] max-[720px]:!max-h-[calc(100dvh-88px)] max-[720px]:w-auto max-[720px]:max-w-none",
     props.ui.content,
   ],
   header: [

@@ -8,7 +8,13 @@ See `proposal.md`. `app/pages/index.vue` wires most workspace state and actions.
 
 **Goals:** Make one feature discoverable within one slice, keep shared data owned once, preserve observed graph behavior, and make closed panels cheap at initial load.
 
-**Non-Goals:** Change database schema, split the initial canvas response, introduce a runtime strategy registry, or alter panel and button positions.
+**Non-Goals:** Change database schema, split the initial canvas response, or introduce a runtime strategy registry.
+
+### Place workspace overlays and gate the app by session
+
+Open workspace drawers from the right. Place observed timing beside the outbound endpoint so a downstream node does not cover the label. Keep the graph legend clear of controls and instructions. Render the login route alone while the operator session is unauthenticated; after sign-in, update shared session state before showing the workspace. Hide Sign out when operator authentication is disabled. Show header and authorization templates in separate collapsible sections.
+
+The shared `WorkspaceDrawer` owns the top and bottom viewport gaps and available height for every drawer. Panel-specific content styles may set width and appearance, but the shared height takes precedence so panels cannot extend under the toolbar or past the bottom edge.
 
 ## Decisions
 

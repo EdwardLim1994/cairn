@@ -1,5 +1,5 @@
 import type { RunGetResponse } from "#shared/api/observability";
-import { RunNotFoundError } from "../../repositories/runs/errors";
+import { RunNotFoundError } from "../../modules/runs";
 
 export function createGetRunUseCase(dependencies: {
   ensureProject: () => Promise<string>;

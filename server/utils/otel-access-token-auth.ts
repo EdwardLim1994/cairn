@@ -1,5 +1,5 @@
 import { digestAccessToken } from "../use-cases/otel-access-tokens/token";
-import { hasValidOtelAccessToken } from "../repositories/otel-access-tokens";
+import { hasValidOtelAccessToken } from "../modules/project-access";
 import { getAppConfig } from "./config";
 
 export async function requireOtelAccessToken(event: {

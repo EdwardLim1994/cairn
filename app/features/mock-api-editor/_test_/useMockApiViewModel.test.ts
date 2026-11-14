@@ -514,4 +514,24 @@ describe("mock API view model", () => {
     );
     expect(failed.store.mockApis).toEqual([]);
   });
+
+  it("requires a successful canvas refresh after saving a template or variable", async () => {
+    const template = {
+      id: "draft-header",
+      name: "Tenant headers",
+      headers: [{ name: "X-Tenant", value: "demo" }],
+      pendingCreate: true,
+    };
+    const templateFailure = setup(false, false, [service], () => false);
+    await expect(templateFailure.viewModel.saveHeaderTemplate(template)).rejects.toThrow(
+      "workspace could not refresh",
+    );
+    expect(templateFailure.operations).toEqual(["load"]);
+
+    const variableFailure = setup(false, false, [service], () => false);
+    await expect(
+      variableFailure.viewModel.saveEnvironmentVariable(null, { name: "TOKEN", value: "secret" }),
+    ).rejects.toThrow("workspace could not refresh");
+    expect(variableFailure.operations).toEqual(["load"]);
+  });
 });

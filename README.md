@@ -25,7 +25,7 @@ Open `http://localhost:3004`. The `app_data` volume contains both database files
 
 Register microservices in Cairn with their `http://localhost:<port>` base URLs. The Java and .NET Compose projects publish those ports through Traefik. Inside the Cairn container, `OUTBOUND_HOST_GATEWAY=host.docker.internal` rewrites localhost service targets to Docker's host gateway, so Cairn can reach each project's proxy without joining their Docker networks. Host-run development leaves service URLs unchanged.
 
-The production image contains the Nuxt `.output` bundle and embedded schema files. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
+The Docker build uses Bun to install dependencies and run `nuxt build`. The production image runs the generated Nitro `.output/server/index.mjs` with Node and includes the embedded schema files. Runtime values are injected by Compose; credentials are not copied into the image. `PORT` sets both the app listener and published port.
 
 ## Environment
 
@@ -45,8 +45,8 @@ The production image contains the Nuxt `.output` bundle and embedded schema file
 | `AUTH_SESSION_SECRET`            | Secret used to encrypt sessions. Required with at least 32 characters; generate with `openssl rand -hex 32`.                                                 |
 | `OUTBOUND_REQUEST_TIMEOUT_MS`    | Timeout for triggered service calls (default `10000`).                                                                                                       |
 | `OUTBOUND_HOST_GATEWAY`          | Optional Docker-only hostname used to route localhost service URLs through host-published proxies. Compose sets this to `host.docker.internal`.              |
-| `TELEMETRY_QUIET_MS`             | Quiet period before a trace flow is considered complete (default `1500`).                                                                                    |
-| `TELEMETRY_MAX_WAIT_MS`          | Maximum time to wait for trace data before returning an incomplete flow (default `10000`).                                                                   |
+| `TELEMETRY_QUIET_MS`             | Quiet period before a trace flow is considered complete (default `5000`).                                                                                    |
+| `TELEMETRY_MAX_WAIT_MS`          | Maximum time to wait for trace data before returning an incomplete flow (default `15000`).                                                                   |
 | `TELEMETRY_RETENTION_DAYS`       | Days to keep received spans and logs (default `365`); run and call history remain in SQLite.                                                                 |
 | `OTLP_MAX_COMPRESSED_BYTES`      | Maximum compressed OTLP request bytes (default `4194304`).                                                                                                   |
 | `OTLP_MAX_DECOMPRESSED_BYTES`    | Maximum inflated OTLP body bytes (default `16777216`).                                                                                                       |
@@ -112,6 +112,8 @@ vp install
 vp run dev
 ```
 
+The frontend uses Feature-Sliced Design under `app/`: shared controls and API clients, entity data, editor and run features, composed widgets, and a workspace page that connects their events. The toolbar and graph load with the workspace; closed panels and panel-only data load when opened. See `app/ARCHITECTURE.md` for import boundaries.
+
 Set `AUTH_USERNAME`, `AUTH_PASSWORD`, and `AUTH_SESSION_SECRET`; generate the session secret with `openssl rand -hex 32`. Use `vp run db:migrate` to initialize the files without serving requests and `vp run build` to produce the production bundle. The collector and instrumented services are not started by this command.
 
 Run the unit and component tests with LCOV coverage locally using:
@@ -121,6 +123,8 @@ vp run test:coverage
 ```
 
 This excludes the embedded integration tests, which run separately through `vp run test:integration` with disposable database files. The coverage report is written to the ignored `coverage/lcov.info` path. The SonarCloud workflow creates a fresh report before analysis, so no artifact upload between workflows is needed.
+
+For a focused change, run `vp test run <test paths>` and `vp check <changed paths>`. Before completing an OpenSpec change, run the relevant frontend tests, `vp check`, `vp run build`, and `openspec validate <change-name> --strict`.
 
 ## API overview
 
@@ -140,7 +144,7 @@ Mock APIs call a registered service endpoint and store a JSON request body. Endp
 
 Create mock APIs in the Mock APIs panel and select a registered service endpoint. Set route parameter values on each mock API.
 
-The panel also supports one shared set of string environment variables per project. Use `{{variableName}}` in request JSON string values or path parameter values. **New variable** adds an editable card; the panel's **Save** button persists new variables, deletions, and mock API changes together. Editing an existing card uses **Update** to save its name or value immediately; unchanged values do not issue an update request. GraphQL mocks use the GraphQL request editor, while gRPC mocks call unary RPC methods from the target service's uploaded proto file.
+The panel also supports one shared set of string environment variables per project. Use `{{variableName}}` in request JSON string values or path parameter values. Header templates, authorization templates, variables, and mock APIs appear in separate collapsible sections. Select a card to edit one item, or choose **New** to create one. Each editor saves or deletes that item individually, then refreshes the workspace; changed drafts require confirmation before discard, and deletion requires confirmation. GraphQL mocks use the GraphQL request editor, while gRPC mocks call unary RPC methods from the target service's uploaded proto file.
 
 The **Shareable authorization templates** section supports **Bearer token**, **Basic Auth**, **API key**, and **OAuth 2.0 Client Credentials**. Create a template there, then choose it in a mock API's **Authorization** accordion; APIs without a selection use **No Auth**. Credential fields accept project variable references. OAuth uses a server-side form-encoded Client Credentials request with `client_secret_basic`, token URL, client ID, client secret, and optional scope. Cairn caches tokens in memory until shortly before their `expires_in` time. Authorization Code and provider-specific token parameters are not supported.
 

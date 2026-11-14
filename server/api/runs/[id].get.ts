@@ -1,6 +1,5 @@
 import { runGetResponseSchema } from "#shared/api/observability";
-import { findRun } from "../../repositories/runs";
-import { RunNotFoundError } from "../../repositories/runs/errors";
+import { findRun, RunNotFoundError } from "../../modules/runs";
 import { ensureProject } from "../../utils/project";
 import { createGetRunUseCase } from "../../use-cases/runs/get-run";
 

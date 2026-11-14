@@ -1,5 +1,5 @@
 import type { MockApiInput } from "#shared/api/mock-apis";
-import { MockApiEndpointError, MockApiNotFoundError } from "../../repositories/mock-apis/errors";
+import { MockApiEndpointError, MockApiNotFoundError } from "../../modules/mock-apis";
 import { validateEndpointPathParameters } from "../../utils/mock-api-validation";
 
 export function createUpdateMockApiUseCase(dependencies: {

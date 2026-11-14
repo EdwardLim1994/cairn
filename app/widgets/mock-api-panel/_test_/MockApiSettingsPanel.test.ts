@@ -197,6 +197,35 @@ function labelControl(wrapper: ReturnType<typeof mountPanel>, label: string, tag
 }
 
 describe("MockApiSettingsPanel", () => {
+  it("collapses header and authorization templates independently", async () => {
+    const wrapper = mountPanel({
+      headerTemplates: [{ id: "header-1", name: "Tenant headers", headers: [] }],
+      authorizationTemplates: [{ id: "auth-1", name: "Bearer", type: "bearer", token: "secret" }],
+    });
+    const headers = wrapper.get("#shareable-header-templates-toggle > button");
+    const authorization = wrapper.get("#shareable-authorization-templates-toggle > button");
+    expect(headers.attributes("aria-expanded")).toBe("true");
+    expect(authorization.attributes("aria-expanded")).toBe("true");
+    await headers.trigger("click");
+    expect(headers.attributes("aria-expanded")).toBe("false");
+    expect(wrapper.find('[aria-label="Edit Tenant headers"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Edit Bearer"]').exists()).toBe(true);
+    await authorization.trigger("click");
+    expect(authorization.attributes("aria-expanded")).toBe("false");
+  });
+
+  it("keeps the editor open when persistence or refresh fails", async () => {
+    const wrapper = mountPanel({
+      saveMockApi: vi.fn(async () => {
+        throw new Error("Workspace could not refresh");
+      }),
+    });
+    await wrapper.get('[aria-label="Edit Fetch orders"]').trigger("click");
+    await wrapper.get("#mock-api-entity-editor").trigger("submit");
+    expect(wrapper.find("#mock-api-entity-editor").exists()).toBe(true);
+    expect(wrapper.get('[role="alert"]').text()).toContain("Workspace could not refresh");
+  });
+
   it("closes on Escape but keeps the overview open on backdrop clicks", async () => {
     const wrapper = mountPanel();
     await wrapper

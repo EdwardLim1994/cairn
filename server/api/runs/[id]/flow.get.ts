@@ -1,6 +1,5 @@
 import { runFlowResponseSchema } from "#shared/api/observability";
-import { getRunFlowData } from "../../../repositories/runs";
-import { RunNotFoundError } from "../../../repositories/runs/errors";
+import { getRunFlowData, RunNotFoundError } from "../../../modules/runs";
 import { getAppConfig } from "../../../utils/config";
 import { ensureProject } from "../../../utils/project";
 import { createGetRunFlowUseCase } from "../../../use-cases/runs/get-run-flow";

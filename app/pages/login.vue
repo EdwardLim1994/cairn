@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { safeLocalReturnPath } from "../utils/auth-redirect";
 
 const route = useRoute();
+const authStatus = useState("auth-session-status", () => ({ enabled: true, authenticated: false }));
 const username = ref("");
 const password = ref("");
 const error = ref("");
@@ -16,6 +17,7 @@ async function signIn() {
       method: "POST",
       body: { username: username.value, password: password.value },
     });
+    authStatus.value = { enabled: true, authenticated: true };
     await navigateTo(safeLocalReturnPath(route.query.returnTo));
   } catch {
     error.value = "Username or password is incorrect.";

@@ -38,6 +38,7 @@
     "better-sqlite3": "^13.1.1",
     "cm6-graphql": "^1.0.0",
     "drizzle-orm": "^0.45.4",
+    "elkjs": "^0.12.1",
     "graphql": "^17.0.2",
     "kafkajs": "^2.2.4",
     "nuxt": "^4.6.2",

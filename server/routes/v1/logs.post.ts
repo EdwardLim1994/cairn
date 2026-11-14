@@ -1,5 +1,5 @@
 import { otlpIngestResponseSchema, otlpLogsRequestSchema } from "#shared/api/observability";
-import { insertOtlpLogs, listTelemetryServiceNames } from "../../repositories/telemetry";
+import { insertOtlpLogs, listTelemetryServiceNames } from "../../modules/observability";
 import { getAppConfig } from "../../utils/config";
 import { ensureProject } from "../../utils/project";
 import { readOtlpBody } from "../../utils/otlp";

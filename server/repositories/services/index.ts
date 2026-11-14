@@ -19,3 +19,9 @@ export const deleteService = (projectId: string, id: string, db: Database = getD
   new ServiceRepository(db).deleteService(projectId, id);
 export const listHealthTargets = (projectId: string) =>
   new ServiceRepository(getDb()).listHealthTargets(projectId);
+export const listServiceNames = (projectId: string) =>
+  new ServiceRepository(getDb()).listServiceNames(projectId);
+export const listServiceSummaries = (projectId: string) =>
+  new ServiceRepository(getDb()).listServiceSummaries(projectId);
+export const listEndpointOwners = (projectId: string) =>
+  new ServiceRepository(getDb()).listEndpointOwners(projectId);

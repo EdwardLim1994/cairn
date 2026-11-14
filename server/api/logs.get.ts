@@ -1,5 +1,5 @@
 import { logListRequestSchema, logListResponseSchema } from "#shared/api/observability";
-import { queryLogs } from "../repositories/telemetry";
+import { queryLogs } from "../modules/observability";
 import { ensureProject } from "../utils/project";
 import { createListLogsUseCase } from "../use-cases/telemetry/list-logs";
 

@@ -2,7 +2,7 @@ import {
   mockApiSettingsSaveRequestSchema,
   mockApiSettingsSaveResponseSchema,
 } from "#shared/api/mock-apis";
-import { saveMockApiSettings } from "../repositories/mock-api-settings";
+import { saveMockApiSettings } from "../modules/mock-apis";
 import { ensureProject } from "../utils/project";
 import { webSocketSessionRegistry } from "../utils/websocket-sessions";
 
